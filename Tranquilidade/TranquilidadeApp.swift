@@ -1,10 +1,3 @@
-//
-//  TranquilidadeApp.swift
-//  Tranquilidade
-//
-//  Created by Felipe Dias Pereira on 21/04/26.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -12,9 +5,17 @@ import SwiftData
 struct TranquilidadeApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Portfolio.self,
+            Holding.self,
+            DividendPayment.self,
+            Contribution.self,
+            UserSettings.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .automatic
+        )
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -23,9 +24,15 @@ struct TranquilidadeApp: App {
         }
     }()
 
+    private let backendService = BackendService()
+    @State private var syncService = SyncService()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.dark)
+                .environment(\.backendService, backendService)
+                .environment(\.syncService, syncService)
         }
         .modelContainer(sharedModelContainer)
     }

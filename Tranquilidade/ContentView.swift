@@ -1,61 +1,65 @@
-//
-//  ContentView.swift
-//  Tranquilidade
-//
-//  Created by Felipe Dias Pereira on 21/04/26.
-//
-
 import SwiftUI
 import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Environment(\.backendService) private var backendService
+    @Environment(\.syncService) private var syncService
+    @Query private var settings: [UserSettings]
+    @Query private var holdings: [Holding]
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
+        Group {
+            if holdings.isEmpty && settings.first?.hasCompletedOnboarding != true {
+                OnboardingContainerView()
+            } else {
+                MainTabView()
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
+        }
+        .task {
+            ensureSettingsExist()
+            await syncService.syncAll(
+                modelContext: modelContext,
+                backendService: backendService
+            )
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
+    private func ensureSettingsExist() {
+        if settings.isEmpty {
+            let newSettings = UserSettings()
+            modelContext.insert(newSettings)
         }
     }
+}
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+struct MainTabView: View {
+    var body: some View {
+        TabView {
+            Tab("Dashboard", systemImage: "chart.pie.fill") {
+                DashboardView()
+            }
+            Tab("Portfolio", systemImage: "briefcase.fill") {
+                PortfolioView()
+            }
+            Tab("Aportar", systemImage: "plus.circle.fill") {
+                RebalancingView()
+            }
+            Tab("Ajustes", systemImage: "gearshape.fill") {
+                SettingsView()
             }
         }
+        .tint(.tqAccentGreen)
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: [
+            Portfolio.self,
+            Holding.self,
+            DividendPayment.self,
+            Contribution.self,
+            UserSettings.self,
+        ], inMemory: true)
 }

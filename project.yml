@@ -1,0 +1,84 @@
+name: Tranquilidade
+
+options:
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.4.1"
+  bundleIdPrefix: com.felipepereira
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+  groupSortPosition: top
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: 439F5NHE7E
+    SWIFT_VERSION: "5.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    STRING_CATALOG_GENERATE_SYMBOLS: YES
+  configs:
+    Debug:
+      ONLY_ACTIVE_ARCH: YES
+      ENABLE_TESTABILITY: YES
+      MTL_ENABLE_DEBUG_INFO: INCLUDE_SOURCE
+      SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG $(inherited)"
+    Release:
+      SWIFT_COMPILATION_MODE: wholemodule
+      VALIDATE_PRODUCT: YES
+      MTL_ENABLE_DEBUG_INFO: "NO"
+
+packages:
+  AsyncAlgorithms:
+    url: https://github.com/apple/swift-async-algorithms.git
+    from: "1.0.0"
+
+targets:
+  Tranquilidade:
+    type: application
+    platform: iOS
+    configFiles:
+      Debug: Secrets.xcconfig
+      Release: Secrets.xcconfig
+    sources:
+      - Tranquilidade
+    resources:
+      - path: Tranquilidade/Assets.xcassets
+      - path: Tranquilidade/Preview Content
+        buildPhase: none
+        type: folder
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.felipepereira.Tranquilidade
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+        ENABLE_PREVIEWS: YES
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
+    dependencies:
+      - package: AsyncAlgorithms
+
+  TranquilidadeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - TranquilidadeTests
+    dependencies:
+      - target: Tranquilidade
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.felipepereira.TranquilidadeTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Tranquilidade.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Tranquilidade"
+        BUNDLE_LOADER: "$(TEST_HOST)"
