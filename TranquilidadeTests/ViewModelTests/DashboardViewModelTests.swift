@@ -3,6 +3,7 @@ import Foundation
 import SwiftData
 @testable import Tranquilidade
 
+@Suite(.serialized)
 struct DashboardViewModelTests {
 
     // MARK: - Initial state

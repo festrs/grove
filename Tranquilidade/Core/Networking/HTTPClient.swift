@@ -30,6 +30,8 @@ enum HTTPClient: Sendable {
         switch httpResponse.statusCode {
         case 200 ..< 300:
             break
+        case 403:
+            throw .unauthorized
         case 404:
             throw .notFound
         case 429:
@@ -82,6 +84,8 @@ enum HTTPClient: Sendable {
         switch httpResponse.statusCode {
         case 200 ..< 300:
             break
+        case 403:
+            throw .unauthorized
         case 404:
             throw .notFound
         case 429:

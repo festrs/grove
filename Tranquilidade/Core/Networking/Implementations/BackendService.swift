@@ -4,6 +4,13 @@ actor BackendService: BackendServiceProtocol {
 
     private let baseURL: String
 
+    private var apiHeaders: [String: String] {
+        [
+            "X-API-Key": Secrets.mobileAPIKey,
+            "X-Device-ID": DeviceIdentifier.current,
+        ]
+    }
+
     init() {
         self.baseURL = AppConstants.API.backendBaseURL
     }
@@ -14,12 +21,12 @@ actor BackendService: BackendServiceProtocol {
         let url = try buildURL(path: "/stocks/search", queryItems: [
             URLQueryItem(name: "q", value: query)
         ])
-        return try await HTTPClient.fetch(url: url)
+        return try await HTTPClient.fetch(url: url, headers: apiHeaders)
     }
 
     func fetchStockQuote(symbol: String) async throws -> StockQuoteDTO {
         let url = try buildURL(path: "/stocks/\(symbol)")
-        return try await HTTPClient.fetch(url: url)
+        return try await HTTPClient.fetch(url: url, headers: apiHeaders)
     }
 
     // MARK: - Batch Quotes (mobile endpoint)
@@ -29,7 +36,7 @@ actor BackendService: BackendServiceProtocol {
         let url = try buildURL(path: "/mobile/quotes", queryItems: [
             URLQueryItem(name: "symbols", value: symbols.joined(separator: ","))
         ])
-        let response: BatchQuotesResponse = try await HTTPClient.fetch(url: url)
+        let response: BatchQuotesResponse = try await HTTPClient.fetch(url: url, headers: apiHeaders)
         return response.quotes
     }
 
@@ -39,7 +46,7 @@ actor BackendService: BackendServiceProtocol {
         let url = try buildURL(path: "/mobile/exchange-rate", queryItems: [
             URLQueryItem(name: "pair", value: pair)
         ])
-        return try await HTTPClient.fetch(url: url)
+        return try await HTTPClient.fetch(url: url, headers: apiHeaders)
     }
 
     // MARK: - Dividends (mobile endpoints)
@@ -49,7 +56,7 @@ actor BackendService: BackendServiceProtocol {
         var queryItems = [URLQueryItem(name: "symbols", value: symbols.joined(separator: ","))]
         if let year { queryItems.append(URLQueryItem(name: "year", value: "\(year)")) }
         let url = try buildURL(path: "/mobile/dividends", queryItems: queryItems)
-        return try await HTTPClient.fetch(url: url)
+        return try await HTTPClient.fetch(url: url, headers: apiHeaders)
     }
 
     func fetchDividendSummary(symbols: [String]) async throws -> [String: DividendSummaryDTO] {
@@ -57,7 +64,7 @@ actor BackendService: BackendServiceProtocol {
         let url = try buildURL(path: "/mobile/dividends/summary", queryItems: [
             URLQueryItem(name: "symbols", value: symbols.joined(separator: ","))
         ])
-        return try await HTTPClient.fetch(url: url)
+        return try await HTTPClient.fetch(url: url, headers: apiHeaders)
     }
 
     // MARK: - Symbol Tracking
@@ -69,6 +76,9 @@ actor BackendService: BackendServiceProtocol {
         ])
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        for (key, value) in apiHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
         let (_, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw APIError.unknown("Failed to track symbol")
@@ -87,6 +97,9 @@ actor BackendService: BackendServiceProtocol {
         ])
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        for (key, value) in apiHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
         let (_, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw APIError.unknown("Failed to sync tracked symbols")

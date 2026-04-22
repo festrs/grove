@@ -59,7 +59,8 @@ struct OnboardingViewModelTests {
         let vm = OnboardingViewModel()
         vm.currentStep = 3
         vm.addHolding(ticker: "ITUB3", quantity: 100)
-        // Default allocations sum to 100
+        // Only acoesBR is in use — set its allocation to 100 so total = 100
+        vm.targetAllocations = [.acoesBR: 100]
         #expect(vm.canAdvance == true)
 
         vm.targetAllocations = [.acoesBR: 50] // only 50, not 100

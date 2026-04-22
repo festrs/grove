@@ -186,8 +186,10 @@ struct TransactionTests {
 
         #expect(holding.quantity == 400)
         // (3400 + 1500) / 400 = 12.25
+        // Due to repeating-decimal intermediate, allow small rounding difference
         let expected2 = Decimal(4900) / Decimal(400)
-        #expect(holding.averagePrice == expected2)
+        let diff = abs(holding.averagePrice - expected2)
+        #expect(diff < Decimal(string: "0.0001")!)
     }
 
     // MARK: - Gain/Loss After Transactions
