@@ -32,9 +32,10 @@ jobs:
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
 
-      - name: Create Secrets.xcconfig
+      - name: Create Secrets
         run: |
           printf 'BACKEND_BASE_URL = https://placeholder.example.com\nMOBILE_API_KEY = ci-placeholder\n' > Secrets.xcconfig
+          cp Secrets.example Grove/Secrets.swift
 
       - name: Generate project
         run: xcodegen generate
@@ -93,9 +94,10 @@ jobs:
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
 
-      - name: Create Secrets.xcconfig
+      - name: Create Secrets
         run: |
           printf 'BACKEND_BASE_URL = https://placeholder.example.com\nMOBILE_API_KEY = ci-placeholder\n' > Secrets.xcconfig
+          cp Secrets.example Grove/Secrets.swift
 
       - name: Generate project
         run: xcodegen generate
