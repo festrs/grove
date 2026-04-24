@@ -103,6 +103,11 @@ cd backend && .venv312/bin/python -m pytest tests/ -v
 - Previews should use `Holding.itub3`, `.btlg11`, etc. (static factory properties on `Holding` in `SampleData+Holdings.swift`).
 - Brazilian Portuguese for UI strings (no localization framework yet — strings are inline).
 
+## Git & PR Conventions
+
+- Do NOT include `Co-Authored-By` lines in commit messages.
+- Do NOT include "Generated with Claude Code" or any Claude attribution in PR descriptions.
+
 ## SPM Dependencies
 
 - `swift-async-algorithms` — used for search debounce (`AsyncChannel` + `.debounce`)
