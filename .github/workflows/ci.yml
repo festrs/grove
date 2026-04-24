@@ -32,12 +32,12 @@ jobs:
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
 
-      - name: Generate project
-        run: xcodegen generate
-
       - name: Create Secrets.xcconfig
         run: |
           printf 'BACKEND_BASE_URL = https://placeholder.example.com\nMOBILE_API_KEY = ci-placeholder\n' > Secrets.xcconfig
+
+      - name: Generate project
+        run: xcodegen generate
 
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -scheme $SCHEME
@@ -93,12 +93,12 @@ jobs:
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
 
-      - name: Generate project
-        run: xcodegen generate
-
       - name: Create Secrets.xcconfig
         run: |
           printf 'BACKEND_BASE_URL = https://placeholder.example.com\nMOBILE_API_KEY = ci-placeholder\n' > Secrets.xcconfig
+
+      - name: Generate project
+        run: xcodegen generate
 
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -scheme $SCHEME
