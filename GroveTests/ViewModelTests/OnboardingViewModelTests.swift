@@ -1,0 +1,291 @@
+import Testing
+import Foundation
+@testable import Grove
+
+struct OnboardingViewModelTests {
+
+    // MARK: - Navigation
+
+    @Test func initialStepIsZero() {
+        let vm = OnboardingViewModel()
+        #expect(vm.currentStep == 0)
+    }
+
+    @Test func advanceIncrementsStep() {
+        let vm = OnboardingViewModel()
+        vm.advance()
+        #expect(vm.currentStep == 1)
+    }
+
+    @Test func advanceDoesNotExceedMaxStep() {
+        let vm = OnboardingViewModel()
+        for _ in 0..<10 {
+            vm.advance()
+        }
+        #expect(vm.currentStep == OnboardingViewModel.totalSteps - 1)
+    }
+
+    @Test func goBackDecrementsStep() {
+        let vm = OnboardingViewModel()
+        vm.advance()
+        vm.advance()
+        vm.goBack()
+        #expect(vm.currentStep == 1)
+    }
+
+    @Test func goBackDoesNotGoBelowZero() {
+        let vm = OnboardingViewModel()
+        vm.goBack()
+        #expect(vm.currentStep == 0)
+    }
+
+    // MARK: - canAdvance
+
+    @Test func canAdvanceStep0AlwaysTrue() {
+        let vm = OnboardingViewModel()
+        #expect(vm.canAdvance == true)
+    }
+
+    @Test func canAdvanceStep1RequiresHoldings() {
+        let vm = OnboardingViewModel()
+        vm.currentStep = 1
+        #expect(vm.canAdvance == false)
+
+        vm.addHolding(ticker: "ITUB3")
+        #expect(vm.canAdvance == true)
+    }
+
+    @Test func canAdvanceStep3RequiresValidTarget() {
+        let vm = OnboardingViewModel()
+        vm.currentStep = 3
+        vm.addHolding(ticker: "ITUB3")
+        // Only acoesBR is in use — set its allocation to 100 so total = 100
+        vm.targetAllocations = [.acoesBR: 100]
+        #expect(vm.canAdvance == true)
+
+        vm.targetAllocations = [.acoesBR: 50] // only 50, not 100
+        #expect(vm.canAdvance == false)
+    }
+
+    // MARK: - Holdings Management
+
+    @Test func addHoldingFromSearchResult() {
+        let vm = OnboardingViewModel()
+        let result = StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "Itau", type: "stock", price: "32", currency: "BRL", change: nil, sector: nil, logo: nil)
+        vm.addHolding(from: result)
+
+        #expect(vm.pendingHoldings.count == 1)
+        #expect(vm.pendingHoldings[0].ticker == "ITUB3.SA")
+        #expect(vm.pendingHoldings[0].quantity == 0)
+        #expect(vm.pendingHoldings[0].status == .estudo)
+    }
+
+    @Test func addHoldingFromTicker() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "PETR4")
+
+        #expect(vm.pendingHoldings.count == 1)
+        #expect(vm.pendingHoldings[0].ticker == "PETR4")
+        #expect(vm.pendingHoldings[0].assetClass == .acoesBR)
+        #expect(vm.pendingHoldings[0].status == .estudo)
+    }
+
+    @Test func addHoldingPreventsDuplicates() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "ITUB3")
+        vm.addHolding(ticker: "ITUB3")
+
+        #expect(vm.pendingHoldings.count == 1)
+        #expect(vm.errorMessage != nil)
+    }
+
+    @Test func addHoldingRespectsFreeTierLimit() {
+        let vm = OnboardingViewModel()
+        for i in 0..<AppConstants.freeTierMaxHoldings {
+            vm.addHolding(ticker: "T\(i)")
+        }
+        #expect(vm.pendingHoldings.count == AppConstants.freeTierMaxHoldings)
+        #expect(vm.canAddMoreHoldings == false)
+
+        vm.addHolding(ticker: "EXTRA")
+        #expect(vm.pendingHoldings.count == AppConstants.freeTierMaxHoldings)
+        #expect(vm.errorMessage != nil)
+    }
+
+    @Test func addHoldingFromSearchRespectsFreeTierLimit() {
+        let vm = OnboardingViewModel()
+        for i in 0..<AppConstants.freeTierMaxHoldings {
+            vm.addHolding(ticker: "T\(i)")
+        }
+        #expect(vm.canAddMoreHoldings == false)
+
+        let result = StockSearchResultDTO(id: "EXTRA.SA", symbol: "EXTRA.SA", name: "Extra", type: "stock", price: "10", currency: "BRL", change: nil, sector: nil, logo: nil)
+        vm.addHolding(from: result)
+
+        #expect(vm.pendingHoldings.count == AppConstants.freeTierMaxHoldings, "Should not exceed limit via search")
+        #expect(vm.errorMessage != nil)
+    }
+
+    @Test func addHoldingIgnoresEmptyTicker() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "  ")
+        #expect(vm.pendingHoldings.isEmpty)
+    }
+
+    @Test func removeHoldingByOffset() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "A")
+        vm.addHolding(ticker: "B")
+        vm.removeHolding(at: IndexSet(integer: 0))
+
+        #expect(vm.pendingHoldings.count == 1)
+        #expect(vm.pendingHoldings[0].ticker == "B")
+    }
+
+    @Test func removeHoldingByID() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "A")
+        let id = vm.pendingHoldings[0].id
+        vm.removeHolding(id: id)
+
+        #expect(vm.pendingHoldings.isEmpty)
+    }
+
+    // MARK: - Computed Properties
+
+    @Test func holdingCount() {
+        let vm = OnboardingViewModel()
+        #expect(vm.holdingCount == 0)
+        vm.addHolding(ticker: "X")
+        #expect(vm.holdingCount == 1)
+    }
+
+    @Test func assetClassesInUse() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "ITUB3") // acoesBR
+        vm.addHolding(ticker: "KNRI11") // fiis
+
+        let classes = vm.assetClassesInUse
+        #expect(classes.contains(.acoesBR))
+        #expect(classes.contains(.fiis))
+        #expect(!classes.contains(.usStocks))
+    }
+
+    @Test func totalTargetAllocationOnlyCountsUsedClasses() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "ITUB3") // acoesBR
+        // Default targetAllocations[.acoesBR] = 30
+        #expect(vm.totalTargetAllocation == 30)
+    }
+
+    @Test func isTargetValidWhenSumIs100() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "ITUB3")
+        vm.targetAllocations = [.acoesBR: 100]
+        #expect(vm.isTargetValid == true)
+    }
+
+    @Test func isTargetInvalidWhenSumIsNot100() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "ITUB3")
+        vm.targetAllocations = [.acoesBR: 50]
+        #expect(vm.isTargetValid == false)
+    }
+
+    // MARK: - Auto-classify
+
+    @Test func autoClassifyAll() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "KNRI11")
+        // Initially detected as fiis from ticker heuristic
+        vm.pendingHoldings[0].assetClass = .acoesBR // manually override to wrong class
+        vm.autoClassifyAll()
+        #expect(vm.pendingHoldings[0].assetClass == .fiis)
+    }
+
+    // MARK: - Ticker Parsing
+
+    @Test func parseTickersFromLines() {
+        let vm = OnboardingViewModel()
+        let result = vm.parseTickers("ITUB3\nPETR4\nBTLG11")
+        #expect(result.count == 3)
+        #expect(result[0] == "ITUB3")
+        #expect(result[1] == "PETR4")
+        #expect(result[2] == "BTLG11")
+    }
+
+    @Test func parseTickersWithComma() {
+        let vm = OnboardingViewModel()
+        let result = vm.parseTickers("ITUB3, 100\nPETR4, 200")
+        #expect(result.count == 2)
+        #expect(result[0] == "ITUB3")
+        #expect(result[1] == "PETR4")
+    }
+
+    @Test func parseTickersWithSemicolon() {
+        let vm = OnboardingViewModel()
+        let result = vm.parseTickers("ITUB3;100")
+        #expect(result.count == 1)
+        #expect(result[0] == "ITUB3")
+    }
+
+    @Test func parseTickersWithTab() {
+        let vm = OnboardingViewModel()
+        let result = vm.parseTickers("ITUB3\t100")
+        #expect(result.count == 1)
+    }
+
+    @Test func parseTickersSkipsEmptyLines() {
+        let vm = OnboardingViewModel()
+        let result = vm.parseTickers("\n\nITUB3\n\n")
+        #expect(result.count == 1)
+    }
+
+    @Test func parseTickersSkipsNonTickers() {
+        let vm = OnboardingViewModel()
+        let result = vm.parseTickers("12345\nITUB3\n!!!")
+        #expect(result.count == 1)
+        #expect(result[0] == "ITUB3")
+    }
+
+    @Test func importFromCSVAddsHoldings() {
+        let vm = OnboardingViewModel()
+        vm.csvText = "ITUB3\nPETR4\nBTLG11"
+        vm.importFromCSV()
+        #expect(vm.pendingHoldings.count == 3)
+        #expect(vm.errorMessage == nil)
+    }
+
+    @Test func importFromCSVSkipsDuplicates() {
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "ITUB3")
+        vm.csvText = "ITUB3\nPETR4"
+        vm.importFromCSV()
+        #expect(vm.pendingHoldings.count == 2) // ITUB3 skipped, PETR4 added
+    }
+
+    @Test func importFromCSVShowsErrorOnEmpty() {
+        let vm = OnboardingViewModel()
+        vm.csvText = "12345"
+        vm.importFromCSV()
+        #expect(vm.errorMessage != nil)
+    }
+
+    // MARK: - Search (async)
+
+    @Test func searchWithEmptyQueryClearsResults() async {
+        let vm = OnboardingViewModel()
+        let mock = MockBackendService()
+        await vm.searchTicker(query: "", service: mock)
+        #expect(vm.searchResults.isEmpty)
+    }
+
+    @Test func searchSetsIsSearching() async {
+        let vm = OnboardingViewModel()
+        let mock = MockBackendService()
+        await vm.searchTicker(query: "ITUB", service: mock)
+        // After completion, isSearching should be false
+        #expect(vm.isSearching == false)
+        #expect(!vm.searchResults.isEmpty)
+    }
+}
