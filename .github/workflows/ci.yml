@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SCHEME: Grove
+  TEST_TARGET: GroveTests
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: brew install xcodegen just
+
+      - name: Select latest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Create Secrets
+        run: |
+          printf 'BACKEND_BASE_URL = https://placeholder.example.com\nMOBILE_API_KEY = ci-placeholder\n' > Secrets.xcconfig
+          cp Secrets.example Grove/Secrets.swift
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -scheme $SCHEME
+
+      - name: Find simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime in sorted(data['devices'].keys(), reverse=True):
+              if 'iOS' in runtime and 'xros' not in runtime.lower() and 'watch' not in runtime.lower() and 'tv' not in runtime.lower():
+                  for d in data['devices'][runtime]:
+                      if 'iPhone' in d['name']:
+                          print(d['udid'])
+                          sys.exit(0)
+          sys.exit(1)
+          ")
+          echo "destination=id=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme $SCHEME \
+            -destination '${{ steps.sim.outputs.destination }}' \
+            -only-testing:$TEST_TARGET \
+            -resultBundlePath TestResults.xcresult 2>&1 \
+            | tee test-output.log
+          tail -5 test-output.log | grep -q "TEST SUCCEEDED"
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults.xcresult
+
+  mutation-tests:
+    name: Mutation Tests
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: brew install xcodegen just
+
+      - name: Select latest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Create Secrets
+        run: |
+          printf 'BACKEND_BASE_URL = https://placeholder.example.com\nMOBILE_API_KEY = ci-placeholder\n' > Secrets.xcconfig
+          cp Secrets.example Grove/Secrets.swift
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -scheme $SCHEME
+
+      - name: Run mutation tests
+        run: |
+          chmod +x scripts/mutation_test.sh
+          ./scripts/mutation_test.sh 2>&1 | tee mutation-results.txt
+
+      - name: Check mutation score
+        run: |
+          SURVIVED=$(grep "Survived:" mutation-results.txt | awk '{print $2}')
+          if [ "$SURVIVED" -gt 0 ]; then
+            echo "::error::$SURVIVED mutation(s) survived — tests need strengthening"
+            grep "SURVIVED" mutation-results.txt
+            exit 1
+          fi
+          echo "All mutations killed — 100% score"
+
+      - name: Upload mutation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-results
+          path: mutation-results.txt

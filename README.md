@@ -1,8 +1,8 @@
-# Tranquilidade
+# Grove
 
 A passive income planner for Brazilian investors following the [Bastter](https://bastter.com) philosophy.
 
-Tranquilidade helps you manage holdings across multiple asset classes (Ações BR, FIIs, US Stocks, REITs, Crypto, Renda Fixa), track dividend income, project passive income toward financial independence, and get monthly rebalancing recommendations.
+Grove helps you manage holdings across multiple asset classes (Ações BR, FIIs, US Stocks, REITs, Crypto, Renda Fixa), track dividend income, project passive income toward financial independence, and get monthly rebalancing recommendations.
 
 ## Features
 

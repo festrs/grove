@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Tranquilidade is a Brazilian investment portfolio tracker iOS app. It helps investors following the Bastter philosophy manage holdings across asset classes (Ações BR, FIIs, US Stocks, REITs, Crypto, Renda Fixa), track dividend income, project passive income toward financial independence, and get monthly rebalancing recommendations.
+Grove is a Brazilian investment portfolio tracker iOS app. It helps investors following the Bastter philosophy manage holdings across asset classes (Ações BR, FIIs, US Stocks, REITs, Crypto, Renda Fixa), track dividend income, project passive income toward financial independence, and get monthly rebalancing recommendations.
 
 ## Project Generation (XcodeGen)
 
@@ -48,7 +48,8 @@ just --list             # show all available recipes
 ## Key Domain Concepts
 
 - **Two-tier rebalancing:** Class allocations (Portfolio level, must sum to 100%) determine budget per class. Holding weight (per-Holding, relative number like 5) distributes within class. `RebalancingEngine.suggestions(modelContext:investmentAmount:)` is the single entry point used by both Dashboard and Aportar.
-- **Holding status:** `.aportar` (eligible for buying), `.congelar` (frozen — counts toward allocation but doesn't receive money), `.quarentena` (quarantine).
+- **Holding status (Bastter pipeline):** `.estudo` (studying, no position yet), `.aportar` (good company, receives monthly contributions), `.quarentena` (first stage of exit — counts toward allocation but receives no money), `.vender` (decision made to exit — excluded from allocation math entirely, sell gradually). A Holding without Contributions is in estudo; first buy promotes to aportar.
+- **Contributions as source of truth:** `Holding.quantity` and `averagePrice` are cached but derived from `Contribution` records via `recalculateFromContributions()`. Always create a Contribution then call recalculate — never write quantity/averagePrice directly.
 - **Asset class detection:** `AssetClassType.detect(from:apiType:)` uses the Brapi API `type` field (`"fund"` → FII, `"stock"` → Ações BR, `"bdr"` → US Stocks) as primary source, falls back to ticker heuristics. Always strip `.SA` suffix before display.
 
 ## Backend (project-fin)
@@ -69,7 +70,7 @@ docker logs project-fin-tunnel 2>&1 | grep "trycloudflare.com" | grep -v ERR | t
 cd backend && .venv312/bin/python -m pytest tests/ -v
 ```
 
-**Update tunnel URL** in `Tranquilidade/AppConstants.swift` → `backendBaseURL` when it changes.
+**Update tunnel URL** in `Grove/AppConstants.swift` → `backendBaseURL` when it changes.
 
 **Key mobile endpoints** (`/api/mobile/`): `quotes`, `exchange-rate`, `dividends`, `dividends/summary`, `track`, `track/sync`. Search is at `/api/stocks/search`.
 
@@ -101,6 +102,11 @@ cd backend && .venv312/bin/python -m pytest tests/ -v
 - Feature-based folder structure: `Features/Dashboard/`, `Features/Portfolio/`, etc.
 - Previews should use `Holding.itub3`, `.btlg11`, etc. (static factory properties on `Holding` in `SampleData+Holdings.swift`).
 - Brazilian Portuguese for UI strings (no localization framework yet — strings are inline).
+
+## Git & PR Conventions
+
+- Do NOT include `Co-Authored-By` lines in commit messages.
+- Do NOT include "Generated with Claude Code" or any Claude attribution in PR descriptions.
 
 ## SPM Dependencies
 

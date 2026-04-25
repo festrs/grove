@@ -1,4 +1,4 @@
-# Tranquilidade iOS — Task Runner
+# Grove iOS — Task Runner
 # Usage: just <recipe>   |   just --list
 
 # Find latest available iOS iPhone simulator dynamically
@@ -23,23 +23,23 @@ generate:
 
 # Build the app
 build: generate
-    xcodebuild -scheme Tranquilidade -destination '{{destination}}' build
+    xcodebuild -scheme Grove -destination '{{destination}}' build
 
 # Run unit tests
 test: generate
-    xcodebuild test -scheme Tranquilidade -destination '{{destination}}' -only-testing:TranquilidadeTests
+    xcodebuild test -scheme Grove -destination '{{destination}}' -only-testing:GroveTests
 
 # Run a specific test struct (e.g. just test-only RebalancingEngineTests)
 test-only name: generate
-    xcodebuild test -scheme Tranquilidade -destination '{{destination}}' -only-testing:TranquilidadeTests/{{name}}
+    xcodebuild test -scheme Grove -destination '{{destination}}' -only-testing:GroveTests/{{name}}
 
 # Clean DerivedData
 clean:
-    rm -rf ~/Library/Developer/Xcode/DerivedData/Tranquilidade-*
+    rm -rf ~/Library/Developer/Xcode/DerivedData/Grove-*
 
 # Clean and rebuild from scratch
 rebuild: clean generate
-    xcodebuild -scheme Tranquilidade -destination '{{destination}}' build
+    xcodebuild -scheme Grove -destination '{{destination}}' build
 
 # Resolve SPM packages
 resolve:

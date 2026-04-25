@@ -1,8 +1,9 @@
-name: Tranquilidade
+name: Grove
 
 options:
   deploymentTarget:
     iOS: "26.0"
+    macOS: "26.0"
   xcodeVersion: "26.4.1"
   bundleIdPrefix: com.felipepereira
   createIntermediateGroups: true
@@ -36,22 +37,22 @@ packages:
     from: "1.0.0"
 
 targets:
-  Tranquilidade:
+  Grove:
     type: application
-    platform: iOS
+    supportedDestinations: [iOS, macOS]
     configFiles:
       Debug: Secrets.xcconfig
       Release: Secrets.xcconfig
     sources:
-      - Tranquilidade
+      - Grove
     resources:
-      - path: Tranquilidade/Assets.xcassets
-      - path: Tranquilidade/Preview Content
+      - path: Grove/Assets.xcassets
+      - path: Grove/Preview Content
         buildPhase: none
         type: folder
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.felipepereira.Tranquilidade
+        PRODUCT_BUNDLE_IDENTIFIER: com.felipepereira.Grove
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: 1
         GENERATE_INFOPLIST_FILE: YES
@@ -69,16 +70,16 @@ targets:
     dependencies:
       - package: AsyncAlgorithms
 
-  TranquilidadeTests:
+  GroveTests:
     type: bundle.unit-test
-    platform: iOS
+    supportedDestinations: [iOS, macOS]
     sources:
-      - TranquilidadeTests
+      - GroveTests
     dependencies:
-      - target: Tranquilidade
+      - target: Grove
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.felipepereira.TranquilidadeTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.felipepereira.GroveTests
         GENERATE_INFOPLIST_FILE: YES
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Tranquilidade.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Tranquilidade"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Grove.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Grove"
         BUNDLE_LOADER: "$(TEST_HOST)"
