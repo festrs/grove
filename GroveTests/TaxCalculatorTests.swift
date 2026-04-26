@@ -81,4 +81,44 @@ struct TaxCalculatorTests {
         #expect(result.totalNet == 0)
         #expect(result.details.isEmpty)
     }
+
+    // MARK: - Money-aware breakdown
+
+    @Test func moneyBreakdownAggregatesInDisplayCurrency() {
+        let rates = StaticRates(brlPerUsd: 5)
+        let grossByClass: [AssetClassType: Money] = [
+            .fiis: Money(amount: 1000, currency: .brl),
+            .usStocks: Money(amount: 100, currency: .usd),
+            .acoesBR: Money(amount: 200, currency: .brl),
+        ]
+        let result = TaxCalculator.taxBreakdown(grossByClass: grossByClass, displayCurrency: .brl, rates: rates)
+
+        #expect(result.totalGross.amount == 1700)
+        #expect(result.totalTax.amount == 150) // US stocks: 100 × 0.30 = 30 USD = 150 BRL
+        #expect(result.totalNet.amount == 1550)
+        #expect(result.totalGross.currency == .brl)
+        #expect(result.details.count == 3)
+    }
+
+    @Test func moneyBreakdownPreservesNativeCurrencyInDetails() {
+        let rates = StaticRates(brlPerUsd: 5)
+        let grossByClass: [AssetClassType: Money] = [
+            .usStocks: Money(amount: 100, currency: .usd),
+        ]
+        let result = TaxCalculator.taxBreakdown(grossByClass: grossByClass, displayCurrency: .brl, rates: rates)
+
+        let detail = result.details.first!
+        #expect(detail.gross.currency == .usd)
+        #expect(detail.gross.amount == 100)
+        #expect(detail.net.currency == .usd)
+        #expect(detail.net.amount == 70)
+    }
+
+    @Test func moneyBreakdownHandlesEmpty() {
+        let rates = StaticRates(brlPerUsd: 5)
+        let result = TaxCalculator.taxBreakdown(grossByClass: [:], displayCurrency: .brl, rates: rates)
+        #expect(result.totalGross.amount == 0)
+        #expect(result.totalNet.amount == 0)
+        #expect(result.details.isEmpty)
+    }
 }

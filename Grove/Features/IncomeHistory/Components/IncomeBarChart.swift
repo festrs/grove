@@ -4,14 +4,16 @@ import Charts
 struct IncomeBarChart: View {
     let summaries: [MonthlyDividendSummary]
     let showNet: Bool
-    var goalLine: Decimal?
+    var goalLine: Money?
+
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     var body: some View {
         Chart {
             ForEach(summaries) { summary in
-                let value = showNet
-                    ? NSDecimalNumber(decimal: summary.net).doubleValue
-                    : NSDecimalNumber(decimal: summary.gross).doubleValue
+                let money = showNet ? summary.netMoney : summary.grossMoney
+                let value = NSDecimalNumber(decimal: money.converted(to: displayCurrency, using: rates).amount).doubleValue
 
                 BarMark(
                     x: .value("Month", summary.monthLabel),
@@ -22,7 +24,8 @@ struct IncomeBarChart: View {
             }
 
             if let goal = goalLine {
-                RuleMark(y: .value("Goal", NSDecimalNumber(decimal: goal).doubleValue))
+                let value = NSDecimalNumber(decimal: goal.converted(to: displayCurrency, using: rates).amount).doubleValue
+                RuleMark(y: .value("Goal", value))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
                     .foregroundStyle(.orange)
                     .annotation(position: .top, alignment: .trailing) {

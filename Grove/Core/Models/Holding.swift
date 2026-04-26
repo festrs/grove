@@ -72,6 +72,26 @@ final class Holding {
         quantity * averagePrice
     }
 
+    var priceMoney: Money {
+        Money(amount: currentPrice, currency: currency)
+    }
+
+    var averagePriceMoney: Money {
+        Money(amount: averagePrice, currency: currency)
+    }
+
+    var currentValueMoney: Money {
+        Money(amount: currentPrice * quantity, currency: currency)
+    }
+
+    var estimatedMonthlyIncomeMoney: Money {
+        Money(amount: estimatedMonthlyIncome, currency: currency)
+    }
+
+    var estimatedMonthlyIncomeNetMoney: Money {
+        Money(amount: estimatedMonthlyIncomeNet, currency: currency)
+    }
+
     var gainLoss: Decimal {
         currentValue - totalCost
     }

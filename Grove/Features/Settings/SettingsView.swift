@@ -3,6 +3,8 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @State private var viewModel = SettingsViewModel()
     @State private var showingResetAlert = false
 
@@ -22,7 +24,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .task {
-                viewModel.loadData(modelContext: modelContext)
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
         }
     }
@@ -40,7 +42,7 @@ struct SettingsView: View {
             LabeledContent("Assets", value: "\(viewModel.holdingCount)")
             LabeledContent(
                 "Total Value",
-                value: viewModel.portfolioValue.formatted(as: viewModel.settings?.preferredCurrency ?? .brl)
+                value: viewModel.portfolioValue.formatted()
             )
         }
     }

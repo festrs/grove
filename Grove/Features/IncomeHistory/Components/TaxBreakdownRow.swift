@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TaxBreakdownRow: View {
-    let detail: TaxBreakdownDetail
+    let detail: MoneyTaxBreakdownDetail
 
     var body: some View {
         HStack {
@@ -16,15 +16,15 @@ struct TaxBreakdownRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 1) {
-                Text(detail.gross.formattedBRL())
+                Text(detail.gross.formatted())
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if detail.tax > 0 {
-                    Text("-\(detail.tax.formattedBRL())")
+                if detail.tax.amount > 0 {
+                    Text("-\(detail.tax.formatted())")
                         .font(.caption2)
                         .foregroundStyle(.red)
                 }
-                Text(detail.net.formattedBRL())
+                Text(detail.net.formatted())
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundStyle(Color.tqAccentGreen)

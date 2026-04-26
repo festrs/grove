@@ -62,7 +62,7 @@ struct AddHoldingView: View {
                         LabeledContent("Ticker", value: viewModel.ticker)
 
                         if viewModel.currentPrice > 0 {
-                            LabeledContent("Current Price", value: viewModel.currentPrice.formattedBRL())
+                            LabeledContent("Current Price", value: Money(amount: viewModel.currentPrice, currency: viewModel.assetClass.defaultCurrency).formatted())
                         }
 
                         HStack {

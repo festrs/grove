@@ -76,7 +76,7 @@ struct DebugMenuView: View {
             Button("Test Dividend (ITUB3)") {
                 Task {
                     await NotificationService.shared.scheduleDividendNotification(
-                        ticker: "ITUB3", amount: 42.50, date: .now
+                        ticker: "ITUB3", amount: Money(amount: 42.50, currency: .brl), date: .now
                     )
                 }
             }

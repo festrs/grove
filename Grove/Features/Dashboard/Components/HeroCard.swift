@@ -4,11 +4,11 @@ struct HeroCard: View {
     let projection: IncomeProjection
     let suggestions: [RebalancingSuggestion]
     @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     var body: some View {
         TQCard {
             VStack(spacing: 0) {
-                // Top: Meter + Action text
                 HStack(alignment: .center, spacing: Theme.Spacing.xl) {
                     TQProgressRing(
                         progress: NSDecimalNumber(decimal: projection.progressPercent).doubleValue / 100.0,
@@ -22,11 +22,11 @@ struct HeroCard: View {
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(.secondary)
                                 .tracking(0.6)
-                            Text(projection.currentMonthlyNet.formatted(as: displayCurrency))
+                            Text(projection.currentMonthlyNet.formatted(in: displayCurrency, using: rates))
                                 .font(.system(size: 32, weight: .bold))
                                 .minimumScaleFactor(0.6)
                                 .lineLimit(1)
-                            Text("of \(projection.goalMonthly.formatted(as: displayCurrency))")
+                            Text("of \(projection.goalMonthly.formatted(in: displayCurrency, using: rates))")
                                 .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
                         }
@@ -59,7 +59,6 @@ struct HeroCard: View {
                 }
                 .padding(Theme.Spacing.lg)
 
-                // Bottom: Suggested tickers
                 if !suggestions.isEmpty {
                     Divider()
                     HStack(spacing: 0) {
@@ -90,7 +89,7 @@ struct HeroCard: View {
 
             Spacer()
 
-            Text(suggestion.amount.formatted(as: displayCurrency))
+            Text(suggestion.amount.formatted())
                 .font(.system(size: 16, weight: .semibold))
                 .monospacedDigit()
         }

@@ -2,9 +2,11 @@ import SwiftUI
 
 struct DividendDayDetail: View {
     let dividends: [DividendPayment]
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
-    private var total: Decimal {
-        dividends.reduce(Decimal.zero) { $0 + $1.netAmount }
+    private var total: Money {
+        dividends.map { $0.netAmountMoney }.sum(in: displayCurrency, using: rates)
     }
 
     var body: some View {
@@ -14,7 +16,7 @@ struct DividendDayDetail: View {
                     Text("Daily Dividends")
                         .font(.headline)
                     Spacer()
-                    Text(total.formattedBRL())
+                    Text(total.formatted())
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.tqAccentGreen)
@@ -32,11 +34,11 @@ struct DividendDayDetail: View {
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text(dividend.netAmount.formattedBRL())
+                            Text(dividend.netAmountMoney.formatted())
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                             if dividend.withholdingTax > 0 {
-                                Text("IR: \(dividend.withholdingTax.formattedBRL())")
+                                Text("IR: \(dividend.withholdingTaxMoney.formatted())")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }

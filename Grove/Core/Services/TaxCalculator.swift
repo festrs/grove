@@ -16,7 +16,7 @@ struct TaxCalculator {
         gross * (1 - netMultiplier(for: assetClass))
     }
 
-    /// Summary of tax impact per asset class
+    /// Decimal-keyed breakdown — tax math is currency-agnostic per class.
     static func taxBreakdown(grossByClass: [AssetClassType: Decimal]) -> TaxBreakdownResult {
         var totalGross: Decimal = 0
         var totalTax: Decimal = 0
@@ -42,6 +42,41 @@ struct TaxCalculator {
             details: details
         )
     }
+
+    /// Money-aware breakdown — each class is taxed in its own currency, then summed
+    /// in the display currency via FX. Returned details remain native per class.
+    static func taxBreakdown(
+        grossByClass: [AssetClassType: Money],
+        displayCurrency: Currency,
+        rates: any ExchangeRates
+    ) -> MoneyTaxBreakdown {
+        var grossValues: [Money] = []
+        var taxValues: [Money] = []
+        var netValues: [Money] = []
+        var details: [MoneyTaxBreakdownDetail] = []
+
+        for (assetClass, gross) in grossByClass.sorted(by: { $0.value.amount > $1.value.amount }) {
+            let multiplier = netMultiplier(for: assetClass)
+            let net = Money(amount: gross.amount * multiplier, currency: gross.currency)
+            let tax = Money(amount: gross.amount * (1 - multiplier), currency: gross.currency)
+            grossValues.append(gross)
+            taxValues.append(tax)
+            netValues.append(net)
+            details.append(MoneyTaxBreakdownDetail(
+                assetClass: assetClass,
+                gross: gross,
+                tax: tax,
+                net: net
+            ))
+        }
+
+        return MoneyTaxBreakdown(
+            totalGross: grossValues.sum(in: displayCurrency, using: rates),
+            totalTax: taxValues.sum(in: displayCurrency, using: rates),
+            totalNet: netValues.sum(in: displayCurrency, using: rates),
+            details: details
+        )
+    }
 }
 
 struct TaxBreakdownResult {
@@ -57,4 +92,19 @@ struct TaxBreakdownDetail: Identifiable {
     let gross: Decimal
     let tax: Decimal
     let net: Decimal
+}
+
+struct MoneyTaxBreakdown {
+    let totalGross: Money
+    let totalTax: Money
+    let totalNet: Money
+    let details: [MoneyTaxBreakdownDetail]
+}
+
+struct MoneyTaxBreakdownDetail: Identifiable {
+    var id: String { assetClass.rawValue }
+    let assetClass: AssetClassType
+    let gross: Money
+    let tax: Money
+    let net: Money
 }

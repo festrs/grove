@@ -72,11 +72,11 @@ struct AllocationBar: View {
 
 #Preview {
     AllocationBar(allocations: [
-        AssetClassAllocation(assetClass: .acoesBR, currentValue: 5000, currentPercent: 23, targetPercent: 30, drift: -7),
-        AssetClassAllocation(assetClass: .fiis, currentValue: 2000, currentPercent: 9, targetPercent: 20, drift: -11),
-        AssetClassAllocation(assetClass: .usStocks, currentValue: 7000, currentPercent: 31, targetPercent: 25, drift: 6),
-        AssetClassAllocation(assetClass: .reits, currentValue: 2000, currentPercent: 9, targetPercent: 10, drift: -1),
-        AssetClassAllocation(assetClass: .crypto, currentValue: 6000, currentPercent: 28, targetPercent: 15, drift: 13),
+        AssetClassAllocation(assetClass: .acoesBR, currentValue: Money(amount: 5000, currency: .brl), currentPercent: 23, targetPercent: 30, drift: -7),
+        AssetClassAllocation(assetClass: .fiis, currentValue: Money(amount: 2000, currency: .brl), currentPercent: 9, targetPercent: 20, drift: -11),
+        AssetClassAllocation(assetClass: .usStocks, currentValue: Money(amount: 7000, currency: .brl), currentPercent: 31, targetPercent: 25, drift: 6),
+        AssetClassAllocation(assetClass: .reits, currentValue: Money(amount: 2000, currency: .brl), currentPercent: 9, targetPercent: 10, drift: -1),
+        AssetClassAllocation(assetClass: .crypto, currentValue: Money(amount: 6000, currency: .brl), currentPercent: 28, targetPercent: 15, drift: 13),
     ])
     .padding()
     .background(Color.tqBackground)

@@ -1,67 +1,69 @@
 import Foundation
 
 struct IncomeProjection {
-    let currentMonthlyNet: Decimal
-    let currentMonthlyGross: Decimal
-    let goalMonthly: Decimal
+    let currentMonthlyNet: Money
+    let currentMonthlyGross: Money
+    let goalMonthly: Money
     let progressPercent: Decimal
     let estimatedMonthsToGoal: Int?
     let estimatedYearsToGoal: Decimal?
 }
 
 struct IncomeProjector {
-    /// Calculate current passive income and time to goal
+    /// Calculate current passive income and time to goal.
+    /// Goal is provided as Money so its currency carries semantics.
+    /// Aggregates and projections render in `displayCurrency`.
     static func project(
         holdings: [Holding],
-        incomeGoal: Decimal,
-        monthlyContribution: Decimal = 5_000,
-        exchangeRate: Decimal = 5.12
+        incomeGoal: Money,
+        monthlyContribution: Money,
+        displayCurrency: Currency,
+        rates: any ExchangeRates
     ) -> IncomeProjection {
-        // Calculate current monthly income (gross and net)
-        var grossByClass: [AssetClassType: Decimal] = [:]
+        var grossByClass: [AssetClassType: Money] = [:]
+        var grossValues: [Money] = []
 
         for holding in holdings {
-            let monthlyGross = holding.estimatedMonthlyIncome
-            let brlMonthly = holding.currency == .usd ? monthlyGross * exchangeRate : monthlyGross
-            grossByClass[holding.assetClass, default: 0] += brlMonthly
+            let monthlyGross = holding.estimatedMonthlyIncomeMoney
+            grossValues.append(monthlyGross)
+            grossByClass[holding.assetClass] = (grossByClass[holding.assetClass] ?? .zero(in: holding.currency)) + monthlyGross
         }
 
-        let totalGross = grossByClass.values.reduce(Decimal.zero, +)
-        let breakdown = TaxCalculator.taxBreakdown(grossByClass: grossByClass)
+        let totalGross = grossValues.sum(in: displayCurrency, using: rates)
+        let breakdown = TaxCalculator.taxBreakdown(
+            grossByClass: grossByClass,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
         let totalNet = breakdown.totalNet
+        let goalDisplay = incomeGoal.converted(to: displayCurrency, using: rates)
 
-        let progress: Decimal = incomeGoal > 0 ? (totalNet / incomeGoal) * 100 : 0
+        let progress: Decimal = goalDisplay.amount > 0 ? (totalNet.amount / goalDisplay.amount) * 100 : 0
 
-        // Estimate time to goal
         var estimatedMonths: Int?
         var estimatedYears: Decimal?
 
-        if totalNet < incomeGoal && monthlyContribution > 0 {
-            // Simplified model: assume avg DY of portfolio applied to new contributions
-            let totalValue = holdings.reduce(Decimal.zero) { sum, h in
-                let val = h.currency == .usd ? h.currentValue * exchangeRate : h.currentValue
-                return sum + val
-            }
+        let contributionDisplay = monthlyContribution.converted(to: displayCurrency, using: rates)
+        let totalValueDisplay = holdings.map { $0.currentValueMoney }.sum(in: displayCurrency, using: rates)
 
+        if totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0 {
             let avgDY: Decimal
-            if totalValue > 0 {
-                let annualIncome = totalGross * 12
-                avgDY = (annualIncome / totalValue) * 100
+            if totalValueDisplay.amount > 0 {
+                let annualIncome = totalGross.amount * 12
+                avgDY = (annualIncome / totalValueDisplay.amount) * 100
             } else {
-                avgDY = 6 // default assumption
+                avgDY = 6
             }
 
-            let avgNetMultiplier: Decimal = totalGross > 0 ? totalNet / totalGross : 0.85
+            let avgNetMultiplier: Decimal = totalGross.amount > 0 ? totalNet.amount / totalGross.amount : 0.85
             let monthlyYield = avgDY / 100 / 12
 
-            // Project month by month
-            var currentIncome = totalNet
+            var currentIncome = totalNet.amount
             var months = 0
-            let maxMonths = 600 // 50 years cap
+            let maxMonths = 600
 
-            while currentIncome < incomeGoal && months < maxMonths {
-                // Each month, new contribution adds to portfolio, generating new yield
-                let newMonthlyIncome = monthlyContribution * monthlyYield * avgNetMultiplier
+            while currentIncome < goalDisplay.amount && months < maxMonths {
+                let newMonthlyIncome = contributionDisplay.amount * monthlyYield * avgNetMultiplier
                 currentIncome += newMonthlyIncome
                 months += 1
             }
@@ -70,7 +72,7 @@ struct IncomeProjector {
                 estimatedMonths = months
                 estimatedYears = Decimal(months) / 12
             }
-        } else if totalNet >= incomeGoal {
+        } else if totalNet.amount >= goalDisplay.amount {
             estimatedMonths = 0
             estimatedYears = 0
         }
@@ -78,7 +80,7 @@ struct IncomeProjector {
         return IncomeProjection(
             currentMonthlyNet: totalNet,
             currentMonthlyGross: totalGross,
-            goalMonthly: incomeGoal,
+            goalMonthly: goalDisplay,
             progressPercent: min(progress, 100),
             estimatedMonthsToGoal: estimatedMonths,
             estimatedYearsToGoal: estimatedYears

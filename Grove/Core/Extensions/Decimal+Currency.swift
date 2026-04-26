@@ -11,10 +11,6 @@ extension Decimal {
         return formatter.string(from: self as NSDecimalNumber) ?? "\(currency.symbol) 0,00"
     }
 
-    func formattedBRL() -> String {
-        formatted(as: .brl)
-    }
-
     func formattedPercent(decimals: Int = 1) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .percent

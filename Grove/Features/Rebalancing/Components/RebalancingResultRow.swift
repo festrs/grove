@@ -18,7 +18,7 @@ struct RebalancingResultRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(suggestion.amount.formattedBRL())
+                Text(suggestion.amount.formatted())
                     .font(.subheadline)
                     .fontWeight(.semibold)
                 Text("\(suggestion.sharesToBuy) shares")

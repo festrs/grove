@@ -51,10 +51,10 @@ actor NotificationService {
         try? await UNUserNotificationCenter.current().add(request)
     }
 
-    func scheduleDividendNotification(ticker: String, amount: Decimal, date: Date) async {
+    func scheduleDividendNotification(ticker: String, amount: Money, date: Date) async {
         let content = UNMutableNotificationContent()
         content.title = "\(ticker) paid a dividend"
-        content.body = "\(amount.formattedBRL()) received"
+        content.body = "\(amount.formatted()) received"
         content.sound = .default
 
         let triggerDate = Calendar.current.dateComponents([.year, .month, .day, .hour], from: date)

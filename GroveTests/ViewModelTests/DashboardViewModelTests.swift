@@ -6,6 +6,8 @@ import SwiftData
 @Suite(.serialized)
 struct DashboardViewModelTests {
 
+    private static let rates: any ExchangeRates = StaticRates(brlPerUsd: 5)
+
     // MARK: - Initial state
 
     @Test func initialState() {
@@ -26,10 +28,11 @@ struct DashboardViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = DashboardViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.summary != nil)
-        #expect(vm.summary!.totalValue > 0)
+        #expect(vm.summary!.totalValue.amount > 0)
+        #expect(vm.summary!.totalValue.currency == .brl)
     }
 
     @MainActor
@@ -38,10 +41,10 @@ struct DashboardViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = DashboardViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.projection != nil)
-        #expect(vm.projection!.goalMonthly == 8000) // from seeded settings
+        #expect(vm.projection!.goalMonthly.amount == 8000)
     }
 
     @MainActor
@@ -50,7 +53,7 @@ struct DashboardViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = DashboardViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(!vm.topSuggestions.isEmpty)
     }
@@ -58,15 +61,14 @@ struct DashboardViewModelTests {
     @MainActor
     @Test func loadDataWithEmptyPortfolio() throws {
         let ctx = try makeTestContext()
-        // Only insert settings, no holdings
         let settings = UserSettings(monthlyIncomeGoal: 5000, hasCompletedOnboarding: true)
         ctx.insert(settings)
 
         let vm = DashboardViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.summary != nil)
-        #expect(vm.summary!.totalValue == 0)
+        #expect(vm.summary!.totalValue.amount == 0)
         #expect(vm.topSuggestions.isEmpty)
     }
 
@@ -76,7 +78,7 @@ struct DashboardViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = DashboardViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.isLoading == false)
     }

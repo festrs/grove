@@ -61,9 +61,9 @@ struct MonthlyActionCard: View {
 #Preview("Com sugestoes") {
     MonthlyActionCard(
         suggestions: [
-            RebalancingSuggestion(ticker: "BTLG11", displayName: "BTG Logistica", sharesToBuy: 5, amount: 500, currentPercent: 8.2, targetPercent: 15, newPercent: 12),
-            RebalancingSuggestion(ticker: "BCRI11", displayName: "Banestes CRI", sharesToBuy: 10, amount: 640, currentPercent: 5.1, targetPercent: 10, newPercent: 8),
-            RebalancingSuggestion(ticker: "KNRI11", displayName: "Kinea Renda", sharesToBuy: 3, amount: 450, currentPercent: 12, targetPercent: 15, newPercent: 13.5),
+            RebalancingSuggestion(ticker: "BTLG11", displayName: "BTG Logistica", sharesToBuy: 5, amount: Money(amount: 500, currency: .brl), currentPercent: 8.2, targetPercent: 15, newPercent: 12),
+            RebalancingSuggestion(ticker: "BCRI11", displayName: "Banestes CRI", sharesToBuy: 10, amount: Money(amount: 640, currency: .brl), currentPercent: 5.1, targetPercent: 10, newPercent: 8),
+            RebalancingSuggestion(ticker: "KNRI11", displayName: "Kinea Renda", sharesToBuy: 3, amount: Money(amount: 450, currency: .brl), currentPercent: 12, targetPercent: 15, newPercent: 13.5),
         ]
     )
     .padding()

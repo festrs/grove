@@ -4,6 +4,7 @@ struct SummaryCardsRow: View {
     let summary: PortfolioSummary
     let projection: IncomeProjection?
     @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     var body: some View {
         LazyVGrid(
@@ -12,17 +13,17 @@ struct SummaryCardsRow: View {
         ) {
             summaryCard(
                 label: "Assets",
-                value: summary.totalValue.formattedCompact(),
-                prefix: "\(displayCurrency.symbol) "
+                value: summary.totalValue.amount.formattedCompact(),
+                prefix: "\(summary.totalValue.currency.symbol) "
             )
             summaryCard(
                 label: "Gross Income",
-                value: summary.monthlyIncomeGross.formatted(as: displayCurrency),
+                value: summary.monthlyIncomeGross.formatted(in: displayCurrency, using: rates),
                 hint: "/mes"
             )
             summaryCard(
                 label: "Net Income",
-                value: summary.monthlyIncomeNet.formatted(as: displayCurrency),
+                value: summary.monthlyIncomeNet.formatted(in: displayCurrency, using: rates),
                 hint: "After taxes",
                 accent: true
             )

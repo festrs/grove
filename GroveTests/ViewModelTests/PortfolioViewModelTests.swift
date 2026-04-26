@@ -6,6 +6,8 @@ import SwiftData
 @Suite(.serialized)
 struct PortfolioViewModelTests {
 
+    private static let rates: any ExchangeRates = StaticRates(brlPerUsd: 5)
+
     // MARK: - Initial state
 
     @Test func initialState() {
@@ -14,7 +16,7 @@ struct PortfolioViewModelTests {
         #expect(vm.holdings.isEmpty)
         #expect(vm.filteredHoldings.isEmpty)
         #expect(vm.summary == nil)
-        #expect(vm.totalValue == 0)
+        #expect(vm.totalValue.amount == 0)
     }
 
     // MARK: - loadData
@@ -25,12 +27,12 @@ struct PortfolioViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(!vm.holdings.isEmpty)
         #expect(!vm.filteredHoldings.isEmpty)
         #expect(vm.summary != nil)
-        #expect(vm.totalValue > 0)
+        #expect(vm.totalValue.amount > 0)
         #expect(!vm.portfolios.isEmpty)
         #expect(vm.selectedPortfolio != nil)
     }
@@ -43,9 +45,9 @@ struct PortfolioViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
-        vm.selectClass(.acoesBR)
+        vm.selectClass(.acoesBR, displayCurrency: .brl, rates: Self.rates)
         #expect(vm.selectedClass == .acoesBR)
         #expect(vm.filteredHoldings.allSatisfy { $0.assetClass == .acoesBR })
     }
@@ -56,12 +58,12 @@ struct PortfolioViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
-        vm.selectClass(.acoesBR)
+        vm.selectClass(.acoesBR, displayCurrency: .brl, rates: Self.rates)
         let filteredCount = vm.filteredHoldings.count
 
-        vm.selectClass(nil)
+        vm.selectClass(nil, displayCurrency: .brl, rates: Self.rates)
         #expect(vm.filteredHoldings.count > filteredCount)
     }
 
@@ -71,9 +73,9 @@ struct PortfolioViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
-        vm.selectClass(.crypto)
+        vm.selectClass(.crypto, displayCurrency: .brl, rates: Self.rates)
         #expect(vm.filteredHoldings.isEmpty)
     }
 
@@ -85,10 +87,10 @@ struct PortfolioViewModelTests {
         let (_, holdings) = seedTestData(ctx)
 
         let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
         let initialCount = vm.holdings.count
 
-        vm.deleteHolding(holdings[0], modelContext: ctx)
+        vm.deleteHolding(holdings[0], modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
         #expect(vm.holdings.count == initialCount - 1)
     }
 
@@ -100,10 +102,10 @@ struct PortfolioViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
         let initialCount = vm.portfolios.count
 
-        vm.createPortfolio(name: "New Portfolio", modelContext: ctx)
+        vm.createPortfolio(name: "New Portfolio", modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
         #expect(vm.portfolios.count == initialCount + 1)
         #expect(vm.selectedPortfolio?.name == "New Portfolio")
     }
@@ -116,7 +118,7 @@ struct PortfolioViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(!vm.allocationByClass.isEmpty)
     }
@@ -128,7 +130,6 @@ struct PortfolioViewModelTests {
         let ctx = try makeTestContext()
         let portfolio = Portfolio(name: "Drift Test")
         ctx.insert(portfolio)
-        // Target 20% for acoesBR, but it's the only class → 100% current
         portfolio.classAllocations = [.acoesBR: 20]
 
         let h = Holding(ticker: "ITUB3", quantity: 100, currentPrice: 30, assetClass: .acoesBR, status: .aportar, targetPercent: 5)
@@ -137,7 +138,12 @@ struct PortfolioViewModelTests {
         try? ctx.save()
 
         let repo = PortfolioRepository(modelContext: ctx)
-        let summary = repo.computeSummary(holdings: [h], classAllocations: portfolio.classAllocations)
+        let summary = repo.computeSummary(
+            holdings: [h],
+            classAllocations: portfolio.classAllocations,
+            displayCurrency: .brl,
+            rates: Self.rates
+        )
 
         let acoesBRAlloc = summary.allocationByClass.first { $0.assetClass == .acoesBR }
         #expect(acoesBRAlloc != nil)
@@ -149,7 +155,6 @@ struct PortfolioViewModelTests {
         let ctx = try makeTestContext()
         let portfolio = Portfolio(name: "Drift Test 2")
         ctx.insert(portfolio)
-        // Target 80% for acoesBR, but fiis has more value → acoesBR underweight
         portfolio.classAllocations = [.acoesBR: 80, .fiis: 20]
 
         let h1 = Holding(ticker: "ITUB3", quantity: 10, currentPrice: 10, assetClass: .acoesBR, status: .aportar, targetPercent: 5)
@@ -161,7 +166,12 @@ struct PortfolioViewModelTests {
         try? ctx.save()
 
         let repo = PortfolioRepository(modelContext: ctx)
-        let summary = repo.computeSummary(holdings: [h1, h2], classAllocations: portfolio.classAllocations)
+        let summary = repo.computeSummary(
+            holdings: [h1, h2],
+            classAllocations: portfolio.classAllocations,
+            displayCurrency: .brl,
+            rates: Self.rates
+        )
 
         let acoesBRAlloc = summary.allocationByClass.first { $0.assetClass == .acoesBR }
         #expect(acoesBRAlloc != nil)

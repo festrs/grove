@@ -4,6 +4,8 @@ import SwiftData
 struct RebalancingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @State private var viewModel = RebalancingViewModel()
     @State private var showingConfirmation = false
 
@@ -65,7 +67,7 @@ struct RebalancingView: View {
                     .font(.headline)
 
                 HStack {
-                    Text("R$")
+                    Text(displayCurrency.symbol)
                         .font(.title2)
                         .foregroundStyle(.secondary)
                     TextField("5.000", text: $viewModel.investmentAmountText)
@@ -77,7 +79,7 @@ struct RebalancingView: View {
                 }
 
                 Button {
-                    viewModel.calculate(modelContext: modelContext)
+                    viewModel.calculate(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 } label: {
                     Text("Calculate Distribution")
                         .fontWeight(.semibold)
@@ -85,7 +87,7 @@ struct RebalancingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.tqAccentGreen)
-                .disabled(viewModel.investmentAmount <= 0)
+                .disabled(viewModel.investmentAmountDecimal <= 0)
             }
         }
     }
@@ -128,7 +130,7 @@ struct RebalancingView: View {
                     Text("Investment Suggestion")
                         .font(.headline)
                     Spacer()
-                    Text(viewModel.totalAllocated.formattedBRL())
+                    Text(viewModel.totalAllocated.formatted())
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -140,14 +142,14 @@ struct RebalancingView: View {
                     }
                 }
 
-                let remainder = viewModel.investmentAmount - viewModel.totalAllocated
+                let remainder = viewModel.investmentAmountDecimal - viewModel.totalAllocated.amount
                 if remainder > 0 {
                     HStack {
                         Text("Remainder (fractional)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(remainder.formattedBRL())
+                        Text(Money(amount: remainder, currency: displayCurrency).formatted())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

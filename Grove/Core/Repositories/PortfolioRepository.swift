@@ -2,11 +2,9 @@ import Foundation
 import SwiftData
 
 struct PortfolioSummary {
-    /// Total portfolio value expressed in the user's display currency
-    /// (currently BRL — non-BRL holdings are converted via the exchange rate).
-    let totalValue: Decimal
-    let monthlyIncomeGross: Decimal
-    let monthlyIncomeNet: Decimal
+    let totalValue: Money
+    let monthlyIncomeGross: Money
+    let monthlyIncomeNet: Money
     let allocationByClass: [AssetClassAllocation]
     let studyCount: Int
     let activeCount: Int
@@ -17,7 +15,7 @@ struct PortfolioSummary {
 struct AssetClassAllocation: Identifiable {
     var id: String { assetClass.rawValue }
     let assetClass: AssetClassType
-    let currentValue: Decimal
+    let currentValue: Money
     let currentPercent: Decimal
     let targetPercent: Decimal
     let drift: Decimal // current - target (positive = overweight)
@@ -48,20 +46,26 @@ struct PortfolioRepository {
         return try modelContext.fetch(descriptor)
     }
 
-    func computeSummary(holdings: [Holding], classAllocations: [AssetClassType: Double] = [:], exchangeRate: Decimal = 5.12) -> PortfolioSummary {
-        var totalBRL: Decimal = 0
-        var grossByClass: [AssetClassType: Decimal] = [:]
-        var valueByClass: [AssetClassType: Decimal] = [:]
+    func computeSummary(
+        holdings: [Holding],
+        classAllocations: [AssetClassType: Double] = [:],
+        displayCurrency: Currency,
+        rates: any ExchangeRates
+    ) -> PortfolioSummary {
+        var grossByClass: [AssetClassType: Money] = [:]
+        var valueByClass: [AssetClassType: Money] = [:]
+        var totalValues: [Money] = []
+        var grossValues: [Money] = []
         var study = 0, active = 0, quarantine = 0, selling = 0
 
         for h in holdings {
-            let brlValue = h.currency == .usd ? h.currentValue * exchangeRate : h.currentValue
-            totalBRL += brlValue
-            valueByClass[h.assetClass, default: 0] += brlValue
+            let value = h.currentValueMoney
+            totalValues.append(value)
+            valueByClass[h.assetClass] = (valueByClass[h.assetClass] ?? .zero(in: h.currency)) + value
 
-            let monthlyGross = h.estimatedMonthlyIncome
-            let brlMonthly = h.currency == .usd ? monthlyGross * exchangeRate : monthlyGross
-            grossByClass[h.assetClass, default: 0] += brlMonthly
+            let gross = h.estimatedMonthlyIncomeMoney
+            grossValues.append(gross)
+            grossByClass[h.assetClass] = (grossByClass[h.assetClass] ?? .zero(in: h.currency)) + gross
 
             switch h.status {
             case .estudo: study += 1
@@ -71,18 +75,23 @@ struct PortfolioRepository {
             }
         }
 
-        let totalGross = grossByClass.values.reduce(Decimal.zero, +)
-        let breakdown = TaxCalculator.taxBreakdown(grossByClass: grossByClass)
+        let totalValue = totalValues.sum(in: displayCurrency, using: rates)
+        let totalGross = grossValues.sum(in: displayCurrency, using: rates)
+        let breakdown = TaxCalculator.taxBreakdown(
+            grossByClass: grossByClass,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
 
-        // Use portfolio class allocations as target (source of truth)
         let allocations = AssetClassType.allCases.compactMap { classType -> AssetClassAllocation? in
-            let value = valueByClass[classType] ?? 0
-            let currentPct = totalBRL > 0 ? (value / totalBRL) * 100 : 0
+            let nativeValue = valueByClass[classType] ?? .zero(in: displayCurrency)
+            let displayValue = nativeValue.converted(to: displayCurrency, using: rates)
+            let currentPct: Decimal = totalValue.amount > 0 ? (displayValue.amount / totalValue.amount) * 100 : 0
             let targetPct = Decimal(classAllocations[classType] ?? 0)
-            guard value > 0 || targetPct > 0 else { return nil }
+            guard displayValue.amount > 0 || targetPct > 0 else { return nil }
             return AssetClassAllocation(
                 assetClass: classType,
-                currentValue: value,
+                currentValue: displayValue,
                 currentPercent: currentPct,
                 targetPercent: targetPct,
                 drift: currentPct - targetPct
@@ -90,7 +99,7 @@ struct PortfolioRepository {
         }
 
         return PortfolioSummary(
-            totalValue: totalBRL,
+            totalValue: totalValue,
             monthlyIncomeGross: totalGross,
             monthlyIncomeNet: breakdown.totalNet,
             allocationByClass: allocations,

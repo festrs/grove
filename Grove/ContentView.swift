@@ -7,6 +7,7 @@ struct ContentView: View {
     @Environment(\.syncService) private var syncService
     @Query private var settings: [UserSettings]
     @Query private var holdings: [Holding]
+    @State private var rateStore = RateStore()
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -29,6 +30,7 @@ struct ContentView: View {
             }
         }
         .environment(\.displayCurrency, settings.first?.preferredCurrency ?? .brl)
+        .environment(\.rates, rateStore)
         .overlay {
             #if DEBUG
             DebugFloatingButton()
@@ -36,6 +38,7 @@ struct ContentView: View {
         }
         .task {
             ensureSettingsExist()
+            await rateStore.refresh(using: backendService)
             guard settings.first?.hasCompletedOnboarding == true else { return }
             // TODO: Enable when push notifications are ready
             // await NotificationCoordinator.handleAppLaunch()

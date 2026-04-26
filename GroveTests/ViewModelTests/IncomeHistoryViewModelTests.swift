@@ -6,13 +6,15 @@ import SwiftData
 @Suite(.serialized)
 struct IncomeHistoryViewModelTests {
 
+    private static let rates: any ExchangeRates = StaticRates(brlPerUsd: 5)
+
     // MARK: - Initial state
 
     @Test func initialState() {
         let vm = IncomeHistoryViewModel()
         #expect(vm.incomeByClass.isEmpty)
-        #expect(vm.totalAnnualBRL == 0)
-        #expect(vm.monthlyIncomeBRL == 0)
+        #expect(vm.totalAnnual.amount == 0)
+        #expect(vm.monthlyIncome.amount == 0)
         #expect(vm.taxBreakdown == nil)
         #expect(vm.isLoading == false)
     }
@@ -25,12 +27,12 @@ struct IncomeHistoryViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = IncomeHistoryViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(!vm.incomeByClass.isEmpty)
-        #expect(vm.totalAnnualBRL > 0)
-        #expect(vm.monthlyIncomeBRL > 0)
-        #expect(vm.monthlyIncomeBRL == vm.totalAnnualBRL / 12)
+        #expect(vm.totalAnnual.amount > 0)
+        #expect(vm.monthlyIncome.amount > 0)
+        #expect(vm.monthlyIncome.amount == vm.totalAnnual.amount / 12)
     }
 
     @MainActor
@@ -39,10 +41,10 @@ struct IncomeHistoryViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = IncomeHistoryViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.taxBreakdown != nil)
-        #expect(vm.taxBreakdown!.totalNet > 0)
+        #expect(vm.taxBreakdown!.totalNet.amount > 0)
     }
 
     @MainActor
@@ -51,11 +53,12 @@ struct IncomeHistoryViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = IncomeHistoryViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
-        let annuals = vm.incomeByClass.map(\.annual)
-        for i in 0..<annuals.count - 1 {
-            #expect(annuals[i] >= annuals[i + 1])
+        for i in 0..<vm.incomeByClass.count - 1 {
+            let lhs = vm.incomeByClass[i].annual.converted(to: .brl, using: Self.rates).amount
+            let rhs = vm.incomeByClass[i + 1].annual.converted(to: .brl, using: Self.rates).amount
+            #expect(lhs >= rhs)
         }
     }
 
@@ -64,10 +67,10 @@ struct IncomeHistoryViewModelTests {
         let ctx = try makeTestContext()
 
         let vm = IncomeHistoryViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.incomeByClass.isEmpty)
-        #expect(vm.totalAnnualBRL == 0)
+        #expect(vm.totalAnnual.amount == 0)
     }
 
     @MainActor
@@ -76,7 +79,7 @@ struct IncomeHistoryViewModelTests {
         let (_, _) = seedTestData(ctx)
 
         let vm = IncomeHistoryViewModel()
-        vm.loadData(modelContext: ctx)
+        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.isLoading == false)
     }

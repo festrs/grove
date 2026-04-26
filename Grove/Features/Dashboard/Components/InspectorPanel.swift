@@ -6,6 +6,7 @@ struct InspectorPanel: View {
     let allocations: [AssetClassAllocation]
 
     @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @State private var selectedTab = InspectorTab.agenda
 
     enum InspectorTab: String, CaseIterable {
@@ -67,8 +68,8 @@ struct InspectorPanel: View {
                     .foregroundStyle(.secondary)
                     .tracking(0.6)
 
-                let total = dividends.reduce(Decimal.zero) { $0 + $1.totalAmount }
-                Text(total.formatted(as: displayCurrency))
+                let total = dividends.map { $0.totalAmountMoney }.sum(in: displayCurrency, using: rates)
+                Text(total.formatted())
                     .font(.system(size: 26, weight: .bold))
                     .monospacedDigit()
 
@@ -125,7 +126,7 @@ struct InspectorPanel: View {
 
             Spacer()
 
-            Text(dividend.totalAmount.formatted(as: displayCurrency))
+            Text(dividend.totalAmountMoney.formatted(in: displayCurrency, using: rates))
                 .font(.system(size: 13, weight: .semibold))
                 .monospacedDigit()
         }
@@ -164,7 +165,7 @@ struct InspectorPanel: View {
 
                     Spacer()
 
-                    Text(suggestion.amount.formatted(as: displayCurrency))
+                    Text(suggestion.amount.formatted())
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.tqAccentGreen)
                 }

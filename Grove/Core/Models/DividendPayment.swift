@@ -21,6 +21,26 @@ final class DividendPayment {
         totalAmount - withholdingTax
     }
 
+    private var resolvedCurrency: Currency {
+        holding?.currency ?? .brl
+    }
+
+    var amountPerShareMoney: Money {
+        Money(amount: amountPerShare, currency: resolvedCurrency)
+    }
+
+    var totalAmountMoney: Money {
+        Money(amount: totalAmount, currency: resolvedCurrency)
+    }
+
+    var netAmountMoney: Money {
+        Money(amount: netAmount, currency: resolvedCurrency)
+    }
+
+    var withholdingTaxMoney: Money {
+        Money(amount: withholdingTax, currency: resolvedCurrency)
+    }
+
     /// True when the payment is informational only — the holding has no shares
     /// (typically status `.estudo`), so we show the per-share amount instead
     /// of an earnings figure.

@@ -10,7 +10,7 @@ final class DashboardViewModel {
     var isLoading = false
     var error: String?
 
-    func loadData(modelContext: ModelContext) {
+    func loadData(modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
         isLoading = true
         error = nil
 
@@ -21,34 +21,30 @@ final class DashboardViewModel {
             let holdings = try portfolioRepo.fetchAllHoldings()
             let settings = try portfolioRepo.fetchSettings()
 
-            let computedSummary = portfolioRepo.computeSummary(holdings: holdings, classAllocations: settings.classAllocations)
+            let computedSummary = portfolioRepo.computeSummary(
+                holdings: holdings,
+                classAllocations: settings.classAllocations,
+                displayCurrency: displayCurrency,
+                rates: rates
+            )
             summary = computedSummary
-
-            // TODO: Enable when push notifications are ready
-            // Task { await NotificationCoordinator.handleDriftCheck(allocations: computedSummary.allocationByClass) }
 
             projection = IncomeProjector.project(
                 holdings: holdings,
-                incomeGoal: settings.monthlyIncomeGoal
+                incomeGoal: settings.monthlyIncomeGoalMoney,
+                monthlyContribution: Money(amount: 5_000, currency: displayCurrency),
+                displayCurrency: displayCurrency,
+                rates: rates
             )
 
-            // TODO: Enable when push notifications are ready
-            // if let progress = projection?.progressPercent {
-            //     Task { await NotificationCoordinator.handleMilestoneCheck(progressPercent: progress) }
-            // }
-
-            // Dashboard only renders ticker + class-drift %, so the amount is
-            // a placeholder for ranking. Use the portfolio total when present,
-            // otherwise fall back to the income goal so a fresh portfolio
-            // (every holding still at quantity 0) still gets a ranked preview.
-            let rankingAmount = max(
-                computedSummary.totalValue,
-                settings.monthlyIncomeGoal,
-                1000
-            )
+            let totalValueAmount = computedSummary.totalValue.amount
+            let goalAmount = settings.monthlyIncomeGoalMoney.converted(to: displayCurrency, using: rates).amount
+            let rankingAmountValue = max(totalValueAmount, goalAmount, 1000)
+            let rankingAmount = Money(amount: rankingAmountValue, currency: displayCurrency)
             topSuggestions = try RebalancingEngine.suggestions(
                 modelContext: modelContext,
-                investmentAmount: rankingAmount
+                investmentAmount: rankingAmount,
+                rates: rates
             )
 
             nextDividends = try dividendRepo.upcomingDividends(days: 30)

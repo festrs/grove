@@ -214,7 +214,7 @@ struct ImportView: View {
                 isDisabled: alreadyAdded,
                 showClassBadge: true,
                 trailingTitle: position.quantity > 0 ? "\(position.quantity) shares" : nil,
-                trailingSubtitle: position.quantity > 0 ? Decimal(position.totalValue).formattedBRL() : nil
+                trailingSubtitle: position.quantity > 0 ? Money(amount: Decimal(position.totalValue), currency: .brl).formatted() : nil
             )
         }
         .buttonStyle(.plain)

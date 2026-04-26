@@ -26,8 +26,8 @@ struct HoldingStatsStrip: View {
     private var portfolioCard: some View {
         let gl = holding.gainLossPercent
         return groupCard(rows: [
-            ("Total Value", holding.currentValue.formatted(as: holding.currency), .standard),
-            ("Average Price", holding.averagePrice.formatted(as: holding.currency), .standard),
+            ("Total Value", holding.currentValueMoney.formatted(), .standard),
+            ("Average Price", holding.averagePriceMoney.formatted(), .standard),
             ("Gain/Loss", "\(gl >= 0 ? "+" : "")\(gl.formattedPercent())", .color(holding.gainLossColor)),
         ])
     }
@@ -37,8 +37,8 @@ struct HoldingStatsStrip: View {
         if holding.assetClass.hasDividends {
             groupCard(rows: [
                 ("Estimated DY", holding.dividendYield.formattedPercent(), .standard),
-                ("Gross Income", holding.estimatedMonthlyIncome.formattedBRL(), .standard),
-                ("Net Income", holding.estimatedMonthlyIncomeNet.formattedBRL(), .accent),
+                ("Gross Income", holding.estimatedMonthlyIncomeMoney.formatted(), .standard),
+                ("Net Income", holding.estimatedMonthlyIncomeNetMoney.formatted(), .accent),
             ])
         }
     }

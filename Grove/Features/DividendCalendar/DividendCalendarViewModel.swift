@@ -5,8 +5,7 @@ struct CalendarDividend: Identifiable {
     var id: String { "\(symbol)-\(date.timeIntervalSince1970)-\(type)" }
     let symbol: String
     let type: String
-    let amount: Decimal
-    let currency: String
+    let amount: Money
     let date: Date
 }
 
@@ -17,14 +16,18 @@ final class DividendCalendarViewModel {
     var dividendsForMonth: [CalendarDividend] = []
     var selectedDay: Date?
     var dividendsForDay: [CalendarDividend] = []
-    var monthlyTotal: Decimal = 0
+    var monthlyTotal: Money = .zero(in: .brl)
+    private var displayCurrency: Currency = .brl
+    private var ratesProvider: any ExchangeRates = IdentityRates()
 
     var daysWithDividends: Set<Int> {
         Set(dividendsForMonth.map { Calendar.current.component(.day, from: $0.date) })
     }
 
-    /// Load from local SwiftData
-    func loadFromLocal(modelContext: ModelContext) {
+    func loadFromLocal(modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
+        self.displayCurrency = displayCurrency
+        self.ratesProvider = rates
+
         let descriptor = FetchDescriptor<DividendPayment>(
             sortBy: [SortDescriptor(\.paymentDate, order: .reverse)]
         )
@@ -35,8 +38,7 @@ final class DividendCalendarViewModel {
                 return CalendarDividend(
                     symbol: payment.holding?.displayTicker ?? ticker,
                     type: payment.taxTreatment.displayName,
-                    amount: payment.netAmount,
-                    currency: "BRL",
+                    amount: payment.netAmountMoney,
                     date: payment.paymentDate
                 )
             }
@@ -52,7 +54,7 @@ final class DividendCalendarViewModel {
             cal.component(.year, from: div.date) == cal.component(.year, from: selectedMonth) &&
             cal.component(.month, from: div.date) == cal.component(.month, from: selectedMonth)
         }
-        monthlyTotal = dividendsForMonth.reduce(Decimal.zero) { $0 + $1.amount }
+        monthlyTotal = dividendsForMonth.map { $0.amount }.sum(in: displayCurrency, using: ratesProvider)
         selectedDay = nil
         dividendsForDay = []
     }

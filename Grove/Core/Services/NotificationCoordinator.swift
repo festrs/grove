@@ -27,7 +27,7 @@ struct NotificationCoordinator {
 
     // MARK: - Dividend Notifications
 
-    static func handleNewDividends(_ payments: [(ticker: String, amount: Decimal, date: Date)]) async {
+    static func handleNewDividends(_ payments: [(ticker: String, amount: Money, date: Date)]) async {
         guard dividendsEnabled else { return }
         for p in payments {
             await NotificationService.shared.scheduleDividendNotification(

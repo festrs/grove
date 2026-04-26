@@ -2,8 +2,8 @@ import SwiftUI
 
 struct TQCurrencyField: View {
     let title: String
+    let currency: Currency
     @Binding var value: Decimal
-    var currency: Currency = .brl
 
     @State private var textValue: String = ""
     @FocusState private var isFocused: Bool

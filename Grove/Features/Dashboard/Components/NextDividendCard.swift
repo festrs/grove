@@ -83,8 +83,8 @@ struct NextDividendCard: View {
 
     private func amountText(_ dividend: DividendPayment) -> String {
         dividend.isInformational
-            ? dividend.amountPerShare.formattedBRL()
-            : dividend.netAmount.formattedBRL()
+            ? dividend.amountPerShareMoney.formatted()
+            : dividend.netAmountMoney.formatted()
     }
 
     private func amountColor(_ dividend: DividendPayment) -> Color {

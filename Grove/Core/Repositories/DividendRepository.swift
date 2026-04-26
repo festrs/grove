@@ -10,6 +10,9 @@ struct MonthlyDividendSummary: Identifiable {
     let net: Decimal
     let payments: [DividendPayment]
 
+    var grossMoney: Money { Money(amount: gross, currency: .brl) }
+    var netMoney: Money { Money(amount: net, currency: .brl) }
+
     var monthLabel: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "pt_BR")

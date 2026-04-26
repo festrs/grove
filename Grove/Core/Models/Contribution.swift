@@ -10,6 +10,10 @@ final class Contribution {
 
     var holding: Holding?
 
+    var pricePerShareMoney: Money {
+        Money(amount: pricePerShare, currency: holding?.currency ?? .brl)
+    }
+
     init(
         date: Date = .now,
         amount: Decimal,

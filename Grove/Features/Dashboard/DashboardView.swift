@@ -11,11 +11,34 @@ struct DashboardView: View {
     @Environment(\.backendService) private var backendService
     @Environment(\.syncService) private var syncService
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     @Query(sort: \Holding.ticker) private var holdings: [Holding]
     @Query private var settingsList: [UserSettings]
 
     @State private var viewModel = DashboardViewModel()
+
+    private static let fxTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    @ViewBuilder
+    private var fxCaption: some View {
+        if let store = rates as? RateStore {
+            if let updated = store.lastUpdated {
+                Text("FX as of \(Self.fxTimeFormatter.string(from: updated))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("FX unavailable")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
 
     private var settings: UserSettings? {
         settingsList.first
@@ -32,10 +55,13 @@ struct DashboardView: View {
                         } else if let errorMessage = viewModel.error, viewModel.summary == nil {
                             TQErrorView(
                                 message: errorMessage,
-                                retryAction: { viewModel.loadData(modelContext: modelContext) }
+                                retryAction: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }
                             )
                         } else {
                             dashboardContent
+                            fxCaption
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.top, Theme.Spacing.sm)
                         }
                     }
                     .padding(.horizontal, Theme.Spacing.lg)
@@ -64,18 +90,18 @@ struct DashboardView: View {
             }
             .refreshable {
                 await syncService.syncAll(modelContext: modelContext, backendService: backendService)
-                viewModel.loadData(modelContext: modelContext)
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
         }
         .task {
-            viewModel.loadData(modelContext: modelContext)
+            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
         }
         .onChange(of: holdings.count) {
-            viewModel.loadData(modelContext: modelContext)
+            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
         }
         .onChange(of: syncService.isSyncing) { _, syncing in
             if !syncing {
-                viewModel.loadData(modelContext: modelContext)
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
         }
     }
@@ -130,12 +156,15 @@ struct DashboardView: View {
 
                 HistoryBarChart(
                     monthlyData: [
-                        ("Jan", 0), ("Fev", 0), ("Mar", 0), ("Abr", 0),
-                        ("Mai", 0), ("Jun", 0), ("Jul", 0), ("Ago", 0),
-                        ("Set", 0), ("Out", 0), ("Nov", 0),
+                        ("Jan", .zero(in: displayCurrency)), ("Fev", .zero(in: displayCurrency)),
+                        ("Mar", .zero(in: displayCurrency)), ("Abr", .zero(in: displayCurrency)),
+                        ("Mai", .zero(in: displayCurrency)), ("Jun", .zero(in: displayCurrency)),
+                        ("Jul", .zero(in: displayCurrency)), ("Ago", .zero(in: displayCurrency)),
+                        ("Set", .zero(in: displayCurrency)), ("Out", .zero(in: displayCurrency)),
+                        ("Nov", .zero(in: displayCurrency)),
                         ("Dez", summary.monthlyIncomeNet),
                     ],
-                    goal: viewModel.projection?.goalMonthly ?? 10000
+                    goal: viewModel.projection?.goalMonthly ?? Money(amount: 10000, currency: displayCurrency)
                 )
                 .frame(minWidth: 0, maxWidth: .infinity)
             }

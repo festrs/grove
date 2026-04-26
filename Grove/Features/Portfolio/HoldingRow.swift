@@ -2,8 +2,7 @@ import SwiftUI
 
 struct HoldingRow: View {
     let holding: Holding
-    let totalValue: Decimal
-    var exchangeRate: Decimal = 5.12
+    let totalValue: Money
 
     private var gainLoss: Decimal { holding.gainLossPercent }
 
@@ -16,9 +15,8 @@ struct HoldingRow: View {
                 showIcon: true
             )
 
-            // Gain/loss badge (unique to portfolio row)
             VStack(alignment: .trailing, spacing: 4) {
-                Text(holding.currentPrice.formatted(as: holding.currency))
+                Text(holding.priceMoney.formatted())
                     .font(.system(.body, weight: .semibold))
 
                 HStack(spacing: 2) {

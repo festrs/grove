@@ -6,30 +6,32 @@ import SwiftData
 @Suite(.serialized)
 struct RebalancingViewModelTests {
 
+    private static let rates: any ExchangeRates = StaticRates(brlPerUsd: 5)
+
     // MARK: - investmentAmount parsing
 
     @Test func investmentAmountParsesPlainNumber() {
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "5000"
-        #expect(vm.investmentAmount == 5000)
+        #expect(vm.investmentAmountDecimal == 5000)
     }
 
     @Test func investmentAmountParsesBrazilianFormat() {
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "5.000,50"
-        #expect(vm.investmentAmount == Decimal(string: "5000.50"))
+        #expect(vm.investmentAmountDecimal == Decimal(string: "5000.50"))
     }
 
     @Test func investmentAmountReturnsZeroForEmpty() {
         let vm = RebalancingViewModel()
         vm.investmentAmountText = ""
-        #expect(vm.investmentAmount == 0)
+        #expect(vm.investmentAmountDecimal == 0)
     }
 
     @Test func investmentAmountReturnsZeroForInvalid() {
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "abc"
-        #expect(vm.investmentAmount == 0)
+        #expect(vm.investmentAmountDecimal == 0)
     }
 
     // MARK: - Initial state
@@ -38,7 +40,7 @@ struct RebalancingViewModelTests {
         let vm = RebalancingViewModel()
         #expect(vm.investmentAmountText == "")
         #expect(vm.suggestions.isEmpty)
-        #expect(vm.totalAllocated == 0)
+        #expect(vm.totalAllocated.amount == 0)
         #expect(vm.hasCalculated == false)
         #expect(vm.isRegistering == false)
     }
@@ -52,11 +54,11 @@ struct RebalancingViewModelTests {
 
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "5000"
-        vm.calculate(modelContext: ctx)
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.hasCalculated == true)
         #expect(!vm.suggestions.isEmpty)
-        #expect(vm.totalAllocated > 0)
+        #expect(vm.totalAllocated.amount > 0)
     }
 
     @MainActor
@@ -66,7 +68,7 @@ struct RebalancingViewModelTests {
 
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "0"
-        vm.calculate(modelContext: ctx)
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.hasCalculated == true)
         #expect(vm.suggestions.isEmpty)
@@ -81,7 +83,7 @@ struct RebalancingViewModelTests {
 
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "5000"
-        vm.calculate(modelContext: ctx)
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.emptyReason == nil)
         #expect(!vm.suggestions.isEmpty)
@@ -104,7 +106,7 @@ struct RebalancingViewModelTests {
 
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "1000"
-        vm.calculate(modelContext: ctx)
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.hasCalculated == true)
         #expect(vm.suggestions.isEmpty)
@@ -113,9 +115,6 @@ struct RebalancingViewModelTests {
 
     @MainActor
     @Test func zeroQuantityAportarHoldingStillRecommended() throws {
-        // A fresh portfolio (every .aportar holding still at quantity 0) should
-        // still produce suggestions — the engine treats those as "fully under
-        // target" so the user gets actionable guidance on day one.
         let ctx = try makeTestContext()
         let portfolio = Portfolio(name: "Test")
         ctx.insert(portfolio)
@@ -131,7 +130,7 @@ struct RebalancingViewModelTests {
 
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "1000"
-        vm.calculate(modelContext: ctx)
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.hasCalculated == true)
         #expect(!vm.suggestions.isEmpty)
@@ -145,11 +144,10 @@ struct RebalancingViewModelTests {
 
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "0"
-        vm.calculate(modelContext: ctx)
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(vm.hasCalculated == true)
         #expect(vm.suggestions.isEmpty)
-        // Zero amount returns empty from engine, emptyReason diagnoses the state
         #expect(vm.emptyReason != nil)
     }
 
@@ -162,7 +160,7 @@ struct RebalancingViewModelTests {
 
         let vm = RebalancingViewModel()
         vm.investmentAmountText = "5000"
-        vm.calculate(modelContext: ctx)
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
         #expect(!vm.suggestions.isEmpty)
 
         vm.registerContributions(modelContext: ctx)

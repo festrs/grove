@@ -1,5 +1,18 @@
 #!/bin/bash
-# Mutation testing for Grove — batched.
+# Mutation testing for Grove — batched, critical-logic only.
+#
+# Scope (intentionally narrow):
+#   Mutations target ONLY paths that drive money decisions or tax routing:
+#     - RebalancingEngine     (where to invest)
+#     - TaxTreatment / TaxCalculator (after-tax income math)
+#     - IncomeProjector       (FIRE projection)
+#     - Holding gainLoss      (per-position P&L)
+#     - PortfolioRepository drift (allocation gap shown to user)
+#     - AssetClassType        (currency + tax-treatment routing)
+#
+#   Deliberately excluded: onboarding UX guards, default property values,
+#   one-time data migrations, UI categorization flags. They are tested
+#   elsewhere; mutating them does not surface gaps in *financial* coverage.
 #
 # Strategy:
 #   1. Mutations are listed as 4-tuples (file desc search replace).
@@ -30,49 +43,39 @@ add() {
     MUTATIONS+=("$1|||$2|||$3|||$4")
 }
 
-# --- RebalancingEngine ---
+# --- RebalancingEngine: where to invest ---
 E="Grove/Core/Services/RebalancingEngine.swift"
-add "$E" "eligible: aportar->quarentena"     'status == .aportar'                           'status == .quarentena'
-add "$E" "remove vender exclusion"           'guard h.status != .vender else { continue }'  '// mutated: vender not excluded'
-add "$E" "flip class gap sort"               'return a.classGap > b.classGap'               'return a.classGap < b.classGap'
-add "$E" "break zero investment guard"       'guard investmentAmount > 0'                   'guard investmentAmount > 999999'
-add "$E" "break empty eligible guard"        'guard !context.eligible.isEmpty'              'guard context.eligible.isEmpty'
-add "$E" "percent helper: divide by total"   'guard total > 0 else { return 0 }'            'guard total < 0 else { return 0 }'
+add "$E" "eligible: aportar->quarentena"     'status == .aportar'                                    'status == .quarentena'
+add "$E" "remove vender exclusion"           'guard h.status != .vender else { continue }'           '// mutated: vender not excluded'
+add "$E" "flip class gap sort"               'return a.classGap > b.classGap'                        'return a.classGap < b.classGap'
+add "$E" "break zero investment guard"       'guard investmentAmount.amount > 0 else { return [] }'  'guard investmentAmount.amount > 999999 else { return [] }'
+add "$E" "break empty eligible guard"        'guard !context.eligible.isEmpty'                       'guard context.eligible.isEmpty'
+add "$E" "percent helper: divide by total"   'guard total > 0 else { return 0 }'                     'guard total < 0 else { return 0 }'
 
-# --- TaxCalculator ---
+# --- TaxTreatment / TaxCalculator: after-tax income ---
+TT="Grove/Core/Models/Enums/TaxTreatment.swift"
+add "$TT" "nra30 multiplier 0.70 -> 1.0"     'case .nra30: 0.70'                                     'case .nra30: 1.0'
+
 T="Grove/Core/Services/TaxCalculator.swift"
-add "$T" "nra30: 0.30 -> 0.00"               'case .nra30: return 0.30'   'case .nra30: return 0.00'
-add "$T" "flip net multiplier"               '1 - taxRate'                '1 + taxRate'
+add "$T" "flip withholding sign"             'gross * (1 - netMultiplier(for: assetClass))'          'gross * (1 + netMultiplier(for: assetClass))'
 
-# --- Holding ---
-H="Grove/Core/Models/Holding.swift"
-add "$H" "flip gainLoss sign"                'currentValue - totalCost'   'totalCost - currentValue'
-add "$H" "wrong congelar migration"          'if statusRaw == "congelar" { return .quarentena }' 'if statusRaw == "congelar" { return .aportar }'
-add "$H" "default targetPercent 5 -> 1"      'targetPercent: Decimal = 5' 'targetPercent: Decimal = 1'
-
-# --- DividendPayment ---
-D="Grove/Core/Models/DividendPayment.swift"
-add "$D" "informational guard inverted"      'totalAmount == 0'           'totalAmount != 0'
-
-# --- PortfolioRepository ---
-R="Grove/Core/Repositories/PortfolioRepository.swift"
-add "$R" "flip drift sign"                   'drift: currentPct - targetPct'  'drift: targetPct - currentPct'
-
-# --- IncomeProjector ---
+# --- IncomeProjector: FIRE projection ---
 I="Grove/Core/Services/IncomeProjector.swift"
-add "$I" "break income check"                'monthlyIncome > 0'  'monthlyIncome > 999999'
+add "$I" "skip projection loop"              'totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0'  'totalNet.amount > goalDisplay.amount && contributionDisplay.amount > 0'
 
-# --- OnboardingViewModel ---
-O="Grove/Features/Onboarding/OnboardingViewModel.swift"
-add "$O" "break target validation"           'total >= 99'                  'total >= 0'
-add "$O" "allow unlimited holdings"          'guard canAddMoreHoldings'     'guard true || canAddMoreHoldings'
-add "$O" "completeOnboarding ignores status" 'status: pending.status'       'status: .estudo'
+# --- Holding: per-position P&L ---
+H="Grove/Core/Models/Holding.swift"
+add "$H" "flip gainLoss sign"                'currentValue - totalCost'                              'totalCost - currentValue'
 
-# --- AssetClassType ---
+# --- PortfolioRepository: allocation drift ---
+R="Grove/Core/Repositories/PortfolioRepository.swift"
+add "$R" "flip drift sign"                   'drift: currentPct - targetPct'                         'drift: targetPct - currentPct'
+
+# --- AssetClassType: currency + tax-treatment routing ---
 A="Grove/Core/Models/Enums/AssetClassType.swift"
-add "$A" "detect: FII->acoesBR"              'return .fiis'        'return .acoesBR'
-add "$A" "BR currency->USD"                  'case .acoesBR, .fiis, .rendaFixa: .brl'  'case .acoesBR, .fiis, .rendaFixa: .usd'
-add "$A" "detect crypto -> nil"              'if apiType == "crypto" { return .crypto }'  'if apiType == "crypto" { return nil }'
+add "$A" "detect FII -> acoesBR"             'if apiType == "fund" { return .fiis }'                 'if apiType == "fund" { return .acoesBR }'
+add "$A" "BR currency -> USD"                'case .acoesBR, .fiis, .rendaFixa: .brl'                'case .acoesBR, .fiis, .rendaFixa: .usd'
+add "$A" "detect crypto -> nil"              'if apiType == "crypto" { return .crypto }'             'if apiType == "crypto" { return nil }'
 
 # ────────────────────────────────────────────────
 #  Batched runner

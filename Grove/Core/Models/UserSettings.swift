@@ -11,6 +11,11 @@ final class UserSettings {
     var preferredCurrencyRaw: String
     var recommendationCount: Int = 2
 
+    var monthlyIncomeGoalCurrencyRaw: String = Currency.brl.rawValue
+    var monthlyCostOfLivingCurrencyRaw: String = Currency.brl.rawValue
+    var emergencyReserveTargetCurrencyRaw: String = Currency.brl.rawValue
+    var emergencyReserveCurrentCurrencyRaw: String = Currency.brl.rawValue
+
     /// Global asset class allocation targets as JSON: {"acoesBR": 40, "fiis": 30, ...}
     /// Must sum to 100. Single source of truth for rebalancing across all portfolios.
     var classAllocationJSON: String = "{}"
@@ -18,6 +23,58 @@ final class UserSettings {
     var preferredCurrency: Currency {
         get { Currency(rawValue: preferredCurrencyRaw) ?? .brl }
         set { preferredCurrencyRaw = newValue.rawValue }
+    }
+
+    var monthlyIncomeGoalCurrency: Currency {
+        get { Currency(rawValue: monthlyIncomeGoalCurrencyRaw) ?? .brl }
+        set { monthlyIncomeGoalCurrencyRaw = newValue.rawValue }
+    }
+
+    var monthlyCostOfLivingCurrency: Currency {
+        get { Currency(rawValue: monthlyCostOfLivingCurrencyRaw) ?? .brl }
+        set { monthlyCostOfLivingCurrencyRaw = newValue.rawValue }
+    }
+
+    var emergencyReserveTargetCurrency: Currency {
+        get { Currency(rawValue: emergencyReserveTargetCurrencyRaw) ?? .brl }
+        set { emergencyReserveTargetCurrencyRaw = newValue.rawValue }
+    }
+
+    var emergencyReserveCurrentCurrency: Currency {
+        get { Currency(rawValue: emergencyReserveCurrentCurrencyRaw) ?? .brl }
+        set { emergencyReserveCurrentCurrencyRaw = newValue.rawValue }
+    }
+
+    var monthlyIncomeGoalMoney: Money {
+        get { Money(amount: monthlyIncomeGoal, currency: monthlyIncomeGoalCurrency) }
+        set {
+            monthlyIncomeGoal = newValue.amount
+            monthlyIncomeGoalCurrencyRaw = newValue.currency.rawValue
+        }
+    }
+
+    var monthlyCostOfLivingMoney: Money {
+        get { Money(amount: monthlyCostOfLiving, currency: monthlyCostOfLivingCurrency) }
+        set {
+            monthlyCostOfLiving = newValue.amount
+            monthlyCostOfLivingCurrencyRaw = newValue.currency.rawValue
+        }
+    }
+
+    var emergencyReserveTargetMoney: Money {
+        get { Money(amount: emergencyReserveTarget, currency: emergencyReserveTargetCurrency) }
+        set {
+            emergencyReserveTarget = newValue.amount
+            emergencyReserveTargetCurrencyRaw = newValue.currency.rawValue
+        }
+    }
+
+    var emergencyReserveCurrentMoney: Money {
+        get { Money(amount: emergencyReserveCurrent, currency: emergencyReserveCurrentCurrency) }
+        set {
+            emergencyReserveCurrent = newValue.amount
+            emergencyReserveCurrentCurrencyRaw = newValue.currency.rawValue
+        }
     }
 
     var classAllocations: [AssetClassType: Double] {
@@ -49,7 +106,8 @@ final class UserSettings {
         emergencyReserveTarget: Decimal = 180_000,
         emergencyReserveCurrent: Decimal = 0,
         hasCompletedOnboarding: Bool = false,
-        preferredCurrency: Currency = .brl
+        preferredCurrency: Currency = .brl,
+        goalCurrency: Currency = .brl
     ) {
         self.monthlyIncomeGoal = monthlyIncomeGoal
         self.monthlyCostOfLiving = monthlyCostOfLiving
@@ -57,5 +115,9 @@ final class UserSettings {
         self.emergencyReserveCurrent = emergencyReserveCurrent
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.preferredCurrencyRaw = preferredCurrency.rawValue
+        self.monthlyIncomeGoalCurrencyRaw = goalCurrency.rawValue
+        self.monthlyCostOfLivingCurrencyRaw = goalCurrency.rawValue
+        self.emergencyReserveTargetCurrencyRaw = goalCurrency.rawValue
+        self.emergencyReserveCurrentCurrencyRaw = goalCurrency.rawValue
     }
 }

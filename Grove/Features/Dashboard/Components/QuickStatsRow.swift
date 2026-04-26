@@ -4,6 +4,7 @@ struct QuickStatsRow: View {
     let summary: PortfolioSummary
     let holdingCount: Int
     @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     var body: some View {
         LazyVGrid(
@@ -12,19 +13,19 @@ struct QuickStatsRow: View {
         ) {
             statCard(
                 label: "Total Assets",
-                value: summary.totalValue.formattedCompact(),
-                prefix: "\(displayCurrency.symbol) "
+                value: summary.totalValue.amount.formattedCompact(),
+                prefix: "\(summary.totalValue.currency.symbol) "
             )
 
             statCard(
                 label: "Net Passive Income",
-                value: summary.monthlyIncomeNet.formatted(as: displayCurrency),
+                value: summary.monthlyIncomeNet.formatted(in: displayCurrency, using: rates),
                 suffix: "/month"
             )
 
             statCard(
                 label: "Gross Passive Income",
-                value: summary.monthlyIncomeGross.formatted(as: displayCurrency),
+                value: summary.monthlyIncomeGross.formatted(in: displayCurrency, using: rates),
                 suffix: "/month"
             )
 
@@ -77,9 +78,9 @@ struct QuickStatsRow: View {
 #Preview {
     QuickStatsRow(
         summary: PortfolioSummary(
-            totalValue: 245_000,
-            monthlyIncomeGross: 2_450,
-            monthlyIncomeNet: 2_100,
+            totalValue: Money(amount: 245_000, currency: .brl),
+            monthlyIncomeGross: Money(amount: 2_450, currency: .brl),
+            monthlyIncomeNet: Money(amount: 2_100, currency: .brl),
             allocationByClass: [],
             studyCount: 1,
             activeCount: 12,

@@ -6,6 +6,8 @@ struct PortfolioView: View {
     @Environment(\.backendService) private var backendService
     @Environment(\.syncService) private var syncService
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @Query private var holdings: [Holding]
     @State private var viewModel = PortfolioViewModel()
     @State private var isSearching = false
@@ -123,7 +125,7 @@ struct PortfolioView: View {
                     if wasAdded && !recentlyAdded.contains(where: { $0.symbol == result.symbol }) {
                         withAnimation { recentlyAdded.insert(result, at: 0) }
                     }
-                    viewModel.loadData(modelContext: modelContext)
+                    viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 }
             }) {
                 if let result = viewModel.selectedSearchResult {
@@ -137,16 +139,16 @@ struct PortfolioView: View {
             }
             .sheet(isPresented: $viewModel.showingNewPortfolio) {
                 NewPortfolioSheet { name in
-                    viewModel.createPortfolio(name: name, modelContext: modelContext)
+                    viewModel.createPortfolio(name: name, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 }
             }
-            .sheet(item: $holdingToBuy, onDismiss: { viewModel.loadData(modelContext: modelContext) }) { holding in
+            .sheet(item: $holdingToBuy, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) { holding in
                 NewTransactionView(transactionType: .buy, preselectedHolding: holding)
             }
-            .sheet(item: $holdingToSell, onDismiss: { viewModel.loadData(modelContext: modelContext) }) { holding in
+            .sheet(item: $holdingToSell, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) { holding in
                 NewTransactionView(transactionType: .sell, preselectedHolding: holding)
             }
-            .sheet(isPresented: $showingImport, onDismiss: { viewModel.loadData(modelContext: modelContext) }) {
+            .sheet(isPresented: $showingImport, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) {
                 if let portfolio = viewModel.selectedPortfolio {
                     ImportPortfolioView(portfolio: portfolio)
                 }
@@ -161,7 +163,7 @@ struct PortfolioView: View {
                 Button("Cancel", role: .cancel) { viewModel.holdingToRemove = nil }
                 Button("Remove", role: .destructive) {
                     if let h = viewModel.holdingToRemove {
-                        viewModel.deleteHolding(h, modelContext: modelContext)
+                        viewModel.deleteHolding(h, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                         viewModel.holdingToRemove = nil
                     }
                 }
@@ -176,21 +178,21 @@ struct PortfolioView: View {
             }
             .refreshable {
                 await syncService.syncAll(modelContext: modelContext, backendService: backendService)
-                viewModel.loadData(modelContext: modelContext)
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
             .task {
-                viewModel.loadData(modelContext: modelContext)
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 let service = backendService
                 debouncer.start { query in
                     (try? await service.searchStocks(query: query)) ?? []
                 }
             }
             .onChange(of: syncService.isSyncing) { _, syncing in
-                if !syncing { viewModel.loadData(modelContext: modelContext) }
+                if !syncing { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }
             }
             .onChange(of: holdings.count) {
                 guard !isSearching else { return }
-                viewModel.loadData(modelContext: modelContext)
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
             .onChange(of: searchText) { _, newValue in
                 debouncer.send(newValue)
@@ -390,7 +392,7 @@ struct PortfolioView: View {
         Menu {
             ForEach(viewModel.portfolios, id: \.persistentModelID) { portfolio in
                 Button {
-                    viewModel.selectPortfolio(portfolio, modelContext: modelContext)
+                    viewModel.selectPortfolio(portfolio, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 } label: {
                     HStack {
                         Text(portfolio.name)
@@ -413,10 +415,10 @@ struct PortfolioView: View {
 
     private var portfolioHeader: some View {
         VStack(spacing: 4) {
-            Text(viewModel.totalValue.formattedBRL())
+            Text(viewModel.totalValue.formatted())
                 .font(.system(size: 32, weight: .bold, design: .rounded))
             if let summary = viewModel.summary {
-                Text("Monthly income: \(summary.monthlyIncomeNet.formattedBRL())")
+                Text("Monthly income: \(summary.monthlyIncomeNet.formatted())")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
         }
@@ -459,13 +461,13 @@ struct PortfolioView: View {
     @ViewBuilder
     private var assetClassTabButtons: some View {
         AssetClassTab(title: "All", isSelected: viewModel.selectedClass == nil, color: .tqAccentGreen) {
-            viewModel.selectClass(nil)
+            viewModel.selectClass(nil, displayCurrency: displayCurrency, rates: rates)
         }
         ForEach(AssetClassType.allCases) { classType in
             let count = viewModel.holdings.filter { $0.assetClass == classType }.count
             if count > 0 {
                 AssetClassTab(title: classType.displayName, isSelected: viewModel.selectedClass == classType, color: classType.color) {
-                    viewModel.selectClass(classType)
+                    viewModel.selectClass(classType, displayCurrency: displayCurrency, rates: rates)
                 }
             }
         }
