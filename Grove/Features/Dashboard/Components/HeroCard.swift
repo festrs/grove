@@ -3,6 +3,7 @@ import SwiftUI
 struct HeroCard: View {
     let projection: IncomeProjection
     let suggestions: [RebalancingSuggestion]
+    @Environment(\.displayCurrency) private var displayCurrency
 
     var body: some View {
         TQCard {
@@ -21,11 +22,11 @@ struct HeroCard: View {
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(.secondary)
                                 .tracking(0.6)
-                            Text(projection.currentMonthlyNet.formattedBRL())
+                            Text(projection.currentMonthlyNet.formatted(as: displayCurrency))
                                 .font(.system(size: 32, weight: .bold))
                                 .minimumScaleFactor(0.6)
                                 .lineLimit(1)
-                            Text("of \(projection.goalMonthly.formattedBRL())")
+                            Text("of \(projection.goalMonthly.formatted(as: displayCurrency))")
                                 .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
                         }
@@ -89,7 +90,7 @@ struct HeroCard: View {
 
             Spacer()
 
-            Text(suggestion.amount.formattedBRL())
+            Text(suggestion.amount.formatted(as: displayCurrency))
                 .font(.system(size: 16, weight: .semibold))
                 .monospacedDigit()
         }

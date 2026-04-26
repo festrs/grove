@@ -3,6 +3,7 @@ import SwiftUI
 struct IncomeGaugeMeter: View {
     let projection: IncomeProjection
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.displayCurrency) private var displayCurrency
 
     private var progressValue: Double {
         NSDecimalNumber(decimal: projection.progressPercent).doubleValue / 100.0
@@ -25,7 +26,7 @@ struct IncomeGaugeMeter: View {
                     )
 
                     VStack(spacing: Theme.Spacing.xs) {
-                        Text(projection.currentMonthlyNet.formattedBRL())
+                        Text(projection.currentMonthlyNet.formatted(as: displayCurrency))
                             .font(.system(size: Theme.FontSize.title2, weight: .bold))
                             .foregroundStyle(goalReached ? Color.tqPositive : .primary)
                             .minimumScaleFactor(0.7)
@@ -41,7 +42,7 @@ struct IncomeGaugeMeter: View {
 
                 // Progress percent and goal
                 VStack(spacing: Theme.Spacing.xs) {
-                    Text("\(projection.progressPercent.formattedPercent(decimals: 2)) of \(projection.goalMonthly.formattedBRL())")
+                    Text("\(projection.progressPercent.formattedPercent(decimals: 2)) of \(projection.goalMonthly.formatted(as: displayCurrency))")
                         .font(.system(size: Theme.FontSize.body, weight: .medium))
                         .foregroundStyle(.primary)
 

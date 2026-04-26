@@ -112,12 +112,14 @@ struct RebalancingViewModelTests {
     }
 
     @MainActor
-    @Test func emptyReasonNoPortfolioValueWhenZeroQuantity() throws {
+    @Test func zeroQuantityAportarHoldingStillRecommended() throws {
+        // A fresh portfolio (every .aportar holding still at quantity 0) should
+        // still produce suggestions — the engine treats those as "fully under
+        // target" so the user gets actionable guidance on day one.
         let ctx = try makeTestContext()
         let portfolio = Portfolio(name: "Test")
         ctx.insert(portfolio)
 
-        // Aportar status but quantity = 0 → currentValue = 0
         let h = Holding(ticker: "TEST3.SA", displayName: "Test", currentPrice: 50, assetClass: .acoesBR, status: .aportar)
         ctx.insert(h)
         h.portfolio = portfolio
@@ -132,8 +134,8 @@ struct RebalancingViewModelTests {
         vm.calculate(modelContext: ctx)
 
         #expect(vm.hasCalculated == true)
-        #expect(vm.suggestions.isEmpty)
-        #expect(vm.emptyReason == .noPortfolioValue)
+        #expect(!vm.suggestions.isEmpty)
+        #expect(vm.emptyReason == nil)
     }
 
     @MainActor

@@ -4,6 +4,7 @@ import Charts
 struct HistoryBarChart: View {
     let monthlyData: [(month: String, value: Decimal)]
     let goal: Decimal
+    @Environment(\.displayCurrency) private var displayCurrency
 
     var body: some View {
         TQCard {
@@ -17,7 +18,7 @@ struct HistoryBarChart: View {
 
                         if let last = monthlyData.last {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                Text("\(last.value.formattedBRL())/month")
+                                Text("\(last.value.formatted(as: displayCurrency))/month")
                                     .font(.system(size: 24, weight: .bold))
                                     .monospacedDigit()
 

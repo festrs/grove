@@ -5,6 +5,7 @@ struct InspectorPanel: View {
     let suggestions: [RebalancingSuggestion]
     let allocations: [AssetClassAllocation]
 
+    @Environment(\.displayCurrency) private var displayCurrency
     @State private var selectedTab = InspectorTab.agenda
 
     enum InspectorTab: String, CaseIterable {
@@ -67,7 +68,7 @@ struct InspectorPanel: View {
                     .tracking(0.6)
 
                 let total = dividends.reduce(Decimal.zero) { $0 + $1.totalAmount }
-                Text(total.formattedBRL())
+                Text(total.formatted(as: displayCurrency))
                     .font(.system(size: 26, weight: .bold))
                     .monospacedDigit()
 
@@ -124,7 +125,7 @@ struct InspectorPanel: View {
 
             Spacer()
 
-            Text(dividend.totalAmount.formattedBRL())
+            Text(dividend.totalAmount.formatted(as: displayCurrency))
                 .font(.system(size: 13, weight: .semibold))
                 .monospacedDigit()
         }
@@ -163,7 +164,7 @@ struct InspectorPanel: View {
 
                     Spacer()
 
-                    Text(suggestion.amount.formattedBRL())
+                    Text(suggestion.amount.formatted(as: displayCurrency))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.tqAccentGreen)
                 }

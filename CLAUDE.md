@@ -41,7 +41,7 @@ just --list             # show all available recipes
 
 **Navigation:** 4-tab `TabView` (Dashboard, Portfolio, Aportar, Ajustes). DividendCalendar and IncomeHistory are pushed from Dashboard via `NavigationLink`. Portfolio uses `.navigationDestination(for: PersistentIdentifier.self)` for holding detail.
 
-**Networking:** All API calls go through `BackendServiceProtocol` → `BackendService` (actor) → project-fin backend. No direct external API calls from the app. Mock service used in previews/tests via `@Environment(\.backendService)`.
+**Networking:** All API calls go through `BackendServiceProtocol` → `BackendService` (actor) → grove-platform backend. No direct external API calls from the app. Mock service used in previews/tests via `@Environment(\.backendService)`.
 
 **Design System:** Custom components prefixed `TQ` (TQCard, TQProgressRing, TQStatusBadge, etc.) in `Core/DesignSystem/`. Theme colors in `Color+Theme.swift`. App is dark-mode only (`.preferredColorScheme(.dark)` on root view).
 
@@ -52,13 +52,13 @@ just --list             # show all available recipes
 - **Contributions as source of truth:** `Holding.quantity` and `averagePrice` are cached but derived from `Contribution` records via `recalculateFromContributions()`. Always create a Contribution then call recalculate — never write quantity/averagePrice directly.
 - **Asset class detection:** `AssetClassType.detect(from:apiType:)` uses the Brapi API `type` field (`"fund"` → FII, `"stock"` → Ações BR, `"bdr"` → US Stocks) as primary source, falls back to ticker heuristics. Always strip `.SA` suffix before display.
 
-## Backend (project-fin)
+## Backend (grove-platform)
 
-Located at `/Users/felipediaspereira/Code/project-fin/`. FastAPI + SQLAlchemy + SQLite.
+Located at `/Users/felipediaspereira/Code/grove/grove-platform/`. FastAPI + SQLAlchemy + SQLite.
 
 ```bash
 # Run with Docker
-cd /path/to/project-fin && docker compose up -d
+cd ../grove-platform && docker compose up -d
 
 # Rebuild after code changes
 docker compose up -d --build backend
