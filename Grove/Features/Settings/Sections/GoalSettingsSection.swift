@@ -3,45 +3,39 @@ import SwiftUI
 struct GoalSettingsSection: View {
     @Bindable var settings: UserSettings
     @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     var body: some View {
         Section("Goals") {
             TQCurrencyField(
                 title: "Monthly Passive Income",
-                currency: settings.monthlyIncomeGoalCurrency,
-                value: $settings.monthlyIncomeGoal
+                currency: displayCurrency,
+                value: binding(for: \.monthlyIncomeGoal, currency: \.monthlyIncomeGoalCurrency)
             )
-            .onChange(of: settings.monthlyIncomeGoal) { _, _ in
-                settings.monthlyIncomeGoalCurrency = displayCurrency
-            }
 
             TQCurrencyField(
                 title: "Monthly Cost of Living",
-                currency: settings.monthlyCostOfLivingCurrency,
-                value: $settings.monthlyCostOfLiving
+                currency: displayCurrency,
+                value: binding(for: \.monthlyCostOfLiving, currency: \.monthlyCostOfLivingCurrency)
             )
-            .onChange(of: settings.monthlyCostOfLiving) { _, _ in
-                settings.monthlyCostOfLivingCurrency = displayCurrency
-            }
 
             TQCurrencyField(
                 title: "Emergency Reserve (Target)",
-                currency: settings.emergencyReserveTargetCurrency,
-                value: $settings.emergencyReserveTarget
+                currency: displayCurrency,
+                value: binding(for: \.emergencyReserveTarget, currency: \.emergencyReserveTargetCurrency)
             )
-            .onChange(of: settings.emergencyReserveTarget) { _, _ in
-                settings.emergencyReserveTargetCurrency = displayCurrency
-            }
 
             TQCurrencyField(
                 title: "Emergency Reserve (Current)",
-                currency: settings.emergencyReserveCurrentCurrency,
-                value: $settings.emergencyReserveCurrent
+                currency: displayCurrency,
+                value: binding(for: \.emergencyReserveCurrent, currency: \.emergencyReserveCurrentCurrency)
             )
-            .onChange(of: settings.emergencyReserveCurrent) { _, _ in
-                settings.emergencyReserveCurrentCurrency = displayCurrency
-            }
         }
+
+        // Goal fields always edit in the user's chosen displayCurrency.
+        // The stored amount is converted via FX for display, and on edit we
+        // overwrite both amount and per-field currency in displayCurrency.
+        // This keeps the symbol next to the value consistent with the rest of the app.
 
         Section("Rebalancing") {
             Stepper(
@@ -50,5 +44,21 @@ struct GoalSettingsSection: View {
                 in: 1...10
             )
         }
+    }
+
+    private func binding(
+        for amount: ReferenceWritableKeyPath<UserSettings, Decimal>,
+        currency: ReferenceWritableKeyPath<UserSettings, Currency>
+    ) -> Binding<Decimal> {
+        Binding<Decimal>(
+            get: {
+                let stored = Money(amount: settings[keyPath: amount], currency: settings[keyPath: currency])
+                return stored.converted(to: displayCurrency, using: rates).amount
+            },
+            set: { newValue in
+                settings[keyPath: amount] = newValue
+                settings[keyPath: currency] = displayCurrency
+            }
+        )
     }
 }

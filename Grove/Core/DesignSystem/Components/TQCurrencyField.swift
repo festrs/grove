@@ -30,16 +30,24 @@ struct TQCurrencyField: View {
             .background(Color.tqCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
         }
-        .onAppear {
-            if value > 0 {
-                let formatter = NumberFormatter()
-                formatter.numberStyle = .decimal
-                formatter.locale = currency.locale
-                formatter.minimumFractionDigits = 2
-                formatter.maximumFractionDigits = 2
-                textValue = formatter.string(from: value as NSDecimalNumber) ?? ""
-            }
+        .onAppear { syncTextFromValue() }
+        // Re-render when an external change (e.g. display currency switch) updates
+        // the bound value or its currency. Skip while editing so we don't fight
+        // the user's keystrokes.
+        .onChange(of: value) { _, _ in
+            if !isFocused { syncTextFromValue() }
         }
+        .onChange(of: currency) { _, _ in
+            if !isFocused { syncTextFromValue() }
+        }
+    }
+
+    private func syncTextFromValue() {
+        guard value > 0 else {
+            textValue = ""
+            return
+        }
+        textValue = Formatters.decimal(currency).string(from: value as NSDecimalNumber) ?? ""
     }
 
     private func parseValue(_ text: String) {
