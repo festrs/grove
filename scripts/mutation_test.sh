@@ -36,6 +36,44 @@ SURVIVED=0
 TOTAL=0
 SURVIVORS=()
 
+# Persistent DerivedData so each xcodebuild call is an INCREMENTAL build
+# (only the mutated file + dependents recompile), not a cold rebuild.
+DERIVED_DATA="${MUTATION_DERIVED_DATA:-$PWD/.mutation-derived}"
+SCHEME="Grove"
+TEST_TARGET="GroveTests"
+
+DESTINATION=$(xcrun simctl list devices available -j | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for runtime in sorted(data['devices'].keys(), reverse=True):
+    if 'iOS' in runtime and 'xros' not in runtime.lower() and 'watch' not in runtime.lower() and 'tv' not in runtime.lower():
+        for d in data['devices'][runtime]:
+            if 'iPhone' in d['name']:
+                print('id=' + d['udid'])
+                sys.exit(0)
+sys.exit(1)
+")
+if [ -z "$DESTINATION" ]; then
+    echo "error: no iPhone simulator available" >&2
+    exit 1
+fi
+
+setup_build() {
+    echo "→ Generating Xcode project..."
+    xcodegen generate >/dev/null
+    echo "→ Cold build-for-testing (one-time)..."
+    if ! xcodebuild build-for-testing \
+        -scheme "$SCHEME" \
+        -destination "$DESTINATION" \
+        -derivedDataPath "$DERIVED_DATA" \
+        -only-testing:"$TEST_TARGET" \
+        >/tmp/mutation-build.log 2>&1; then
+        echo "error: initial build-for-testing failed" >&2
+        tail -50 /tmp/mutation-build.log >&2
+        exit 1
+    fi
+}
+
 # Mutation list: each entry is a single line "file|||desc|||search|||replace"
 MUTATIONS=()
 
@@ -105,7 +143,14 @@ revert_all_batch() {
 }
 
 run_tests_silent() {
-    just test >/dev/null 2>&1
+    # Incremental build (reuses DerivedData) + run tests.
+    # Mutated Swift files trigger a partial rebuild only.
+    xcodebuild build-for-testing test-without-building \
+        -scheme "$SCHEME" \
+        -destination "$DESTINATION" \
+        -derivedDataPath "$DERIVED_DATA" \
+        -only-testing:"$TEST_TARGET" \
+        >/dev/null 2>&1
 }
 
 record_killed() {
@@ -170,6 +215,8 @@ echo "========================================"
 echo " Mutation Testing - Grove (batched, size=$BATCH_SIZE)"
 echo "========================================"
 echo ""
+
+setup_build
 
 # bash 3.2 compatible: walk MUTATIONS, fill each batch with mutations from
 # distinct files, and push the rest into the next pass.

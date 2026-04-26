@@ -25,7 +25,7 @@ struct RebalancingEngineTests {
 
         let acoes = suggestions.first { $0.ticker == "ITUB3" }
         #expect(acoes != nil, "Underweight class should receive investment")
-        #expect(acoes!.sharesToBuy > 0)
+        #expect((acoes?.sharesToBuy ?? 0) > 0)
     }
 
     @Test func classAtTargetStillRecommends() {
@@ -192,7 +192,7 @@ struct RebalancingEngineTests {
         )
         #expect(suggestions.first { $0.ticker == "SELL" } == nil, "Vender should never appear in suggestions")
         #expect(suggestions.count == 1)
-        #expect(suggestions[0].ticker == "KEEP", "acoesBR should be most underweight when vender value is excluded")
+        #expect(suggestions.first?.ticker == "KEEP", "acoesBR should be most underweight when vender value is excluded")
     }
 
     // MARK: - Edge cases

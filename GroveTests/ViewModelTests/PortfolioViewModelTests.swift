@@ -147,7 +147,7 @@ struct PortfolioViewModelTests {
 
         let acoesBRAlloc = summary.allocationByClass.first { $0.assetClass == .acoesBR }
         #expect(acoesBRAlloc != nil)
-        #expect(acoesBRAlloc!.drift > 0, "Overweight class should have positive drift")
+        #expect((acoesBRAlloc?.drift ?? 0) > 0, "Overweight class should have positive drift")
     }
 
     @MainActor
@@ -175,6 +175,6 @@ struct PortfolioViewModelTests {
 
         let acoesBRAlloc = summary.allocationByClass.first { $0.assetClass == .acoesBR }
         #expect(acoesBRAlloc != nil)
-        #expect(acoesBRAlloc!.drift < 0, "Underweight class should have negative drift")
+        #expect((acoesBRAlloc?.drift ?? 0) < 0, "Underweight class should have negative drift")
     }
 }

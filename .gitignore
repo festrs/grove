@@ -3,6 +3,8 @@
 *.xcuserstate
 *.xcuserdatad/
 DerivedData/
+.mutation-derived/
+*.mut.bak
 build/
 *.ipa
 *.dSYM.zip

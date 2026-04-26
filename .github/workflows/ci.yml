@@ -99,13 +99,9 @@ jobs:
           printf 'BACKEND_BASE_URL = https://placeholder.example.com\nMOBILE_API_KEY = ci-placeholder\n' > Secrets.xcconfig
           cp Secrets.example Grove/Secrets.swift
 
-      - name: Generate project
-        run: xcodegen generate
-
-      - name: Resolve packages
-        run: xcodebuild -resolvePackageDependencies -scheme $SCHEME
-
       - name: Run mutation tests
+        # Script does xcodegen + one cold build-for-testing, then incremental
+        # rebuilds (only the mutated file recompiles) per mutation.
         run: |
           chmod +x scripts/mutation_test.sh
           ./scripts/mutation_test.sh 2>&1 | tee mutation-results.txt

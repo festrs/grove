@@ -107,7 +107,10 @@ struct TaxCalculatorTests {
         ]
         let result = TaxCalculator.taxBreakdown(grossByClass: grossByClass, displayCurrency: .brl, rates: rates)
 
-        let detail = result.details.first!
+        guard let detail = result.details.first else {
+            Issue.record("expected at least one detail row")
+            return
+        }
         #expect(detail.gross.currency == .usd)
         #expect(detail.gross.amount == 100)
         #expect(detail.net.currency == .usd)

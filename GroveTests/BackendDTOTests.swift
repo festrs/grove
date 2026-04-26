@@ -109,6 +109,11 @@ struct BackendDTOTests {
         #expect(AssetClassType.detect(from: "AAPL34.SA", apiType: "bdr") == .usStocks)
     }
 
+    @Test func detectCryptoFromApiType() {
+        // DOGE is not in the symbol fallback list, so only the apiType branch can classify it as crypto.
+        #expect(AssetClassType.detect(from: "DOGE", apiType: "crypto") == .crypto)
+    }
+
     @Test func detectWithoutApiTypeFallsBackToTicker() {
         #expect(AssetClassType.detect(from: "ITUB3.SA") == .acoesBR)
         #expect(AssetClassType.detect(from: "KNRI11.SA") == .fiis)
