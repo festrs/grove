@@ -78,54 +78,75 @@ setup_build() {
 MUTATIONS=()
 
 add() {
-    MUTATIONS+=("$1|||$2|||$3|||$4")
+    # add file desc search replace tests
+    # `tests` is a comma-separated list of test class names (e.g. "RebalancingEngineTests").
+    # The runner expands each into `-only-testing:GroveTests/<TestClass>` so we only
+    # run the tests that could actually catch the mutant — typically 5-10× faster
+    # than running the full suite per mutation.
+    MUTATIONS+=("$1|||$2|||$3|||$4|||$5")
 }
 
 # --- RebalancingEngine: where to invest ---
 E="Grove/Core/Services/RebalancingEngine.swift"
-add "$E" "eligible: aportar->quarentena"     'status == .aportar'                                    'status == .quarentena'
-add "$E" "remove vender exclusion"           'guard h.status != .vender else { continue }'           '// mutated: vender not excluded'
-add "$E" "flip class gap sort"               'return a.classGap > b.classGap'                        'return a.classGap < b.classGap'
-add "$E" "break zero investment guard"       'guard investmentAmount.amount > 0 else { return [] }'  'guard investmentAmount.amount > 999999 else { return [] }'
-add "$E" "break empty eligible guard"        'guard !context.eligible.isEmpty'                       'guard context.eligible.isEmpty'
-add "$E" "percent helper: divide by total"   'guard total > 0 else { return 0 }'                     'guard total < 0 else { return 0 }'
+RE_TESTS="RebalancingEngineTests"
+add "$E" "eligible: aportar->quarentena"     'status == .aportar'                                    'status == .quarentena'                                                                  "$RE_TESTS"
+add "$E" "remove vender exclusion"           'guard h.status != .vender else { continue }'           '// mutated: vender not excluded'                                                        "$RE_TESTS"
+add "$E" "flip class gap sort"               'return a.classGap > b.classGap'                        'return a.classGap < b.classGap'                                                         "$RE_TESTS"
+add "$E" "break zero investment guard"       'guard investmentAmount.amount > 0 else { return [] }'  'guard investmentAmount.amount > 999999 else { return [] }'                              "$RE_TESTS"
+add "$E" "break empty eligible guard"        'guard !context.eligible.isEmpty'                       'guard context.eligible.isEmpty'                                                         "$RE_TESTS"
+add "$E" "percent helper: divide by total"   'guard total > 0 else { return 0 }'                     'guard total < 0 else { return 0 }'                                                      "$RE_TESTS"
 
 # --- TaxTreatment / TaxCalculator: after-tax income ---
 TT="Grove/Core/Models/Enums/TaxTreatment.swift"
-add "$TT" "nra30 multiplier 0.70 -> 1.0"     'case .nra30: 0.70'                                     'case .nra30: 1.0'
+add "$TT" "nra30 multiplier 0.70 -> 1.0"     'case .nra30: 0.70'                                     'case .nra30: 1.0'                                                                       "TaxCalculatorTests"
 
 T="Grove/Core/Services/TaxCalculator.swift"
-add "$T" "flip withholding sign"             'gross * (1 - netMultiplier(for: assetClass))'          'gross * (1 + netMultiplier(for: assetClass))'
+add "$T" "flip withholding sign"             'gross * (1 - netMultiplier(for: assetClass))'          'gross * (1 + netMultiplier(for: assetClass))'                                           "TaxCalculatorTests"
 
 # --- IncomeProjector: FIRE projection ---
 I="Grove/Core/Services/IncomeProjector.swift"
-add "$I" "skip projection loop"              'totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0'  'totalNet.amount > goalDisplay.amount && contributionDisplay.amount > 0'
+add "$I" "skip projection loop"              'totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0'  'totalNet.amount > goalDisplay.amount && contributionDisplay.amount > 0' "IncomeProjectorTests"
 
 # --- Holding: per-position P&L ---
 H="Grove/Core/Models/Holding.swift"
-add "$H" "flip gainLoss sign"                'currentValue - totalCost'                              'totalCost - currentValue'
+add "$H" "flip gainLoss sign"                'currentValue - totalCost'                              'totalCost - currentValue'                                                               "TransactionTests"
 
 # --- PortfolioRepository: allocation drift ---
 R="Grove/Core/Repositories/PortfolioRepository.swift"
-add "$R" "flip drift sign"                   'drift: currentPct - targetPct'                         'drift: targetPct - currentPct'
+add "$R" "flip drift sign"                   'drift: currentPct - targetPct'                         'drift: targetPct - currentPct'                                                          "PortfolioViewModelTests"
 
 # --- AssetClassType: currency + tax-treatment routing ---
 A="Grove/Core/Models/Enums/AssetClassType.swift"
-add "$A" "detect FII -> acoesBR"             'if apiType == "fund" { return .fiis }'                 'if apiType == "fund" { return .acoesBR }'
-add "$A" "BR currency -> USD"                'case .acoesBR, .fiis, .rendaFixa: .brl'                'case .acoesBR, .fiis, .rendaFixa: .usd'
-add "$A" "detect crypto -> nil"              'if apiType == "crypto" { return .crypto }'             'if apiType == "crypto" { return nil }'
+add "$A" "detect FII -> acoesBR"             'if apiType == "fund" { return .fiis }'                 'if apiType == "fund" { return .acoesBR }'                                               "BackendDTOTests"
+add "$A" "BR currency -> USD"                'case .acoesBR, .fiis, .rendaFixa: .brl'                'case .acoesBR, .fiis, .rendaFixa: .usd'                                                 "AssetClassTypeTests,TaxCalculatorTests"
+add "$A" "detect crypto -> nil"              'if apiType == "crypto" { return .crypto }'             'if apiType == "crypto" { return nil }'                                                  "BackendDTOTests"
 
 # ────────────────────────────────────────────────
 #  Batched runner
 # ────────────────────────────────────────────────
 
 parse_entry() {
-    # Splits "file|||desc|||search|||replace" into globals: ENTRY_FILE, ENTRY_DESC, ENTRY_SEARCH, ENTRY_REPLACE
+    # Splits "file|||desc|||search|||replace|||tests" into globals.
     local entry="$1"
     ENTRY_FILE="${entry%%|||*}"; entry="${entry#*|||}"
     ENTRY_DESC="${entry%%|||*}"; entry="${entry#*|||}"
     ENTRY_SEARCH="${entry%%|||*}"; entry="${entry#*|||}"
-    ENTRY_REPLACE="$entry"
+    ENTRY_REPLACE="${entry%%|||*}"; entry="${entry#*|||}"
+    ENTRY_TESTS="$entry"
+}
+
+# Convert a comma-separated list of test classes into "-only-testing:GroveTests/X"
+# args, deduplicated. Empty input falls back to the whole target.
+build_only_testing_args() {
+    local csv="$1"
+    if [ -z "$csv" ]; then
+        echo "-only-testing:$TEST_TARGET"
+        return
+    fi
+    # Sort -u to dedupe across batched mutations from different files.
+    echo "$csv" | tr ',' '\n' | awk 'NF' | sort -u | while read -r cls; do
+        printf -- "-only-testing:%s/%s " "$TEST_TARGET" "$cls"
+    done
 }
 
 apply_one() {
@@ -143,13 +164,19 @@ revert_all_batch() {
 }
 
 run_tests_silent() {
-    # Incremental build (reuses DerivedData) + run tests.
-    # Mutated Swift files trigger a partial rebuild only.
+    # Incremental build (reuses DerivedData) + run only the test classes that
+    # could catch this batch's mutations. Mutated Swift files trigger a partial
+    # rebuild only, and scoping the test phase is the largest single speedup —
+    # often 5-10× faster than running the whole target.
+    local tests_csv="$1"
+    local only_testing_args
+    only_testing_args=$(build_only_testing_args "$tests_csv")
+    # shellcheck disable=SC2086 — we want word-splitting of the -only-testing flags.
     xcodebuild build-for-testing test-without-building \
         -scheme "$SCHEME" \
         -destination "$DESTINATION" \
         -derivedDataPath "$DERIVED_DATA" \
-        -only-testing:"$TEST_TARGET" \
+        $only_testing_args \
         >/dev/null 2>&1
 }
 
@@ -174,7 +201,7 @@ run_individually() {
         fi
         TOTAL=$((TOTAL + 1))
         $PY apply "$ENTRY_FILE" "$ENTRY_SEARCH" "$ENTRY_REPLACE"
-        if run_tests_silent; then
+        if run_tests_silent "$ENTRY_TESTS"; then
             record_survived "$(basename "$ENTRY_FILE"): $ENTRY_DESC"
         else
             record_killed "$(basename "$ENTRY_FILE"): $ENTRY_DESC"
@@ -186,9 +213,18 @@ run_individually() {
 run_batch() {
     local -a batch=("$@")
     local applied=()
+    local batch_tests_csv=""
     for entry in "${batch[@]}"; do
         if apply_one "$entry"; then
             applied+=("$entry")
+            parse_entry "$entry"
+            if [ -n "$ENTRY_TESTS" ]; then
+                if [ -n "$batch_tests_csv" ]; then
+                    batch_tests_csv="$batch_tests_csv,$ENTRY_TESTS"
+                else
+                    batch_tests_csv="$ENTRY_TESTS"
+                fi
+            fi
         fi
     done
 
@@ -196,7 +232,7 @@ run_batch() {
         return
     fi
 
-    if run_tests_silent; then
+    if run_tests_silent "$batch_tests_csv"; then
         # Whole batch survived
         for entry in "${applied[@]}"; do
             parse_entry "$entry"

@@ -8,6 +8,7 @@ struct RebalancingView: View {
     @Environment(\.rates) private var rates
     @State private var viewModel = RebalancingViewModel()
     @State private var showingConfirmation = false
+    @FocusState private var amountFieldFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -18,7 +19,9 @@ struct RebalancingView: View {
                     compactRebalancingLayout
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Invest")
+            .keyboardDoneBar()
         }
     }
 
@@ -75,6 +78,7 @@ struct RebalancingView: View {
                         .fontWeight(.bold)
                         #if os(iOS)
                         .keyboardType(.decimalPad)
+                        .focused($amountFieldFocused)
                         #endif
                 }
 

@@ -22,7 +22,9 @@ struct SettingsView: View {
                     dangerSection
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")
+            .keyboardDoneBar()
             .task {
                 viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }

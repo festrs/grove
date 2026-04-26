@@ -6,6 +6,7 @@ struct TQCurrencyField: View {
     @Binding var value: Decimal
 
     @State private var textValue: String = ""
+    @State private var suppressParse = false
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -23,6 +24,14 @@ struct TQCurrencyField: View {
                     #endif
                     .focused($isFocused)
                     .onChange(of: textValue) { _, newValue in
+                        // Skip parsing when WE updated textValue (e.g. via syncTextFromValue
+                        // after a display-currency switch). Parsing back would round-trip
+                        // through Decimal precision and re-write `value`, mutating the
+                        // caller's storage on every render and triggering an infinite loop.
+                        if suppressParse {
+                            suppressParse = false
+                            return
+                        }
                         parseValue(newValue)
                     }
             }
@@ -43,11 +52,15 @@ struct TQCurrencyField: View {
     }
 
     private func syncTextFromValue() {
-        guard value > 0 else {
-            textValue = ""
-            return
+        let newText: String
+        if value > 0 {
+            newText = Formatters.decimal(currency).string(from: value as NSDecimalNumber) ?? ""
+        } else {
+            newText = ""
         }
-        textValue = Formatters.decimal(currency).string(from: value as NSDecimalNumber) ?? ""
+        guard newText != textValue else { return }
+        suppressParse = true
+        textValue = newText
     }
 
     private func parseValue(_ text: String) {
