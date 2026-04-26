@@ -2,8 +2,9 @@ import Foundation
 import SwiftData
 
 struct PortfolioSummary {
+    /// Total portfolio value expressed in the user's display currency
+    /// (currently BRL — non-BRL holdings are converted via the exchange rate).
     let totalValue: Decimal
-    let totalValueBRL: Decimal
     let monthlyIncomeGross: Decimal
     let monthlyIncomeNet: Decimal
     let allocationByClass: [AssetClassAllocation]
@@ -89,8 +90,7 @@ struct PortfolioRepository {
         }
 
         return PortfolioSummary(
-            totalValue: holdings.reduce(Decimal.zero) { $0 + $1.currentValue },
-            totalValueBRL: totalBRL,
+            totalValue: totalBRL,
             monthlyIncomeGross: totalGross,
             monthlyIncomeNet: breakdown.totalNet,
             allocationByClass: allocations,

@@ -32,8 +32,8 @@ struct NewTransactionView: View {
 
         var title: String {
             switch self {
-            case .buy: "Comprar"
-            case .sell: "Vender"
+            case .buy: "Buy"
+            case .sell: "Sell"
             }
         }
 
@@ -97,23 +97,24 @@ struct NewTransactionView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Confirmar") { submit() }
+                    Button("Confirm") { submit() }
                         .disabled(!isValid)
                 }
             }
         }
         #if os(macOS)
-        .frame(minWidth: 480, minHeight: 400)
+        .formStyle(.grouped)
+        .frame(minWidth: 560, idealWidth: 620, minHeight: 460)
         #endif
     }
 
     // MARK: - Asset Section
 
     private var assetSection: some View {
-        Section("Ativo") {
+        Section("Asset") {
             if preselectedHolding != nil, let holding = selectedHolding {
                 // Opened from holding detail — show fixed header
                 HStack {
@@ -125,30 +126,30 @@ struct NewTransactionView: View {
                     }
                     Spacer()
                     if transactionType == .sell {
-                        Text("\(holding.quantity) cotas")
+                        Text("\(holding.quantity) shares")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
             } else if transactionType == .sell {
-                Picker("Ativo", selection: $selectedHolding) {
-                    Text("Selecionar").tag(nil as Holding?)
+                Picker("Asset", selection: $selectedHolding) {
+                    Text("Select").tag(nil as Holding?)
                     ForEach(holdings.filter { $0.quantity > 0 }, id: \.ticker) { holding in
-                        Text("\(holding.ticker) (\(holding.quantity) cotas)")
+                        Text("\(holding.ticker) (\(holding.quantity) shares)")
                             .tag(holding as Holding?)
                     }
                 }
             } else {
-                Picker("Modo", selection: $isNewAsset) {
-                    Text("Existente").tag(false)
-                    Text("Novo ativo").tag(true)
+                Picker("Mode", selection: $isNewAsset) {
+                    Text("Existing").tag(false)
+                    Text("New Asset").tag(true)
                 }
                 .pickerStyle(.segmented)
 
                 if isNewAsset {
                     newAssetSearch
                 } else {
-                    Picker("Ativo", selection: $selectedHolding) {
-                        Text("Selecionar").tag(nil as Holding?)
+                    Picker("Asset", selection: $selectedHolding) {
+                        Text("Select").tag(nil as Holding?)
                         ForEach(holdings, id: \.ticker) { holding in
                             Text("\(holding.ticker) — \(holding.displayName)")
                                 .tag(holding as Holding?)
@@ -161,7 +162,7 @@ struct NewTransactionView: View {
 
     private var newAssetSearch: some View {
         Group {
-            TextField("Buscar ticker (ex: ITUB3, AAPL)", text: $searchQuery)
+            TextField("Search ticker (e.g.: ITUB3, AAPL)", text: $searchQuery)
                 #if os(iOS)
                 .textInputAutocapitalization(.characters)
                 #endif
@@ -177,7 +178,7 @@ struct NewTransactionView: View {
                 }
 
             if debouncer.isSearching {
-                HStack { ProgressView(); Text("Buscando...").font(.caption).foregroundStyle(.secondary) }
+                HStack { ProgressView(); Text("Searching...").font(.caption).foregroundStyle(.secondary) }
             }
 
             ForEach(debouncer.results) { result in
@@ -205,9 +206,9 @@ struct NewTransactionView: View {
             if !newTicker.isEmpty {
                 LabeledContent("Ticker", value: newTicker)
                 if !newDisplayName.isEmpty {
-                    LabeledContent("Nome", value: newDisplayName)
+                    LabeledContent("Name", value: newDisplayName)
                 }
-                Picker("Classe", selection: $newAssetClass) {
+                Picker("Class", selection: $newAssetClass) {
                     ForEach(AssetClassType.allCases) { ct in
                         Text(ct.displayName).tag(ct)
                     }
@@ -219,45 +220,42 @@ struct NewTransactionView: View {
     // MARK: - Details
 
     private var detailsSection: some View {
-        Section("Detalhes") {
-            HStack {
-                Text("Quantidade")
-                Spacer()
+        Section("Details") {
+            LabeledContent("Quantity") {
                 TextField("0", text: $quantityText)
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
                     .multilineTextAlignment(.trailing)
-                    .frame(width: 120)
+                    .frame(minWidth: 120)
             }
 
             if let holding = selectedHolding, transactionType == .sell {
-                Text("Disponivel: \(holding.quantity) cotas")
+                Text("Available: \(holding.quantity) shares")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
-            HStack {
-                Text("Preco (\(currency.symbol))")
-                Spacer()
+            LabeledContent("Price (\(currency.symbol))") {
                 TextField("0,00", text: $priceText)
                     #if os(iOS)
                     .keyboardType(.decimalPad)
                     #endif
                     .multilineTextAlignment(.trailing)
-                    .frame(width: 120)
+                    .frame(minWidth: 120)
             }
 
-            DatePicker("Data", selection: $date, displayedComponents: .date)
-            TextField("Notas (opcional)", text: $notes)
+            DatePicker("Date", selection: $date, displayedComponents: .date)
+
+            LabeledContent("Notes") {
+                TextField("optional", text: $notes)
+                    .multilineTextAlignment(.trailing)
+            }
         }
     }
 
     private var summarySection: some View {
-        Section("Resumo") {
-            HStack {
-                Text(transactionType == .buy ? "Total investido" : "Total resgatado")
-                    .fontWeight(.semibold)
-                Spacer()
+        Section("Summary") {
+            LabeledContent(transactionType == .buy ? "Total Invested" : "Total Withdrawn") {
                 Text(totalValue.formatted(as: currency))
                     .fontWeight(.bold)
                     .foregroundStyle(transactionType.color)
@@ -286,6 +284,10 @@ struct NewTransactionView: View {
             existing.currentPrice = price
             holding = existing
         } else {
+            guard Holding.canAddMore(modelContext: modelContext) else {
+                error = Holding.freeTierLimitMessage
+                return
+            }
             holding = Holding(
                 ticker: newTicker,
                 displayName: newDisplayName.isEmpty ? newTicker : newDisplayName,
@@ -303,6 +305,11 @@ struct NewTransactionView: View {
                 holding.portfolio = portfolio
             }
             modelContext.insert(holding)
+
+            let sym = holding.ticker
+            let cls = holding.assetClass.rawValue
+            let svc = backendService
+            Task { try? await svc.trackSymbol(symbol: sym, assetClass: cls) }
         }
 
         let contribution = Contribution(date: date, amount: quantity * price, shares: quantity, pricePerShare: price)

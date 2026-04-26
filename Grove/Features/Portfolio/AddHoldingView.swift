@@ -10,8 +10,8 @@ struct AddHoldingView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Buscar ativo") {
-                    TextField("Ticker (ex: ITUB3, AAPL)", text: $viewModel.searchQuery)
+                Section("Search Asset") {
+                    TextField("Ticker (e.g.: ITUB3, AAPL)", text: $viewModel.searchQuery)
                         #if os(iOS)
                         .textInputAutocapitalization(.characters)
                         #endif
@@ -25,7 +25,7 @@ struct AddHoldingView: View {
                     if viewModel.isSearching {
                         HStack {
                             ProgressView()
-                            Text("Buscando...")
+                            Text("Searching...")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -58,15 +58,15 @@ struct AddHoldingView: View {
                 }
 
                 if !viewModel.ticker.isEmpty {
-                    Section("Detalhes") {
+                    Section("Details") {
                         LabeledContent("Ticker", value: viewModel.ticker)
 
                         if viewModel.currentPrice > 0 {
-                            LabeledContent("Preco atual", value: viewModel.currentPrice.formattedBRL())
+                            LabeledContent("Current Price", value: viewModel.currentPrice.formattedBRL())
                         }
 
                         HStack {
-                            Text("Quantidade")
+                            Text("Quantity")
                             Spacer()
                             TextField("0", text: $viewModel.quantityText)
                                 #if os(iOS)
@@ -76,7 +76,7 @@ struct AddHoldingView: View {
                                 .frame(width: 100)
                         }
 
-                        Picker("Classe", selection: $viewModel.assetClass) {
+                        Picker("Class", selection: $viewModel.assetClass) {
                             ForEach(AssetClassType.allCases) { classType in
                                 Label(classType.displayName, systemImage: classType.icon)
                                     .tag(classType)
@@ -99,17 +99,17 @@ struct AddHoldingView: View {
                     }
                 }
             }
-            .navigationTitle("Adicionar ativo")
+            .navigationTitle("Add Asset")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Adicionar") {
-                        if viewModel.save(modelContext: modelContext) {
+                    Button("Add") {
+                        if viewModel.save(modelContext: modelContext, backendService: backendService) {
                             dismiss()
                         }
                     }

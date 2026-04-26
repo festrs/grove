@@ -4,31 +4,31 @@ struct GoalSettingsSection: View {
     @Bindable var settings: UserSettings
 
     var body: some View {
-        Section("Metas") {
+        Section("Goals") {
             TQCurrencyField(
-                title: "Renda passiva mensal",
+                title: "Monthly Passive Income",
                 value: $settings.monthlyIncomeGoal
             )
 
             TQCurrencyField(
-                title: "Custo de vida mensal",
+                title: "Monthly Cost of Living",
                 value: $settings.monthlyCostOfLiving
             )
 
             TQCurrencyField(
-                title: "Reserva de emergencia (alvo)",
+                title: "Emergency Reserve (Target)",
                 value: $settings.emergencyReserveTarget
             )
 
             TQCurrencyField(
-                title: "Reserva de emergencia (atual)",
+                title: "Emergency Reserve (Current)",
                 value: $settings.emergencyReserveCurrent
             )
         }
 
-        Section("Rebalanceamento") {
+        Section("Rebalancing") {
             Stepper(
-                "Recomendacoes por aporte: \(settings.recommendationCount)",
+                "Recommendations per investment: \(settings.recommendationCount)",
                 value: $settings.recommendationCount,
                 in: 1...10
             )

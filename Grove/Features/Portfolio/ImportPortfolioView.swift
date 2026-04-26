@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct ImportPortfolioView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.backendService) private var backendService
     @State private var viewModel = ImportViewModel()
 
     let portfolio: Portfolio
@@ -15,20 +16,23 @@ struct ImportPortfolioView: View {
                 viewModel: viewModel,
                 showFileOption: true,
                 existingTickers: existingTickers,
-                confirmLabel: "Importar"
+                confirmLabel: "Import"
             ) { positions in
                 confirmImport(positions)
                 dismiss()
             }
+            .onAppear {
+                viewModel.maxSelectable = Holding.remainingSlots(modelContext: modelContext)
+            }
             .padding(.vertical, Theme.Spacing.md)
             .background(Color.tqBackground)
-            .navigationTitle("Importar ativos")
+            .navigationTitle("Import Assets")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
             #if os(macOS)
@@ -42,6 +46,7 @@ struct ImportPortfolioView: View {
     }
 
     private func confirmImport(_ positions: [ImportedPosition]) {
+        let service = backendService
         for position in positions {
             let assetClass = position.assetClassType
             let holding = Holding(
@@ -53,6 +58,8 @@ struct ImportPortfolioView: View {
             )
             holding.portfolio = portfolio
             modelContext.insert(holding)
+
+            Task { try? await service.trackSymbol(symbol: position.ticker, assetClass: assetClass.rawValue) }
 
             if position.quantity > 0 {
                 let pricePerShare = Decimal(position.currentPrice)

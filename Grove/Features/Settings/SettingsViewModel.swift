@@ -13,7 +13,7 @@ final class SettingsViewModel {
         let holdings = (try? repo.fetchAllHoldings()) ?? []
         holdingCount = holdings.count
         let summary = repo.computeSummary(holdings: holdings)
-        portfolioValue = summary.totalValueBRL
+        portfolioValue = summary.totalValue
     }
 
     func resetOnboarding() {

@@ -14,7 +14,7 @@ struct PortfolioViewModelTests {
         #expect(vm.holdings.isEmpty)
         #expect(vm.filteredHoldings.isEmpty)
         #expect(vm.summary == nil)
-        #expect(vm.totalValueBRL == 0)
+        #expect(vm.totalValue == 0)
     }
 
     // MARK: - loadData
@@ -30,7 +30,7 @@ struct PortfolioViewModelTests {
         #expect(!vm.holdings.isEmpty)
         #expect(!vm.filteredHoldings.isEmpty)
         #expect(vm.summary != nil)
-        #expect(vm.totalValueBRL > 0)
+        #expect(vm.totalValue > 0)
         #expect(!vm.portfolios.isEmpty)
         #expect(vm.selectedPortfolio != nil)
     }

@@ -16,10 +16,10 @@ struct AddHoldingsStepView: View {
         VStack(spacing: Theme.Spacing.md) {
             // MARK: - Header
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text("Adicione seus ativos")
+                Text("Add Your Assets")
                     .font(.system(size: Theme.FontSize.title2, weight: .bold))
 
-                Text("Adicione os tickers que voce ja possui ou quer acompanhar. Transacoes serao registradas depois.")
+                Text("Add the tickers you already own or want to track. Transactions will be recorded later.")
                     .font(.system(size: Theme.FontSize.caption))
                     .foregroundStyle(Color.tqSecondaryText)
             }
@@ -27,9 +27,9 @@ struct AddHoldingsStepView: View {
             .padding(.horizontal, Theme.Spacing.lg)
 
             // MARK: - Tab Picker
-            Picker("Modo", selection: $selectedTab) {
-                Text("Buscar").tag(0)
-                Text("Importar").tag(1)
+            Picker("Mode", selection: $selectedTab) {
+                Text("Search").tag(0)
+                Text("Import").tag(1)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, Theme.Spacing.lg)
@@ -41,11 +41,15 @@ struct AddHoldingsStepView: View {
                     viewModel: importViewModel,
                     showFileOption: true,
                     existingTickers: Set(viewModel.pendingHoldings.map { $0.ticker.uppercased() }),
-                    confirmLabel: "Adicionar"
+                    confirmLabel: "Add"
                 ) { positions in
                     withAnimation {
                         viewModel.addHoldings(from: positions)
                     }
+                }
+                .onAppear {
+                    let remaining = AppConstants.freeTierMaxHoldings - viewModel.pendingHoldings.count
+                    importViewModel.maxSelectable = max(remaining, 0)
                 }
             }
         }
@@ -74,7 +78,7 @@ struct AddHoldingsStepView: View {
                     }
 
                     HStack {
-                        Text("Adicionados")
+                        Text("Added")
                             .font(.system(size: Theme.FontSize.caption, weight: .medium))
                             .foregroundStyle(Color.tqSecondaryText)
                         Spacer()
@@ -108,7 +112,7 @@ struct AddHoldingsStepView: View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(Color.tqSecondaryText)
-            TextField("Buscar ticker (ex: ITUB3, PETR4)", text: $viewModel.searchQuery)
+            TextField("Search ticker (e.g.: ITUB3, PETR4)", text: $viewModel.searchQuery)
                 #if os(iOS)
                 .textInputAutocapitalization(.characters)
                 #endif

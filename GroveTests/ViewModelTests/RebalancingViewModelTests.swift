@@ -72,6 +72,85 @@ struct RebalancingViewModelTests {
         #expect(vm.suggestions.isEmpty)
     }
 
+    // MARK: - emptyReason diagnostics
+
+    @MainActor
+    @Test func emptyReasonIsNilWhenSuggestionsExist() throws {
+        let ctx = try makeTestContext()
+        let (_, _) = seedTestData(ctx)
+
+        let vm = RebalancingViewModel()
+        vm.investmentAmountText = "5000"
+        vm.calculate(modelContext: ctx)
+
+        #expect(vm.emptyReason == nil)
+        #expect(!vm.suggestions.isEmpty)
+    }
+
+    @MainActor
+    @Test func emptyReasonNoAportarWhenAllEstudo() throws {
+        let ctx = try makeTestContext()
+        let portfolio = Portfolio(name: "Test")
+        ctx.insert(portfolio)
+
+        let h = Holding(ticker: "TEST3.SA", displayName: "Test", currentPrice: 50, assetClass: .acoesBR, status: .estudo)
+        ctx.insert(h)
+        h.portfolio = portfolio
+
+        let settings = UserSettings(hasCompletedOnboarding: true)
+        settings.classAllocations = [.acoesBR: 100]
+        ctx.insert(settings)
+        try ctx.save()
+
+        let vm = RebalancingViewModel()
+        vm.investmentAmountText = "1000"
+        vm.calculate(modelContext: ctx)
+
+        #expect(vm.hasCalculated == true)
+        #expect(vm.suggestions.isEmpty)
+        #expect(vm.emptyReason == .noAportarHoldings)
+    }
+
+    @MainActor
+    @Test func emptyReasonNoPortfolioValueWhenZeroQuantity() throws {
+        let ctx = try makeTestContext()
+        let portfolio = Portfolio(name: "Test")
+        ctx.insert(portfolio)
+
+        // Aportar status but quantity = 0 → currentValue = 0
+        let h = Holding(ticker: "TEST3.SA", displayName: "Test", currentPrice: 50, assetClass: .acoesBR, status: .aportar)
+        ctx.insert(h)
+        h.portfolio = portfolio
+
+        let settings = UserSettings(hasCompletedOnboarding: true)
+        settings.classAllocations = [.acoesBR: 100]
+        ctx.insert(settings)
+        try ctx.save()
+
+        let vm = RebalancingViewModel()
+        vm.investmentAmountText = "1000"
+        vm.calculate(modelContext: ctx)
+
+        #expect(vm.hasCalculated == true)
+        #expect(vm.suggestions.isEmpty)
+        #expect(vm.emptyReason == .noPortfolioValue)
+    }
+
+    @MainActor
+    @Test func emptyReasonSetOnZeroAmount() throws {
+        let ctx = try makeTestContext()
+        let (_, _) = seedTestData(ctx)
+
+        let vm = RebalancingViewModel()
+        vm.investmentAmountText = "0"
+        vm.calculate(modelContext: ctx)
+
+        #expect(vm.hasCalculated == true)
+        #expect(vm.suggestions.isEmpty)
+        // Zero amount returns empty from engine, emptyReason diagnoses the state
+        #expect(vm.emptyReason != nil)
+    }
+
     // MARK: - registerContributions
 
     @MainActor

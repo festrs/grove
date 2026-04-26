@@ -4,10 +4,12 @@ struct CompanyInfoCard: View {
     let holding: Holding
 
     var body: some View {
-        TQCard {
-            HStack(spacing: Theme.Spacing.md) {
-                logoView
-                infoColumns
+        if holding.hasCompanyInfo {
+            TQCard {
+                HStack(spacing: Theme.Spacing.md) {
+                    logoView
+                    infoColumns
+                }
             }
         }
     }

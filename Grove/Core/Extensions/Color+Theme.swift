@@ -2,6 +2,7 @@ import SwiftUI
 
 extension Color {
     static let tqAccentGreen = Color(red: 0.18, green: 0.74, blue: 0.45)
+    static let tqAccentBlue = Color(red: 0.30, green: 0.55, blue: 0.95)
     static let tqPositive = Color.green
     static let tqNegative = Color.red
     static let tqWarning = Color.orange

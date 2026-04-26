@@ -10,10 +10,10 @@ enum HoldingStatus: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .estudo: "Estudo"
-        case .aportar: "Aportar"
-        case .quarentena: "Quarentena"
-        case .vender: "Vender"
+        case .estudo: "Study"
+        case .aportar: "Invest"
+        case .quarentena: "Quarantine"
+        case .vender: "Sell"
         }
     }
 
@@ -37,10 +37,10 @@ enum HoldingStatus: String, Codable, CaseIterable, Identifiable {
 
     var description: String {
         switch self {
-        case .estudo: "Estudando, ainda sem posicao"
-        case .aportar: "Empresa boa, recebe aportes mensais"
-        case .quarentena: "Nao compra, nao vende. Primeiro estagio da saida"
-        case .vender: "Decisao tomada, saindo aos poucos"
+        case .estudo: "Studying, no position yet"
+        case .aportar: "Good company, receives monthly investments"
+        case .quarentena: "Not buying, not selling. First exit stage"
+        case .vender: "Decision made, exiting gradually"
         }
     }
 }

@@ -11,7 +11,7 @@ struct DividendDayDetail: View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 HStack {
-                    Text("Dividendos do dia")
+                    Text("Daily Dividends")
                         .font(.headline)
                     Spacer()
                     Text(total.formattedBRL())

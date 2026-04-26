@@ -12,12 +12,12 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .acoesBR: "Acoes BR"
+        case .acoesBR: "Brazilian Stocks"
         case .fiis: "FIIs"
-        case .usStocks: "Stocks US"
-        case .reits: "REITs US"
+        case .usStocks: "US Stocks"
+        case .reits: "US REITs"
         case .crypto: "Crypto"
-        case .rendaFixa: "Renda Fixa"
+        case .rendaFixa: "Fixed Income"
         }
     }
 
@@ -73,6 +73,22 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Whether this asset class pays dividends
+    var hasDividends: Bool {
+        switch self {
+        case .acoesBR, .fiis, .usStocks, .reits: true
+        case .crypto, .rendaFixa: false
+        }
+    }
+
+    /// Whether this asset class has tradable market prices with history
+    var hasPriceHistory: Bool {
+        switch self {
+        case .acoesBR, .fiis, .usStocks, .reits, .crypto: true
+        case .rendaFixa: false
+        }
+    }
+
     /// Whether this asset class has fundamentals data (equity-like assets only)
     var hasFundamentals: Bool {
         switch self {
@@ -91,6 +107,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
 
         // Use API type when available (brapi: "fund" = FII, "stock" = BR equity, "bdr")
         if let apiType = apiType?.lowercased() {
+            if apiType == "crypto" { return .crypto }
             if apiType == "fund" { return .fiis }
             if apiType == "stock" { return .acoesBR }
             if apiType == "bdr" { return .usStocks }

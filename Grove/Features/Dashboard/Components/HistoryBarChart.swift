@@ -10,14 +10,14 @@ struct HistoryBarChart: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("HISTORICO · 12 MESES")
+                        Text("HISTORY · 12 MONTHS")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .tracking(0.6)
 
                         if let last = monthlyData.last {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                Text("\(last.value.formattedBRL())/mes")
+                                Text("\(last.value.formattedBRL())/month")
                                     .font(.system(size: 24, weight: .bold))
                                     .monospacedDigit()
 
@@ -49,7 +49,7 @@ struct HistoryBarChart: View {
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                         .foregroundStyle(.secondary.opacity(0.5))
                         .annotation(position: .trailing, alignment: .trailing) {
-                            Text("meta")
+                            Text("goal")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                         }

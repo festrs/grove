@@ -90,6 +90,8 @@ final class SyncService {
             existingKeys.insert(key)
         }
 
+        var newPayments: [(ticker: String, amount: Decimal, date: Date)] = []
+
         for item in dividends {
             guard let holding = holdingByTicker[item.symbol] else { continue }
 
@@ -110,6 +112,13 @@ final class SyncService {
             )
             dividend.holding = holding
             modelContext.insert(dividend)
+
+            newPayments.append((ticker: holding.ticker, amount: dividend.netAmount, date: paymentDate))
         }
+
+        // TODO: Enable when push notifications are ready
+        // if !newPayments.isEmpty {
+        //     await NotificationCoordinator.handleNewDividends(newPayments)
+        // }
     }
 }

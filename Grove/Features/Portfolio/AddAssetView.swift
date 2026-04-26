@@ -15,6 +15,7 @@ struct AddAssetDetailSheet: View {
     @State private var priceText = ""
     @State private var date = Date.now
     @State private var isFetchingPrice = false
+    @State private var error: String?
 
     init(searchResult: StockSearchResultDTO) {
         self.searchResult = searchResult
@@ -67,8 +68,8 @@ struct AddAssetDetailSheet: View {
                     }
                 }
 
-                Section("Classe do ativo") {
-                    Picker("Classe", selection: $detectedClass) {
+                Section("Asset Class") {
+                    Picker("Class", selection: $detectedClass) {
                         ForEach(AssetClassType.allCases) { ct in
                             HStack {
                                 Image(systemName: ct.icon)
@@ -79,8 +80,8 @@ struct AddAssetDetailSheet: View {
                     }
                 }
 
-                Section("Detalhes da compra") {
-                    LabeledContent("Quantidade") {
+                Section("Purchase Details") {
+                    LabeledContent("Quantity") {
                         TextField("0", text: $quantityText)
                             #if os(iOS)
                             .keyboardType(.decimalPad)
@@ -88,7 +89,7 @@ struct AddAssetDetailSheet: View {
                             .multilineTextAlignment(.trailing)
                     }
 
-                    LabeledContent("Preco (\(currency.symbol))") {
+                    LabeledContent("Price (\(currency.symbol))") {
                         if isFetchingPrice {
                             ProgressView()
                         } else {
@@ -100,7 +101,7 @@ struct AddAssetDetailSheet: View {
                         }
                     }
 
-                    DatePicker("Data", selection: $date, displayedComponents: .date)
+                    DatePicker("Date", selection: $date, displayedComponents: .date)
                 }
 
                 if totalValue > 0 {
@@ -116,17 +117,23 @@ struct AddAssetDetailSheet: View {
                         }
                     }
                 }
+
+                if let error {
+                    Section {
+                        Text(error).foregroundStyle(.red).font(.caption)
+                    }
+                }
             }
-            .navigationTitle("Adicionar ativo")
+            .navigationTitle("Add Asset")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Adicionar") { addAsset() }
+                    Button("Add") { addAsset() }
                         .fontWeight(.semibold)
                         .disabled(!isValid)
                 }
@@ -155,6 +162,11 @@ struct AddAssetDetailSheet: View {
 
     private func addAsset() {
         guard let qty = quantity, let prc = price else { return }
+
+        guard Holding.canAddMore(modelContext: modelContext) else {
+            error = Holding.freeTierLimitMessage
+            return
+        }
 
         let holding = Holding(
             ticker: searchResult.symbol,

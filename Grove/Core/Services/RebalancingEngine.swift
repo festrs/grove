@@ -62,7 +62,17 @@ struct RebalancingEngine {
         guard investmentAmount > 0 else { return [] }
 
         let context = buildContext(holdings: holdings, investmentAmount: investmentAmount, exchangeRate: exchangeRate)
-        guard context.totalValue > 0 else { return [] }
+        print("[Rebalance][engine] holdings=\(holdings.count) eligible=\(context.eligible.count) totalValue=\(context.totalValue)")
+        for h in context.eligible {
+            print("    eligible: \(h.ticker) class=\(h.assetClassRaw) price=\(h.currentPrice) targetPct=\(h.targetPercent)")
+        }
+        // totalValue == 0 is fine — happens when every .aportar ticker has quantity 0
+        // (first investment, or onboarding with all in study/aportar). Class gaps fall
+        // back to full target weight, and we still need to score the eligible holdings.
+        guard !context.eligible.isEmpty else {
+            print("[Rebalance][engine] no eligible — returning empty")
+            return []
+        }
 
         let scored = scoreHoldings(
             eligible: context.eligible,
@@ -235,9 +245,9 @@ struct RebalancingEngine {
                 displayName: sh.holding.displayName,
                 sharesToBuy: shares,
                 amount: actualAmount,
-                currentPercent: (brlValue / totalValue) * 100,
+                currentPercent: percent(of: brlValue, total: totalValue),
                 targetPercent: sh.classTarget,
-                newPercent: ((brlValue + actualAmount) / newTotalValue) * 100
+                newPercent: percent(of: brlValue + actualAmount, total: newTotalValue)
             ))
             remaining -= actualAmount
         }
@@ -262,7 +272,7 @@ struct RebalancingEngine {
                         amount: old.amount + extraAmount,
                         currentPercent: old.currentPercent,
                         targetPercent: old.targetPercent,
-                        newPercent: ((brlValue + old.amount + extraAmount) / newTotalValue) * 100
+                        newPercent: percent(of: brlValue + old.amount + extraAmount, total: newTotalValue)
                     )
                 } else {
                     let brlValue = sh.holding.currency == .usd
@@ -273,9 +283,9 @@ struct RebalancingEngine {
                         displayName: sh.holding.displayName,
                         sharesToBuy: extraShares,
                         amount: extraAmount,
-                        currentPercent: (brlValue / totalValue) * 100,
+                        currentPercent: percent(of: brlValue, total: totalValue),
                         targetPercent: sh.classTarget,
-                        newPercent: ((brlValue + extraAmount) / newTotalValue) * 100
+                        newPercent: percent(of: brlValue + extraAmount, total: newTotalValue)
                     ))
                 }
                 remaining -= extraAmount
@@ -284,5 +294,10 @@ struct RebalancingEngine {
         }
 
         return suggestions.sorted { $0.amount > $1.amount }
+    }
+
+    private static func percent(of value: Decimal, total: Decimal) -> Decimal {
+        guard total > 0 else { return 0 }
+        return (value / total) * 100
     }
 }

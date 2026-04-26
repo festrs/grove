@@ -3,6 +3,15 @@ import SwiftData
 
 @main
 struct GroveApp: App {
+    init() {
+        UserDefaults.standard.register(defaults: [
+            "notif_dividends": true,
+            "notif_monthly": true,
+            "notif_milestones": true,
+            "notif_drift": false,
+        ])
+    }
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Portfolio.self,
@@ -20,7 +29,9 @@ struct GroveApp: App {
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            // If schema is corrupted, fall back to in-memory container so the app can launch
+            let fallback = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try! ModelContainer(for: schema, configurations: [fallback])
         }
     }()
 
@@ -44,7 +55,7 @@ struct GroveApp: App {
             SidebarCommands()
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .toolbar) {
-                Button("Sincronizar") {
+                Button("Sync") {
                     Task {
                         await syncService.syncAll(
                             modelContext: sharedModelContainer.mainContext,

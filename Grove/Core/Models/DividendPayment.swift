@@ -21,6 +21,13 @@ final class DividendPayment {
         totalAmount - withholdingTax
     }
 
+    /// True when the payment is informational only — the holding has no shares
+    /// (typically status `.estudo`), so we show the per-share amount instead
+    /// of an earnings figure.
+    var isInformational: Bool {
+        totalAmount == 0
+    }
+
     init(
         exDate: Date,
         paymentDate: Date,

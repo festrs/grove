@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TQLoadingView: View {
-    var message: String = "Carregando..."
+    var message: String = "Loading..."
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {

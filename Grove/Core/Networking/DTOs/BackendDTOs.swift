@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Common
 
@@ -38,6 +39,16 @@ nonisolated struct StockSearchResultDTO: Codable, Sendable, Identifiable, Hashab
 
     var displaySymbol: String {
         symbol.replacingOccurrences(of: ".SA", with: "")
+    }
+
+    /// Inferred asset class from the API `type` field plus ticker heuristics.
+    /// Single source of truth for badges and add-flow defaults.
+    var inferredAssetClass: AssetClassType? {
+        AssetClassType.detect(from: symbol, apiType: type)
+    }
+
+    var isCrypto: Bool {
+        inferredAssetClass == .crypto
     }
 
     var displayDescription: String {
@@ -166,6 +177,22 @@ nonisolated struct FundamentalsDTO: Codable, Sendable {
         case compositeScore = "composite_score"
         case updatedAt = "updated_at"
     }
+
+    /// Map backend rating strings ("green"/"yellow"/"red") to SwiftUI colors.
+    static func ratingColor(_ rating: String?) -> Color {
+        switch rating?.lowercased() {
+        case "green": .tqPositive
+        case "yellow": .tqWarning
+        case "red": .tqNegative
+        default: .secondary
+        }
+    }
+
+    var scoreColor: Color { Self.ratingColor(compositeScore.map { $0 >= 60 ? "green" : $0 >= 40 ? "yellow" : "red" }) }
+    var profitColor: Color { Self.ratingColor(profitRating) }
+    var epsColor: Color { Self.ratingColor(epsRating) }
+    var debtColor: Color { Self.ratingColor(debtRating) }
+    var ipoColor: Color { Self.ratingColor(ipoRating) }
 }
 
 // MARK: - Import Portfolio

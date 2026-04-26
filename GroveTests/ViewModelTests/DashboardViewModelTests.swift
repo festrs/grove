@@ -29,7 +29,7 @@ struct DashboardViewModelTests {
         vm.loadData(modelContext: ctx)
 
         #expect(vm.summary != nil)
-        #expect(vm.summary!.totalValueBRL > 0)
+        #expect(vm.summary!.totalValue > 0)
     }
 
     @MainActor
@@ -66,7 +66,7 @@ struct DashboardViewModelTests {
         vm.loadData(modelContext: ctx)
 
         #expect(vm.summary != nil)
-        #expect(vm.summary!.totalValueBRL == 0)
+        #expect(vm.summary!.totalValue == 0)
         #expect(vm.topSuggestions.isEmpty)
     }
 

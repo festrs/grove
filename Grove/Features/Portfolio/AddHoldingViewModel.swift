@@ -63,21 +63,18 @@ final class AddHoldingViewModel {
         }
     }
 
-    func save(modelContext: ModelContext) -> Bool {
+    func save(modelContext: ModelContext, backendService: any BackendServiceProtocol) -> Bool {
         guard !ticker.isEmpty else {
-            error = "Informe o ticker."
+            error = "Please enter a ticker."
             return false
         }
         guard let qty = Decimal(string: quantityText), qty > 0 else {
-            error = "Informe uma quantidade valida."
+            error = "Please enter a valid quantity."
             return false
         }
 
-        // Check free tier limit
-        let descriptor = FetchDescriptor<Holding>()
-        let count = (try? modelContext.fetchCount(descriptor)) ?? 0
-        if count >= AppConstants.freeTierMaxHoldings {
-            error = "Limite de \(AppConstants.freeTierMaxHoldings) ativos no plano gratuito."
+        guard Holding.canAddMore(modelContext: modelContext) else {
+            error = Holding.freeTierLimitMessage
             return false
         }
 
@@ -100,6 +97,11 @@ final class AddHoldingViewModel {
         }
 
         modelContext.insert(holding)
+
+        let sym = holding.ticker
+        let cls = holding.assetClass.rawValue
+        Task { try? await backendService.trackSymbol(symbol: sym, assetClass: cls) }
+
         return true
     }
 }

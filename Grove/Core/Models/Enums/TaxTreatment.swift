@@ -17,10 +17,10 @@ enum TaxTreatment: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .exempt: "Isento"
+        case .exempt: "Exempt"
         case .nra30: "30% NRA"
         case .crypto15: "15% Crypto"
-        case .irRegressivo: "IR Regressivo"
+        case .irRegressivo: "Progressive Tax"
         }
     }
 

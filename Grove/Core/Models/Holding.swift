@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 @Model
 final class Holding {
@@ -59,6 +60,10 @@ final class Holding {
         quantity > 0
     }
 
+    var hasCompanyInfo: Bool {
+        sector != nil || marketCap != nil || logoURL != nil
+    }
+
     var currentValue: Decimal {
         quantity * currentPrice
     }
@@ -74,6 +79,10 @@ final class Holding {
     var gainLossPercent: Decimal {
         guard totalCost > 0 else { return 0 }
         return (gainLoss / totalCost) * 100
+    }
+
+    var gainLossColor: Color {
+        gainLossPercent >= 0 ? .tqPositive : .tqNegative
     }
 
     /// Estimated monthly dividend income (gross)
@@ -112,6 +121,20 @@ final class Holding {
         self.dividends = []
         self.contributions = []
     }
+
+    // MARK: - Free Tier Limit
+
+    static func canAddMore(modelContext: ModelContext) -> Bool {
+        let count = (try? modelContext.fetchCount(FetchDescriptor<Holding>())) ?? 0
+        return count < AppConstants.freeTierMaxHoldings
+    }
+
+    static func remainingSlots(modelContext: ModelContext) -> Int {
+        let count = (try? modelContext.fetchCount(FetchDescriptor<Holding>())) ?? 0
+        return max(AppConstants.freeTierMaxHoldings - count, 0)
+    }
+
+    static let freeTierLimitMessage = "Limit of \(AppConstants.freeTierMaxHoldings) assets on the free plan."
 
     // MARK: - Contribution-Based Recalculation
 

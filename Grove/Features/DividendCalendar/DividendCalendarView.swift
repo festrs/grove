@@ -17,7 +17,7 @@ struct DividendCalendarView: View {
                 compactCalendarLayout
             }
         }
-        .navigationTitle("Dividendos")
+        .navigationTitle("Dividends")
         .refreshable {
             await syncService.syncAll(modelContext: modelContext, backendService: backendService)
             viewModel.loadFromLocal(modelContext: modelContext)
@@ -114,7 +114,7 @@ struct DividendCalendarView: View {
         TQCard {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Total do mes")
+                    Text("Monthly Total")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Text(viewModel.monthlyTotal.formattedBRL())
@@ -136,7 +136,7 @@ struct DividendCalendarView: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 let total = viewModel.dividendsForDay.reduce(Decimal.zero) { $0 + $1.amount }
                 HStack {
-                    Text("Dividendos do dia")
+                    Text("Daily Dividends")
                         .font(.headline)
                     Spacer()
                     Text(total.formattedBRL())

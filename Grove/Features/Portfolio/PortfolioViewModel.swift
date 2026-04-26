@@ -10,7 +10,7 @@ final class PortfolioViewModel {
     var filteredHoldings: [Holding] = []
     var allocationByClass: [AssetClassAllocation] = []
     var summary: PortfolioSummary?
-    var totalValueBRL: Decimal = 0
+    var totalValue: Decimal = 0
     var isLoading = false
 
     // Search result from AssetSearchView
@@ -44,7 +44,7 @@ final class PortfolioViewModel {
             let summaryResult = repo.computeSummary(holdings: holdings, classAllocations: settings.classAllocations, exchangeRate: exchangeRate)
             summary = summaryResult
             allocationByClass = summaryResult.allocationByClass
-            totalValueBRL = summaryResult.totalValueBRL
+            totalValue = summaryResult.totalValue
             applyFilter()
         } catch {
             holdings = []
@@ -99,8 +99,8 @@ final class PortfolioViewModel {
     }
 
     private func currentPercent(for holding: Holding) -> Decimal {
-        guard totalValueBRL > 0 else { return 0 }
+        guard totalValue > 0 else { return 0 }
         let brlValue = holding.currency == .usd ? holding.currentValue * 5.12 : holding.currentValue
-        return (brlValue / totalValueBRL) * 100
+        return (brlValue / totalValue) * 100
     }
 }

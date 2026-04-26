@@ -290,6 +290,103 @@ struct RebalancingEngineTests {
         #expect(totalShares == 300, "1500/10 × 2 = 300 total shares")
     }
 
+    // MARK: - Zero-quantity .aportar holdings (fresh portfolios)
+
+    @Test func recommendsZeroQuantityAportarHoldings() {
+        // Onboarding case: three tickers, all .aportar, none bought yet.
+        // Engine should still recommend buys because the user has money to invest.
+        let holdings = [
+            Holding(ticker: "ITUB3", quantity: 0, currentPrice: 32,
+                    assetClass: .acoesBR, status: .aportar, targetPercent: 5),
+            Holding(ticker: "XPML11", quantity: 0, currentPrice: 100,
+                    assetClass: .fiis, status: .aportar, targetPercent: 5),
+            Holding(ticker: "AAPL", quantity: 0, currentPrice: 200,
+                    assetClass: .usStocks, currency: .usd, status: .aportar, targetPercent: 5),
+        ]
+        let classAlloc: [AssetClassType: Double] = [.acoesBR: 40, .fiis: 30, .usStocks: 30]
+
+        let suggestions = RebalancingEngine.calculate(
+            holdings: holdings, investmentAmount: 6000,
+            classAllocations: classAlloc, exchangeRate: 5
+        )
+
+        #expect(!suggestions.isEmpty, "Zero-quantity .aportar tickers must still get recommendations")
+        #expect(suggestions.contains { $0.ticker == "ITUB3" })
+        #expect(suggestions.contains { $0.ticker == "XPML11" })
+        #expect(suggestions.contains { $0.ticker == "AAPL" })
+    }
+
+    @Test func zeroQuantityClassGapEqualsFullTarget() {
+        // Single .aportar holding with no shares → its class gap == full target.
+        // newPercent should reflect 100% since portfolio starts at zero.
+        let holdings = [
+            Holding(ticker: "ITUB3", quantity: 0, currentPrice: 30,
+                    assetClass: .acoesBR, status: .aportar, targetPercent: 5),
+        ]
+        let suggestions = RebalancingEngine.calculate(
+            holdings: holdings, investmentAmount: 300,
+            classAllocations: [.acoesBR: 100]
+        )
+
+        #expect(suggestions.count == 1)
+        if let s = suggestions.first {
+            #expect(s.sharesToBuy == 10, "300 / 30 = 10 shares")
+            #expect(s.currentPercent == 0, "No existing position → 0%")
+            #expect(s.newPercent == 100, "After buy, 100% of new portfolio")
+        }
+    }
+
+    @Test func mixesZeroQuantityAportarWithExistingPositions() {
+        // One existing .aportar holding (20 × $10 = $200) and one fresh .aportar (qty 0).
+        // Both should appear in suggestions.
+        let holdings = [
+            Holding(ticker: "OLD", quantity: 20, currentPrice: 10,
+                    assetClass: .acoesBR, status: .aportar, targetPercent: 5),
+            Holding(ticker: "NEW", quantity: 0, currentPrice: 10,
+                    assetClass: .fiis, status: .aportar, targetPercent: 5),
+        ]
+        let suggestions = RebalancingEngine.calculate(
+            holdings: holdings, investmentAmount: 500,
+            classAllocations: [.acoesBR: 50, .fiis: 50]
+        )
+
+        #expect(suggestions.contains { $0.ticker == "OLD" })
+        #expect(suggestions.contains { $0.ticker == "NEW" }, "Zero-qty .aportar must appear alongside existing positions")
+    }
+
+    @Test func zeroPriceHoldingExcluded() {
+        // currentPrice == 0 means the backend hasn't synced a quote yet.
+        // The engine cannot decide how many shares to buy → exclude it.
+        let holdings = [
+            Holding(ticker: "NOPRICE", quantity: 0, currentPrice: 0,
+                    assetClass: .acoesBR, status: .aportar, targetPercent: 5),
+            Holding(ticker: "GOOD", quantity: 0, currentPrice: 10,
+                    assetClass: .fiis, status: .aportar, targetPercent: 5),
+        ]
+        let suggestions = RebalancingEngine.calculate(
+            holdings: holdings, investmentAmount: 500,
+            classAllocations: [.acoesBR: 50, .fiis: 50]
+        )
+
+        #expect(suggestions.first { $0.ticker == "NOPRICE" } == nil, "Holdings without a price are not actionable")
+        #expect(suggestions.first { $0.ticker == "GOOD" } != nil)
+    }
+
+    @Test func returnsEmptyWhenAllStudying() {
+        // No .aportar holdings at all → engine bails (study/quarentena/vender don't receive).
+        let holdings = [
+            Holding(ticker: "S1", quantity: 0, currentPrice: 10,
+                    assetClass: .acoesBR, status: .estudo, targetPercent: 5),
+            Holding(ticker: "S2", quantity: 0, currentPrice: 10,
+                    assetClass: .fiis, status: .estudo, targetPercent: 5),
+        ]
+        let suggestions = RebalancingEngine.calculate(
+            holdings: holdings, investmentAmount: 1000,
+            classAllocations: [.acoesBR: 50, .fiis: 50]
+        )
+        #expect(suggestions.isEmpty)
+    }
+
     // MARK: - Portfolio class allocation storage
 
     @Test func portfolioClassAllocationsRoundTrip() {

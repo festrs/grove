@@ -7,10 +7,10 @@ struct SetTargetsStepView: View {
         VStack(spacing: Theme.Spacing.md) {
             // MARK: - Header
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text("Meta de alocacao")
+                Text("Allocation Target")
                     .font(.system(size: Theme.FontSize.title2, weight: .bold))
 
-                Text("Defina quanto da sua carteira cada classe deve representar.")
+                Text("Define how much of your portfolio each class should represent.")
                     .font(.system(size: Theme.FontSize.caption))
                     .foregroundStyle(Color.tqSecondaryText)
             }
@@ -81,14 +81,14 @@ struct SetTargetsStepView: View {
             if !isValid {
                 HStack(spacing: Theme.Spacing.xs) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                    Text(total > 100 ? "Acima de 100%" : "Abaixo de 100%")
+                    Text(total > 100 ? "Above 100%" : "Below 100%")
                 }
                 .font(.system(size: Theme.FontSize.caption))
                 .foregroundStyle(Color.tqWarning)
             } else {
                 HStack(spacing: Theme.Spacing.xs) {
                     Image(systemName: "checkmark.circle.fill")
-                    Text("Alocacao valida")
+                    Text("Valid allocation")
                 }
                 .font(.system(size: Theme.FontSize.caption))
                 .foregroundStyle(Color.tqAccentGreen)
@@ -132,7 +132,7 @@ struct SetTargetsStepView: View {
                 Slider(value: binding, in: 0...100, step: 1)
                     .tint(assetClass.color)
 
-                Text("\(holdingCount) ativo\(holdingCount == 1 ? "" : "s")")
+                Text("\(holdingCount) asset\(holdingCount == 1 ? "" : "s")")
                     .font(.system(size: Theme.FontSize.caption))
                     .foregroundStyle(Color.tqSecondaryText)
             }

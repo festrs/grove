@@ -3,6 +3,7 @@ import SwiftUI
 struct QuickStatsRow: View {
     let summary: PortfolioSummary
     let holdingCount: Int
+    @Environment(\.displayCurrency) private var displayCurrency
 
     var body: some View {
         LazyVGrid(
@@ -10,25 +11,25 @@ struct QuickStatsRow: View {
             spacing: Theme.Spacing.sm
         ) {
             statCard(
-                label: "Patrimonio total",
-                value: summary.totalValueBRL.formattedCompact(),
-                prefix: "R$ "
+                label: "Total Assets",
+                value: summary.totalValue.formattedCompact(),
+                prefix: "\(displayCurrency.symbol) "
             )
 
             statCard(
-                label: "Renda passiva liquida",
-                value: summary.monthlyIncomeNet.formattedBRL(),
-                suffix: "/mes"
+                label: "Net Passive Income",
+                value: summary.monthlyIncomeNet.formatted(as: displayCurrency),
+                suffix: "/month"
             )
 
             statCard(
-                label: "Renda passiva bruta",
-                value: summary.monthlyIncomeGross.formattedBRL(),
-                suffix: "/mes"
+                label: "Gross Passive Income",
+                value: summary.monthlyIncomeGross.formatted(as: displayCurrency),
+                suffix: "/month"
             )
 
             statCard(
-                label: "Holdings ativos",
+                label: "Active Holdings",
                 value: "\(summary.activeCount)",
                 suffix: "/ \(holdingCount)"
             )
@@ -77,7 +78,6 @@ struct QuickStatsRow: View {
     QuickStatsRow(
         summary: PortfolioSummary(
             totalValue: 245_000,
-            totalValueBRL: 245_000,
             monthlyIncomeGross: 2_450,
             monthlyIncomeNet: 2_100,
             allocationByClass: [],

@@ -8,10 +8,10 @@ struct SetStatusStepView: View {
             LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 // MARK: - Header
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    Text("Status dos ativos")
+                    Text("Asset Status")
                         .font(.system(size: Theme.FontSize.title2, weight: .bold))
 
-                    Text("Defina a estrategia para cada ativo da sua carteira.")
+                    Text("Define the strategy for each asset in your portfolio.")
                         .font(.system(size: Theme.FontSize.caption))
                         .foregroundStyle(Color.tqSecondaryText)
                 }
@@ -101,10 +101,10 @@ struct SetStatusStepView: View {
                 }
 
                 Picker("Status", selection: $viewModel.pendingHoldings[index].status) {
-                    Text("Estudo").tag(HoldingStatus.estudo)
-                    Text("Aportar").tag(HoldingStatus.aportar)
-                    Text("Quarent.").tag(HoldingStatus.quarentena)
-                    Text("Vender").tag(HoldingStatus.vender)
+                    Text("Study").tag(HoldingStatus.estudo)
+                    Text("Invest").tag(HoldingStatus.aportar)
+                    Text("Quarant.").tag(HoldingStatus.quarentena)
+                    Text("Sell").tag(HoldingStatus.vender)
                 }
                 .pickerStyle(.segmented)
 

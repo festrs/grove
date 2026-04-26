@@ -21,7 +21,7 @@ struct RebalancingResultRow: View {
                 Text(suggestion.amount.formattedBRL())
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                Text("\(suggestion.sharesToBuy) cotas")
+                Text("\(suggestion.sharesToBuy) shares")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

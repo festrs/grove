@@ -6,7 +6,7 @@ struct NextDividendCard: View {
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateFormat = "dd MMM"
         return formatter
     }()
@@ -17,7 +17,7 @@ struct NextDividendCard: View {
                 HStack {
                     Image(systemName: "calendar.badge.clock")
                         .foregroundStyle(Color.tqAccentGreen)
-                    Text("Proximos dividendos")
+                    Text("Upcoming Dividends")
                         .font(.system(size: Theme.FontSize.body, weight: .semibold))
                 }
 
@@ -25,7 +25,7 @@ struct NextDividendCard: View {
                     HStack(spacing: Theme.Spacing.sm) {
                         Image(systemName: "info.circle")
                             .foregroundStyle(Color.tqSecondaryText)
-                        Text("Nenhum dividendo previsto")
+                        Text("No dividends scheduled")
                             .font(.system(size: Theme.FontSize.body))
                             .foregroundStyle(Color.tqSecondaryText)
                     }
@@ -47,8 +47,19 @@ struct NextDividendCard: View {
     private func dividendRow(_ dividend: DividendPayment) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(dividend.holding?.ticker ?? "---")
-                    .font(.system(size: Theme.FontSize.body, weight: .semibold))
+                HStack(spacing: 6) {
+                    Text(dividend.holding?.ticker ?? "---")
+                        .font(.system(size: Theme.FontSize.body, weight: .semibold))
+
+                    if dividend.isInformational {
+                        Text("studying")
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.tqAccentBlue.opacity(0.18), in: Capsule())
+                            .foregroundStyle(Color.tqAccentBlue)
+                    }
+                }
 
                 Text(Self.dateFormatter.string(from: dividend.paymentDate))
                     .font(.system(size: Theme.FontSize.caption))
@@ -58,16 +69,30 @@ struct NextDividendCard: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(dividend.netAmount.formattedBRL())
+                Text(amountText(dividend))
                     .font(.system(size: Theme.FontSize.body, weight: .medium))
-                    .foregroundStyle(Color.tqPositive)
+                    .foregroundStyle(amountColor(dividend))
 
-                Text("liquido")
+                Text(amountCaption(dividend))
                     .font(.system(size: Theme.FontSize.caption))
                     .foregroundStyle(Color.tqSecondaryText)
             }
         }
         .padding(.vertical, Theme.Spacing.xs)
+    }
+
+    private func amountText(_ dividend: DividendPayment) -> String {
+        dividend.isInformational
+            ? dividend.amountPerShare.formattedBRL()
+            : dividend.netAmount.formattedBRL()
+    }
+
+    private func amountColor(_ dividend: DividendPayment) -> Color {
+        dividend.isInformational ? Color.tqAccentBlue : Color.tqPositive
+    }
+
+    private func amountCaption(_ dividend: DividendPayment) -> String {
+        dividend.isInformational ? "per share" : "net"
     }
 }
 

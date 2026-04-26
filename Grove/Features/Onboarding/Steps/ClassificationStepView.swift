@@ -8,10 +8,10 @@ struct ClassificationStepView: View {
             LazyVStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 // MARK: - Header
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    Text("Classifique seus ativos")
+                    Text("Classify Your Assets")
                         .font(.system(size: Theme.FontSize.title2, weight: .bold))
 
-                    Text("Verificamos automaticamente a classe de cada ativo. Ajuste se necessario.")
+                    Text("We automatically verified each asset's class. Adjust if necessary.")
                         .font(.system(size: Theme.FontSize.caption))
                         .foregroundStyle(Color.tqSecondaryText)
                 }
@@ -23,7 +23,7 @@ struct ClassificationStepView: View {
                 } label: {
                     HStack(spacing: Theme.Spacing.xs) {
                         Image(systemName: "wand.and.stars")
-                        Text("Auto-classificar")
+                        Text("Auto-classify")
                     }
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(Color.tqAccentGreen)
@@ -53,29 +53,7 @@ struct ClassificationStepView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Menu {
-                    Picker("Classe", selection: holding.assetClass) {
-                        ForEach(AssetClassType.allCases) { cls in
-                            Label(cls.displayName, systemImage: cls.icon).tag(cls)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: holding.wrappedValue.assetClass.icon)
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(holding.wrappedValue.assetClass.shortName)
-                            .font(.system(size: 13, weight: .semibold))
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9, weight: .bold))
-                            .opacity(0.6)
-                    }
-                    .foregroundStyle(holding.wrappedValue.assetClass.color)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(holding.wrappedValue.assetClass.color.opacity(0.15), in: Capsule())
-                    .animation(.spring(duration: 0.25), value: holding.wrappedValue.assetClass)
-                }
-                .buttonStyle(.plain)
+                TQAssetClassPicker(selection: holding.assetClass)
             }
         }
     }

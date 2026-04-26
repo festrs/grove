@@ -14,19 +14,19 @@ struct IncomeBarChart: View {
                     : NSDecimalNumber(decimal: summary.gross).doubleValue
 
                 BarMark(
-                    x: .value("Mes", summary.monthLabel),
-                    y: .value("Renda", value)
+                    x: .value("Month", summary.monthLabel),
+                    y: .value("Income", value)
                 )
                 .foregroundStyle(Color.tqAccentGreen.gradient)
                 .cornerRadius(4)
             }
 
             if let goal = goalLine {
-                RuleMark(y: .value("Meta", NSDecimalNumber(decimal: goal).doubleValue))
+                RuleMark(y: .value("Goal", NSDecimalNumber(decimal: goal).doubleValue))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
                     .foregroundStyle(.orange)
                     .annotation(position: .top, alignment: .trailing) {
-                        Text("Meta")
+                        Text("Goal")
                             .font(.caption2)
                             .foregroundStyle(.orange)
                     }

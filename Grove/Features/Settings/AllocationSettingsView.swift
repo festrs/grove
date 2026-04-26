@@ -38,7 +38,7 @@ struct AllocationSettingsView: View {
                                 weights[cls] = $0
                                 hasChanges = true
                             }
-                        ), in: 0...100, step: 5)
+                        ), in: 0...100, step: 1)
                         .labelsHidden()
                     }
                 }
@@ -52,27 +52,27 @@ struct AllocationSettingsView: View {
                         .foregroundStyle(isValid ? Color.tqAccentGreen : Color.tqNegative)
                 }
             } header: {
-                Text("Alocacao por classe")
+                Text("Allocation by Class")
             } footer: {
-                Text("Define quanto do patrimonio total cada classe deve representar. Deve somar 100%. Aplica-se a todos os portfolios.")
+                Text("Define how much of your total assets each class should represent. Must sum to 100%. Applies to all portfolios.")
             }
 
             if !isValid {
                 Section {
-                    Text("A alocacao deve somar 100%.")
+                    Text("Allocation must sum to 100%.")
                         .font(.caption)
                         .foregroundStyle(Color.tqNegative)
                 }
             }
         }
-        .navigationTitle("Alocacao")
+        .navigationTitle("Allocation")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
             if hasChanges {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Salvar") {
+                    Button("Save") {
                         save()
                     }
                     .disabled(!isValid)

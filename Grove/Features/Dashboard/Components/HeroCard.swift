@@ -17,7 +17,7 @@ struct HeroCard: View {
                     )
                     .overlay {
                         VStack(spacing: Theme.Spacing.xs) {
-                            Text("RENDA PASSIVA · MES")
+                            Text("PASSIVE INCOME · MONTH")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(.secondary)
                                 .tracking(0.6)
@@ -25,7 +25,7 @@ struct HeroCard: View {
                                 .font(.system(size: 32, weight: .bold))
                                 .minimumScaleFactor(0.6)
                                 .lineLimit(1)
-                            Text("de \(projection.goalMonthly.formattedBRL())")
+                            Text("of \(projection.goalMonthly.formattedBRL())")
                                 .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
                         }
@@ -33,14 +33,14 @@ struct HeroCard: View {
                     }
 
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        Text("Para este mes")
+                        Text("For this month")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .tracking(0.6)
                             .textCase(.uppercase)
 
                         if !suggestions.isEmpty {
-                            Text("Aportar em \(suggestions.count) ativos abaixo do alvo")
+                            Text("Invest in \(suggestions.count) assets below target")
                                 .font(.system(size: 22, weight: .bold))
                                 .lineLimit(2)
                         }
@@ -48,7 +48,7 @@ struct HeroCard: View {
                         if let years = projection.estimatedYearsToGoal {
                             let pctLeft = 100 - NSDecimalNumber(decimal: projection.progressPercent).doubleValue
                             let formatted = String(format: "%.1f", NSDecimalNumber(decimal: years).doubleValue)
-                            Text("Faltam ~\(formatted) anos · \(String(format: "%.0f", pctLeft))% restante")
+                            Text("~\(formatted) years left · \(String(format: "%.0f", pctLeft))% remaining")
                                 .font(.system(size: 14))
                                 .foregroundStyle(.secondary)
                                 .lineSpacing(4)
@@ -82,7 +82,7 @@ struct HeroCard: View {
                 Text(suggestion.displayTicker)
                     .font(.system(size: 15, weight: .semibold))
                 let gap = NSDecimalNumber(decimal: suggestion.targetPercent - suggestion.currentPercent).doubleValue
-                Text("-\(String(format: "%.0f", abs(gap)))% do alvo")
+                Text("-\(String(format: "%.0f", abs(gap)))% of target")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

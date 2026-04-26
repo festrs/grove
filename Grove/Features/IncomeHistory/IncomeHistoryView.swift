@@ -36,7 +36,7 @@ struct IncomeHistoryView: View {
             .padding(Theme.Spacing.md)
             .frame(maxWidth: Theme.Layout.maxContentWidth)
         }
-        .navigationTitle("Renda Passiva")
+        .navigationTitle("Passive Income")
         .refreshable {
             await syncService.syncAll(modelContext: modelContext, backendService: backendService)
             viewModel.loadData(modelContext: modelContext)
@@ -53,7 +53,7 @@ struct IncomeHistoryView: View {
         TQCard {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Renda anual estimada")
+                    Text("Estimated Annual Income")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(viewModel.totalAnnualBRL.formattedBRL())
@@ -73,7 +73,7 @@ struct IncomeHistoryView: View {
         TQCard {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Renda mensal estimada")
+                    Text("Estimated Monthly Income")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(viewModel.monthlyIncomeBRL.formattedBRL())
@@ -81,7 +81,7 @@ struct IncomeHistoryView: View {
                         .fontWeight(.bold)
                 }
                 Spacer()
-                Text("/mes").font(.caption).foregroundStyle(.secondary)
+                Text("/month").font(.caption).foregroundStyle(.secondary)
             }
         }
     }

@@ -385,7 +385,7 @@ struct AllocationOption6: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 20))
                             .foregroundStyle(Color.tqPositive)
-                        Text("Balanceado")
+                        Text("Balanced")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
                     } else {
@@ -633,7 +633,7 @@ struct AllocationOption9: View {
                             .font(.system(size: 9))
                             .foregroundStyle(Color.tqAccentGreen)
                     } else {
-                        Text("ok")
+                        Text("OK")
                             .font(.system(size: 9))
                             .foregroundStyle(Color.tqPositive)
                     }
@@ -672,13 +672,13 @@ struct AllocationOption10: View {
                     if underweight == 0 {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(Color.tqPositive)
-                        Text("Balanceado")
+                        Text("Balanced")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                     } else {
                         Text("\(underweight)")
                             .font(.system(size: 22, weight: .bold))
-                        Text("abaixo do alvo")
+                        Text("Below target")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                     }
@@ -779,7 +779,7 @@ struct AllocationOption11: View {
                             .font(.system(size: 13, weight: .bold))
                             .monospacedDigit()
 
-                        Text("de \(String(format: "%.0f%%", target))")
+                        Text("of \(String(format: "%.0f%%", target))")
                             .font(.system(size: 11))
                             .foregroundStyle(.tertiary)
                     }
@@ -811,15 +811,15 @@ struct AllocationOption11: View {
                     HStack {
                         Spacer()
                         if isOver {
-                            Text("excedente \(String(format: "%.0f%%", current - target))")
+                            Text("Excess \(String(format: "%.0f%%", current - target))")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Color.tqWarning)
                         } else if target - current < 1 {
-                            Text("no alvo")
+                            Text("On target")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Color.tqPositive)
                         } else {
-                            Text("faltam \(String(format: "%.0f%%", target - current))")
+                            Text("Missing \(String(format: "%.0f%%", target - current))")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Color.tqAccentGreen)
                         }
@@ -841,19 +841,19 @@ struct AllocationOption12: View {
         VStack(spacing: Theme.Spacing.sm) {
             // Header
             HStack {
-                Text("Classe")
+                Text("Class")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .frame(width: 70, alignment: .leading)
-                Text("Progresso")
+                Text("Progress")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.tertiary)
                 Spacer()
-                Text("Atual")
+                Text("Current")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .frame(width: 35)
-                Text("Alvo")
+                Text("Target")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .frame(width: 35)

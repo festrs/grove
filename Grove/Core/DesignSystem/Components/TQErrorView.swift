@@ -16,7 +16,7 @@ struct TQErrorView: View {
                 .multilineTextAlignment(.center)
 
             if let retryAction {
-                Button("Tentar novamente") {
+                Button("Try Again") {
                     Task { await retryAction() }
                 }
                 .buttonStyle(.borderedProminent)

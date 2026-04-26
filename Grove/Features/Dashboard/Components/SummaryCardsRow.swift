@@ -3,6 +3,7 @@ import SwiftUI
 struct SummaryCardsRow: View {
     let summary: PortfolioSummary
     let projection: IncomeProjection?
+    @Environment(\.displayCurrency) private var displayCurrency
 
     var body: some View {
         LazyVGrid(
@@ -10,27 +11,27 @@ struct SummaryCardsRow: View {
             spacing: 12
         ) {
             summaryCard(
-                label: "Patrimonio",
-                value: summary.totalValueBRL.formattedCompact(),
-                prefix: "R$ "
+                label: "Assets",
+                value: summary.totalValue.formattedCompact(),
+                prefix: "\(displayCurrency.symbol) "
             )
             summaryCard(
-                label: "Renda bruta",
-                value: summary.monthlyIncomeGross.formattedBRL(),
+                label: "Gross Income",
+                value: summary.monthlyIncomeGross.formatted(as: displayCurrency),
                 hint: "/mes"
             )
             summaryCard(
-                label: "Renda liquida",
-                value: summary.monthlyIncomeNet.formattedBRL(),
-                hint: "Apos impostos",
+                label: "Net Income",
+                value: summary.monthlyIncomeNet.formatted(as: displayCurrency),
+                hint: "After taxes",
                 accent: true
             )
             if let years = projection?.estimatedYearsToGoal {
                 let formatted = String(format: "%.1f", NSDecimalNumber(decimal: years).doubleValue)
                 summaryCard(
-                    label: "FI em",
-                    value: "\(formatted) anos",
-                    hint: "No ritmo atual"
+                    label: "FI in",
+                    value: "\(formatted) years",
+                    hint: "At current pace"
                 )
             }
         }

@@ -15,7 +15,7 @@ struct MonthlyActionCard: View {
                     .padding(.trailing, Theme.Spacing.sm)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Este mes, aportar em:")
+                    Text("This month, invest in:")
                         .font(.system(size: Theme.FontSize.body, weight: .semibold))
                         .foregroundStyle(.primary)
 
@@ -23,7 +23,7 @@ struct MonthlyActionCard: View {
                         HStack(spacing: Theme.Spacing.sm) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(Color.tqPositive)
-                            Text("Portfolio balanceado!")
+                            Text("Balanced portfolio!")
                                 .font(.system(size: Theme.FontSize.body))
                                 .foregroundStyle(Color.tqSecondaryText)
                         }
@@ -47,7 +47,7 @@ struct MonthlyActionCard: View {
                 Text(suggestion.ticker)
                     .font(.system(size: Theme.FontSize.body, weight: .semibold))
 
-                Text("\(gap.formattedPercent(decimals: 1)) abaixo do alvo")
+                Text("\(gap.formattedPercent(decimals: 1)) below target")
                     .font(.system(size: Theme.FontSize.caption))
                     .foregroundStyle(Color.tqAccentGreen)
             }

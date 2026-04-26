@@ -31,7 +31,7 @@ struct IncomeGaugeMeter: View {
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
 
-                        Text("/mes")
+                        Text("/month")
                             .font(.system(size: Theme.FontSize.caption))
                             .foregroundStyle(Color.tqSecondaryText)
                     }
@@ -41,22 +41,22 @@ struct IncomeGaugeMeter: View {
 
                 // Progress percent and goal
                 VStack(spacing: Theme.Spacing.xs) {
-                    Text("\(projection.progressPercent.formattedPercent(decimals: 2)) de \(projection.goalMonthly.formattedBRL())")
+                    Text("\(projection.progressPercent.formattedPercent(decimals: 2)) of \(projection.goalMonthly.formattedBRL())")
                         .font(.system(size: Theme.FontSize.body, weight: .medium))
                         .foregroundStyle(.primary)
 
                     // Estimated time or goal reached
                     if goalReached {
-                        Label("Meta atingida!", systemImage: "checkmark.seal.fill")
+                        Label("Goal reached!", systemImage: "checkmark.seal.fill")
                             .font(.system(size: Theme.FontSize.body, weight: .semibold))
                             .foregroundStyle(Color.tqPositive)
                     } else if let years = projection.estimatedYearsToGoal {
                         let formatted = String(format: "%.1f", NSDecimalNumber(decimal: years).doubleValue)
-                        Text("~\(formatted) anos para tranquilidade")
+                        Text("~\(formatted) years to financial freedom")
                             .font(.system(size: Theme.FontSize.caption))
                             .foregroundStyle(Color.tqSecondaryText)
                     } else {
-                        Text("Continue aportando para alcancar sua meta")
+                        Text("Keep investing to reach your goal")
                             .font(.system(size: Theme.FontSize.caption))
                             .foregroundStyle(Color.tqSecondaryText)
                     }

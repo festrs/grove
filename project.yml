@@ -9,6 +9,8 @@ options:
   createIntermediateGroups: true
   generateEmptyDirectories: false
   groupSortPosition: top
+  defaultLocalization: en
+  knownRegions: [en, pt-BR, es]
 
 settings:
   base:

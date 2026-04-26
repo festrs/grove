@@ -26,4 +26,11 @@ enum Currency: String, Codable, CaseIterable, Identifiable {
         case .usd: Locale(identifier: "en_US")
         }
     }
+
+    var displayName: String {
+        switch self {
+        case .brl: "Real (R$)"
+        case .usd: "US Dollar ($)"
+        }
+    }
 }
