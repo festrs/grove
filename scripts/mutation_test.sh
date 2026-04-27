@@ -28,50 +28,39 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# Self-heal if launched under Rosetta. On Apple Silicon, an x86_64 parent shell
+# forces every spawned xcodebuild / swiftc / simulator process through Rosetta,
+# roughly doubling iteration time. proc_translated == 1 means we're translated.
+if [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = "1" ]; then
+    echo "→ re-execing under arm64 (parent shell was x86_64/Rosetta)"
+    exec arch -arm64 /bin/bash "$0" "$@"
+fi
+
 PY="python3 scripts/mutate.py"
 BATCH_SIZE="${BATCH_SIZE:-6}"
+# Optional cap on mutations processed (for sample/CI runs). Empty = no limit.
+MUTATION_LIMIT="${MUTATION_LIMIT:-}"
 
 KILLED=0
 SURVIVED=0
 TOTAL=0
 SURVIVORS=()
 
-# Persistent DerivedData so each xcodebuild call is an INCREMENTAL build
-# (only the mutated file + dependents recompile), not a cold rebuild.
-DERIVED_DATA="${MUTATION_DERIVED_DATA:-$PWD/.mutation-derived}"
-SCHEME="Grove"
-TEST_TARGET="GroveTests"
+# Mutation tests run via `swift test` against the GroveCore SPM package —
+# native macOS, no simulator, ~10× faster than xcodebuild test on iOS sim.
+# Incremental rebuilds reuse .build/ inside the package directory.
 
-DESTINATION=$(xcrun simctl list devices available -j | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-for runtime in sorted(data['devices'].keys(), reverse=True):
-    if 'iOS' in runtime and 'xros' not in runtime.lower() and 'watch' not in runtime.lower() and 'tv' not in runtime.lower():
-        for d in data['devices'][runtime]:
-            if 'iPhone' in d['name']:
-                print('id=' + d['udid'])
-                sys.exit(0)
-sys.exit(1)
-")
-if [ -z "$DESTINATION" ]; then
-    echo "error: no iPhone simulator available" >&2
-    exit 1
-fi
+PACKAGE_DIR="Packages/GroveCore"
 
 setup_build() {
-    echo "→ Generating Xcode project..."
-    xcodegen generate >/dev/null
-    echo "→ Cold build-for-testing (one-time)..."
-    if ! xcodebuild build-for-testing \
-        -scheme "$SCHEME" \
-        -destination "$DESTINATION" \
-        -derivedDataPath "$DERIVED_DATA" \
-        -only-testing:"$TEST_TARGET" \
-        >/tmp/mutation-build.log 2>&1; then
-        echo "error: initial build-for-testing failed" >&2
+    echo "→ Cold swift build (one-time, primes module cache)..."
+    local t0=$(date +%s)
+    if ! (cd "$PACKAGE_DIR" && swift build --build-tests >/tmp/mutation-build.log 2>&1); then
+        echo "error: initial swift build --build-tests failed" >&2
         tail -50 /tmp/mutation-build.log >&2
         exit 1
     fi
+    echo "  cold build: $(( $(date +%s) - t0 ))s"
 }
 
 # Mutation list: each entry is a single line "file|||desc|||search|||replace"
@@ -87,7 +76,7 @@ add() {
 }
 
 # --- RebalancingEngine: where to invest ---
-E="Grove/Core/Services/RebalancingEngine.swift"
+E="Packages/GroveCore/Sources/GroveServices/RebalancingEngine.swift"
 RE_TESTS="RebalancingEngineTests"
 add "$E" "eligible: aportar->quarentena"     'status == .aportar'                                    'status == .quarentena'                                                                  "$RE_TESTS"
 add "$E" "remove vender exclusion"           'guard h.status != .vender else { continue }'           '// mutated: vender not excluded'                                                        "$RE_TESTS"
@@ -97,26 +86,26 @@ add "$E" "break empty eligible guard"        'guard !context.eligible.isEmpty'  
 add "$E" "percent helper: divide by total"   'guard total > 0 else { return 0 }'                     'guard total < 0 else { return 0 }'                                                      "$RE_TESTS"
 
 # --- TaxTreatment / TaxCalculator: after-tax income ---
-TT="Grove/Core/Models/Enums/TaxTreatment.swift"
+TT="Packages/GroveCore/Sources/GroveDomain/TaxTreatment.swift"
 add "$TT" "nra30 multiplier 0.70 -> 1.0"     'case .nra30: 0.70'                                     'case .nra30: 1.0'                                                                       "TaxCalculatorTests"
 
-T="Grove/Core/Services/TaxCalculator.swift"
+T="Packages/GroveCore/Sources/GroveServices/TaxCalculator.swift"
 add "$T" "flip withholding sign"             'gross * (1 - netMultiplier(for: assetClass))'          'gross * (1 + netMultiplier(for: assetClass))'                                           "TaxCalculatorTests"
 
 # --- IncomeProjector: FIRE projection ---
-I="Grove/Core/Services/IncomeProjector.swift"
+I="Packages/GroveCore/Sources/GroveServices/IncomeProjector.swift"
 add "$I" "skip projection loop"              'totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0'  'totalNet.amount > goalDisplay.amount && contributionDisplay.amount > 0' "IncomeProjectorTests"
 
 # --- Holding: per-position P&L ---
-H="Grove/Core/Models/Holding.swift"
+H="Packages/GroveCore/Sources/GroveDomain/Holding.swift"
 add "$H" "flip gainLoss sign"                'currentValue - totalCost'                              'totalCost - currentValue'                                                               "TransactionTests"
 
 # --- PortfolioRepository: allocation drift ---
-R="Grove/Core/Repositories/PortfolioRepository.swift"
-add "$R" "flip drift sign"                   'drift: currentPct - targetPct'                         'drift: targetPct - currentPct'                                                          "PortfolioViewModelTests"
+R="Packages/GroveCore/Sources/GroveRepositories/PortfolioRepository.swift"
+add "$R" "flip drift sign"                   'drift: currentPct - targetPct'                         'drift: targetPct - currentPct'                                                          "PortfolioRepositoryTests"
 
 # --- AssetClassType: currency + tax-treatment routing ---
-A="Grove/Core/Models/Enums/AssetClassType.swift"
+A="Packages/GroveCore/Sources/GroveDomain/AssetClassType.swift"
 add "$A" "detect FII -> acoesBR"             'if apiType == "fund" { return .fiis }'                 'if apiType == "fund" { return .acoesBR }'                                               "BackendDTOTests"
 add "$A" "BR currency -> USD"                'case .acoesBR, .fiis, .rendaFixa: .brl'                'case .acoesBR, .fiis, .rendaFixa: .usd'                                                 "AssetClassTypeTests,TaxCalculatorTests"
 add "$A" "detect crypto -> nil"              'if apiType == "crypto" { return .crypto }'             'if apiType == "crypto" { return nil }'                                                  "BackendDTOTests"
@@ -135,18 +124,15 @@ parse_entry() {
     ENTRY_TESTS="$entry"
 }
 
-# Convert a comma-separated list of test classes into "-only-testing:GroveTests/X"
-# args, deduplicated. Empty input falls back to the whole target.
-build_only_testing_args() {
+# Convert a comma-separated list of test classes into a regex `swift test --filter`
+# argument: "RebalancingEngineTests|TaxCalculatorTests". Empty falls back to all.
+build_filter_regex() {
     local csv="$1"
     if [ -z "$csv" ]; then
-        echo "-only-testing:$TEST_TARGET"
+        echo ""
         return
     fi
-    # Sort -u to dedupe across batched mutations from different files.
-    echo "$csv" | tr ',' '\n' | awk 'NF' | sort -u | while read -r cls; do
-        printf -- "-only-testing:%s/%s " "$TEST_TARGET" "$cls"
-    done
+    echo "$csv" | tr ',' '\n' | awk 'NF' | sort -u | paste -sd '|' -
 }
 
 apply_one() {
@@ -164,20 +150,17 @@ revert_all_batch() {
 }
 
 run_tests_silent() {
-    # Incremental build (reuses DerivedData) + run only the test classes that
-    # could catch this batch's mutations. Mutated Swift files trigger a partial
-    # rebuild only, and scoping the test phase is the largest single speedup —
-    # often 5-10× faster than running the whole target.
+    # Native macOS `swift test` against the SPM package — no simulator, no Xcode
+    # orchestration. Incremental rebuild reuses .build/. Filter by suite so each
+    # run only executes the tests that could catch this batch's mutations.
     local tests_csv="$1"
-    local only_testing_args
-    only_testing_args=$(build_only_testing_args "$tests_csv")
-    # shellcheck disable=SC2086 — we want word-splitting of the -only-testing flags.
-    xcodebuild build-for-testing test-without-building \
-        -scheme "$SCHEME" \
-        -destination "$DESTINATION" \
-        -derivedDataPath "$DERIVED_DATA" \
-        $only_testing_args \
-        >/dev/null 2>&1
+    local filter
+    filter=$(build_filter_regex "$tests_csv")
+    if [ -n "$filter" ]; then
+        (cd "$PACKAGE_DIR" && swift test --filter "$filter" >/dev/null 2>&1)
+    else
+        (cd "$PACKAGE_DIR" && swift test >/dev/null 2>&1)
+    fi
 }
 
 record_killed() {
@@ -232,6 +215,7 @@ run_batch() {
         return
     fi
 
+    local t0=$(date +%s)
     if run_tests_silent "$batch_tests_csv"; then
         # Whole batch survived
         for entry in "${applied[@]}"; do
@@ -245,6 +229,7 @@ run_batch() {
         revert_all_batch
         run_individually "${applied[@]}"
     fi
+    echo "  (batch took $(( $(date +%s) - t0 ))s, ${#applied[@]} mutation(s))"
 }
 
 echo "========================================"
@@ -253,6 +238,13 @@ echo "========================================"
 echo ""
 
 setup_build
+
+# Apply MUTATION_LIMIT (used for sample/CI runs to validate timing changes
+# without paying for the full mutation set).
+if [ -n "$MUTATION_LIMIT" ]; then
+    echo "→ MUTATION_LIMIT=$MUTATION_LIMIT — sampling first $MUTATION_LIMIT mutations"
+    MUTATIONS=("${MUTATIONS[@]:0:$MUTATION_LIMIT}")
+fi
 
 # bash 3.2 compatible: walk MUTATIONS, fill each batch with mutations from
 # distinct files, and push the rest into the next pass.

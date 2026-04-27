@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import GroveDomain
 
 struct MonthlyDividendSummary: Identifiable {
     var id: String { "\(year)-\(month)" }

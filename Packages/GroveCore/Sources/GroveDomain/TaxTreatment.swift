@@ -1,6 +1,6 @@
 import Foundation
 
-enum TaxTreatment: String, Codable, CaseIterable, Identifiable {
+public enum TaxTreatment: String, Codable, CaseIterable, Identifiable, Sendable {
     /// FII dividends and BR stock dividends (currently exempt for PF)
     case exempt
 
@@ -13,9 +13,9 @@ enum TaxTreatment: String, Codable, CaseIterable, Identifiable {
     /// Renda Fixa: IR regressivo (22.5% to 15% based on holding period)
     case irRegressivo
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .exempt: "Exempt"
         case .nra30: "30% NRA"
@@ -25,7 +25,7 @@ enum TaxTreatment: String, Codable, CaseIterable, Identifiable {
     }
 
     /// Net multiplier: after-tax fraction of gross income
-    var netMultiplier: Decimal {
+    public var netMultiplier: Decimal {
         switch self {
         case .exempt: 1.0
         case .nra30: 0.70

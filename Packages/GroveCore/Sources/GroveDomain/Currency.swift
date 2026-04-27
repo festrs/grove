@@ -1,33 +1,33 @@
 import Foundation
 
-enum Currency: String, Codable, CaseIterable, Identifiable {
+public enum Currency: String, Codable, CaseIterable, Identifiable, Sendable {
     case brl
     case usd
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var symbol: String {
+    public var symbol: String {
         switch self {
         case .brl: "R$"
         case .usd: "$"
         }
     }
 
-    var code: String {
+    public var code: String {
         switch self {
         case .brl: "BRL"
         case .usd: "USD"
         }
     }
 
-    var locale: Locale {
+    public var locale: Locale {
         switch self {
         case .brl: Locale(identifier: "pt_BR")
         case .usd: Locale(identifier: "en_US")
         }
     }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .brl: "Real (R$)"
         case .usd: "US Dollar ($)"

@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 struct HoldingRow: View {
     let holding: Holding

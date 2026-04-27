@@ -1,6 +1,8 @@
 import Testing
 import Foundation
 import SwiftData
+import GroveDomain
+import GroveRepositories
 @testable import Grove
 
 @Suite(.serialized)

@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 struct ClassificationStepView: View {
     @Bindable var viewModel: OnboardingViewModel

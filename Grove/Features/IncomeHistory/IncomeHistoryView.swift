@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
+import GroveServices
 
 struct IncomeHistoryView: View {
     @Environment(\.modelContext) private var modelContext

@@ -1,4 +1,6 @@
 import SwiftUI
+import GroveDomain
+import GroveServices
 
 struct IncomeGaugeMeter: View {
     let projection: IncomeProjection

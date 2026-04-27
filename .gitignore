@@ -4,6 +4,8 @@
 *.xcuserdatad/
 DerivedData/
 .mutation-derived/
+.mutation-derived-mac/
+Packages/*/.build/
 *.mut.bak
 build/
 *.ipa

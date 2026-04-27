@@ -1,14 +1,14 @@
 import SwiftUI
 
-enum HoldingStatus: String, Codable, CaseIterable, Identifiable {
+public enum HoldingStatus: String, Codable, CaseIterable, Identifiable, Sendable {
     case estudo
     case aportar
     case quarentena
     case vender
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .estudo: "Study"
         case .aportar: "Invest"
@@ -17,7 +17,7 @@ enum HoldingStatus: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var color: Color {
+    public var color: Color {
         switch self {
         case .estudo: .blue
         case .aportar: .green
@@ -26,7 +26,7 @@ enum HoldingStatus: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .estudo: "magnifyingglass.circle.fill"
         case .aportar: "arrow.up.circle.fill"
@@ -35,7 +35,7 @@ enum HoldingStatus: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .estudo: "Studying, no position yet"
         case .aportar: "Good company, receives monthly investments"

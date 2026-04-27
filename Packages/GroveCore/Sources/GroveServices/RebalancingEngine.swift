@@ -1,55 +1,44 @@
 import Foundation
-import SwiftData
+import GroveDomain
 
-struct RebalancingSuggestion: Identifiable {
-    var id: String { ticker }
-    let ticker: String
-    let displayName: String
-    let sharesToBuy: Int
-    let amount: Money
-    let currentPercent: Decimal
-    let targetPercent: Decimal
-    let newPercent: Decimal
+public struct RebalancingSuggestion: Identifiable {
+    public var id: String { ticker }
+    public let ticker: String
+    public let displayName: String
+    public let sharesToBuy: Int
+    public let amount: Money
+    public let currentPercent: Decimal
+    public let targetPercent: Decimal
+    public let newPercent: Decimal
 
-    var displayTicker: String {
+    public init(
+        ticker: String,
+        displayName: String,
+        sharesToBuy: Int,
+        amount: Money,
+        currentPercent: Decimal,
+        targetPercent: Decimal,
+        newPercent: Decimal
+    ) {
+        self.ticker = ticker
+        self.displayName = displayName
+        self.sharesToBuy = sharesToBuy
+        self.amount = amount
+        self.currentPercent = currentPercent
+        self.targetPercent = targetPercent
+        self.newPercent = newPercent
+    }
+
+    public var displayTicker: String {
         ticker.replacingOccurrences(of: ".SA", with: "")
     }
 }
 
-struct RebalancingEngine {
+public struct RebalancingEngine {
 
     // MARK: - Public API
 
-    static func suggestions(
-        modelContext: ModelContext,
-        investmentAmount: Money,
-        rates: any ExchangeRates
-    ) throws -> [RebalancingSuggestion] {
-        let repo = PortfolioRepository(modelContext: modelContext)
-        let holdings = try HoldingRepository(modelContext: modelContext).fetchAll()
-        let settings = try repo.fetchSettings()
-
-        let globalAllocations = settings.classAllocations
-
-        if globalAllocations.isEmpty {
-            return calculate(
-                holdings: holdings,
-                investmentAmount: investmentAmount,
-                maxRecommendations: settings.recommendationCount,
-                rates: rates
-            )
-        } else {
-            return calculate(
-                holdings: holdings,
-                investmentAmount: investmentAmount,
-                classAllocations: globalAllocations,
-                maxRecommendations: settings.recommendationCount,
-                rates: rates
-            )
-        }
-    }
-
-    static func calculate(
+    public static func calculate(
         holdings: [Holding],
         investmentAmount: Money,
         classAllocations: [AssetClassType: Double],
@@ -81,7 +70,7 @@ struct RebalancingEngine {
     }
 
     /// Simplified overload — derives equal class allocations from holdings.
-    static func calculate(
+    public static func calculate(
         holdings: [Holding],
         investmentAmount: Money,
         maxRecommendations: Int = .max,

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import GroveDomain
 
 struct CalendarDividend: Identifiable {
     var id: String { "\(symbol)-\(date.timeIntervalSince1970)-\(type)" }

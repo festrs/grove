@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 struct DividendDayDetail: View {
     let dividends: [DividendPayment]

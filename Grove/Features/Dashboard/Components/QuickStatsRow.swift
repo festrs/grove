@@ -1,4 +1,6 @@
 import SwiftUI
+import GroveDomain
+import GroveRepositories
 
 struct QuickStatsRow: View {
     let summary: PortfolioSummary

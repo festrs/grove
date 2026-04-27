@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import GroveDomain
 
 struct HoldingRepository {
     let modelContext: ModelContext

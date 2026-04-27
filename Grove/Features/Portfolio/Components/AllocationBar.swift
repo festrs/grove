@@ -1,4 +1,6 @@
 import SwiftUI
+import GroveDomain
+import GroveRepositories
 
 struct AllocationBar: View {
     let allocations: [AssetClassAllocation]

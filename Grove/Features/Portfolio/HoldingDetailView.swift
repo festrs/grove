@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct HoldingDetailView: View {
     let holdingID: PersistentIdentifier

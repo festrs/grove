@@ -1,54 +1,53 @@
 import Foundation
 import SwiftData
-import SwiftUI
 
 @Model
-final class Holding {
-    var ticker: String
-    var displayName: String
-    var quantity: Decimal
-    var averagePrice: Decimal
-    var currentPrice: Decimal
-    var dividendYield: Decimal
+public final class Holding {
+    public var ticker: String
+    public var displayName: String
+    public var quantity: Decimal
+    public var averagePrice: Decimal
+    public var currentPrice: Decimal
+    public var dividendYield: Decimal
 
     // Stored as raw strings for SwiftData compatibility
-    var assetClassRaw: String
-    var currencyRaw: String
-    var statusRaw: String
+    public var assetClassRaw: String
+    public var currencyRaw: String
+    public var statusRaw: String
 
-    var targetPercent: Decimal
-    var lastPriceUpdate: Date?
+    public var targetPercent: Decimal
+    public var lastPriceUpdate: Date?
 
     // Optional enrichment data
-    var sector: String?
-    var logoURL: String?
-    var marketCap: String?
+    public var sector: String?
+    public var logoURL: String?
+    public var marketCap: String?
 
-    var portfolio: Portfolio?
+    public var portfolio: Portfolio?
 
     @Relationship(deleteRule: .cascade, inverse: \DividendPayment.holding)
-    var dividends: [DividendPayment]
+    public var dividends: [DividendPayment]
 
     @Relationship(deleteRule: .cascade, inverse: \Contribution.holding)
-    var contributions: [Contribution]
+    public var contributions: [Contribution]
 
     // MARK: - Computed Properties
 
-    var displayTicker: String {
+    public var displayTicker: String {
         ticker.replacingOccurrences(of: ".SA", with: "")
     }
 
-    var assetClass: AssetClassType {
+    public var assetClass: AssetClassType {
         get { AssetClassType(rawValue: assetClassRaw) ?? .acoesBR }
         set { assetClassRaw = newValue.rawValue }
     }
 
-    var currency: Currency {
+    public var currency: Currency {
         get { Currency(rawValue: currencyRaw) ?? .brl }
         set { currencyRaw = newValue.rawValue }
     }
 
-    var status: HoldingStatus {
+    public var status: HoldingStatus {
         get {
             if statusRaw == "congelar" { return .quarentena }
             return HoldingStatus(rawValue: statusRaw) ?? .aportar
@@ -56,67 +55,63 @@ final class Holding {
         set { statusRaw = newValue.rawValue }
     }
 
-    var hasPosition: Bool {
+    public var hasPosition: Bool {
         quantity > 0
     }
 
-    var hasCompanyInfo: Bool {
+    public var hasCompanyInfo: Bool {
         sector != nil || marketCap != nil || logoURL != nil
     }
 
-    var currentValue: Decimal {
+    public var currentValue: Decimal {
         quantity * currentPrice
     }
 
-    var totalCost: Decimal {
+    public var totalCost: Decimal {
         quantity * averagePrice
     }
 
-    var priceMoney: Money {
+    public var priceMoney: Money {
         Money(amount: currentPrice, currency: currency)
     }
 
-    var averagePriceMoney: Money {
+    public var averagePriceMoney: Money {
         Money(amount: averagePrice, currency: currency)
     }
 
-    var currentValueMoney: Money {
+    public var currentValueMoney: Money {
         Money(amount: currentPrice * quantity, currency: currency)
     }
 
-    var estimatedMonthlyIncomeMoney: Money {
+    public var estimatedMonthlyIncomeMoney: Money {
         Money(amount: estimatedMonthlyIncome, currency: currency)
     }
 
-    var estimatedMonthlyIncomeNetMoney: Money {
+    public var estimatedMonthlyIncomeNetMoney: Money {
         Money(amount: estimatedMonthlyIncomeNet, currency: currency)
     }
 
-    var gainLoss: Decimal {
+    public var gainLoss: Decimal {
         currentValue - totalCost
     }
 
-    var gainLossPercent: Decimal {
+    public var gainLossPercent: Decimal {
         guard totalCost > 0 else { return 0 }
         return (gainLoss / totalCost) * 100
     }
 
-    var gainLossColor: Color {
-        gainLossPercent >= 0 ? .tqPositive : .tqNegative
-    }
-
     /// Estimated monthly dividend income (gross)
-    var estimatedMonthlyIncome: Decimal {
+    public var estimatedMonthlyIncome: Decimal {
         guard dividendYield > 0 else { return 0 }
         return (currentValue * dividendYield / 100) / 12
     }
 
     /// Estimated monthly dividend income (net of taxes)
-    var estimatedMonthlyIncomeNet: Decimal {
+    public var estimatedMonthlyIncomeNet: Decimal {
         estimatedMonthlyIncome * assetClass.defaultTaxTreatment.netMultiplier
     }
 
-    init(
+    public init(
         ticker: String,
         displayName: String = "",
         quantity: Decimal = 0,
@@ -142,25 +137,11 @@ final class Holding {
         self.contributions = []
     }
 
-    // MARK: - Free Tier Limit
-
-    static func canAddMore(modelContext: ModelContext) -> Bool {
-        let count = (try? modelContext.fetchCount(FetchDescriptor<Holding>())) ?? 0
-        return count < AppConstants.freeTierMaxHoldings
-    }
-
-    static func remainingSlots(modelContext: ModelContext) -> Int {
-        let count = (try? modelContext.fetchCount(FetchDescriptor<Holding>())) ?? 0
-        return max(AppConstants.freeTierMaxHoldings - count, 0)
-    }
-
-    static let freeTierLimitMessage = "Limit of \(AppConstants.freeTierMaxHoldings) assets on the free plan."
-
     // MARK: - Contribution-Based Recalculation
 
     /// Recomputes quantity and averagePrice from the contributions ledger.
     /// Call this after inserting a new Contribution.
-    func recalculateFromContributions() {
+    public func recalculateFromContributions() {
         var totalShares: Decimal = 0
         var totalCost: Decimal = 0
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 /// Compact capsule-style asset class picker used across the app.
 /// Shows icon + short name in a colored capsule with a dropdown chevron.

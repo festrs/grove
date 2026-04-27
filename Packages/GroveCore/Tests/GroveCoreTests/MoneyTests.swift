@@ -1,7 +1,8 @@
 import Testing
 import Foundation
-@testable import Grove
+import GroveDomain
 
+@MainActor
 struct MoneyTests {
 
     // MARK: - Construction

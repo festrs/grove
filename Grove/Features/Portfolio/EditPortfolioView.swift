@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct EditPortfolioView: View {
     @Environment(\.modelContext) private var modelContext

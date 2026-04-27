@@ -1,20 +1,26 @@
 import Foundation
 
-protocol ExchangeRates: Sendable {
+public protocol ExchangeRates: Sendable {
     func rate(from source: Currency, to target: Currency) -> Decimal
 }
 
-struct IdentityRates: ExchangeRates {
-    func rate(from source: Currency, to target: Currency) -> Decimal {
+public struct IdentityRates: ExchangeRates {
+    public init() {}
+
+    public func rate(from source: Currency, to target: Currency) -> Decimal {
         if source == target { return 1 }
         fatalError("IdentityRates cannot convert \(source.rawValue) → \(target.rawValue) — inject a real ExchangeRates implementation.")
     }
 }
 
-struct StaticRates: ExchangeRates {
-    let brlPerUsd: Decimal
+public struct StaticRates: ExchangeRates {
+    public let brlPerUsd: Decimal
 
-    func rate(from source: Currency, to target: Currency) -> Decimal {
+    public init(brlPerUsd: Decimal) {
+        self.brlPerUsd = brlPerUsd
+    }
+
+    public func rate(from source: Currency, to target: Currency) -> Decimal {
         if source == target { return 1 }
         switch (source, target) {
         case (.usd, .brl): return brlPerUsd

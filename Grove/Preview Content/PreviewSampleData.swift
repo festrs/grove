@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import GroveDomain
 
 struct PreviewSampleData {
     static let schema = Schema([

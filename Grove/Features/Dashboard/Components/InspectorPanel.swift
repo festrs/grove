@@ -1,4 +1,7 @@
 import SwiftUI
+import GroveDomain
+import GroveServices
+import GroveRepositories
 
 struct InspectorPanel: View {
     let dividends: [DividendPayment]

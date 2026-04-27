@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import GroveDomain
 @testable import Grove
 
 @Suite(.serialized)

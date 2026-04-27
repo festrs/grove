@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct AllocationSettingsView: View {
     @Environment(\.modelContext) private var modelContext

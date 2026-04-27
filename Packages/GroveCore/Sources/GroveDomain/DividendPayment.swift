@@ -2,22 +2,22 @@ import Foundation
 import SwiftData
 
 @Model
-final class DividendPayment {
-    var exDate: Date
-    var paymentDate: Date
-    var amountPerShare: Decimal
-    var totalAmount: Decimal
-    var taxTreatmentRaw: String
-    var withholdingTax: Decimal
+public final class DividendPayment {
+    public var exDate: Date
+    public var paymentDate: Date
+    public var amountPerShare: Decimal
+    public var totalAmount: Decimal
+    public var taxTreatmentRaw: String
+    public var withholdingTax: Decimal
 
-    var holding: Holding?
+    public var holding: Holding?
 
-    var taxTreatment: TaxTreatment {
+    public var taxTreatment: TaxTreatment {
         get { TaxTreatment(rawValue: taxTreatmentRaw) ?? .exempt }
         set { taxTreatmentRaw = newValue.rawValue }
     }
 
-    var netAmount: Decimal {
+    public var netAmount: Decimal {
         totalAmount - withholdingTax
     }
 
@@ -25,30 +25,30 @@ final class DividendPayment {
         holding?.currency ?? .brl
     }
 
-    var amountPerShareMoney: Money {
+    public var amountPerShareMoney: Money {
         Money(amount: amountPerShare, currency: resolvedCurrency)
     }
 
-    var totalAmountMoney: Money {
+    public var totalAmountMoney: Money {
         Money(amount: totalAmount, currency: resolvedCurrency)
     }
 
-    var netAmountMoney: Money {
+    public var netAmountMoney: Money {
         Money(amount: netAmount, currency: resolvedCurrency)
     }
 
-    var withholdingTaxMoney: Money {
+    public var withholdingTaxMoney: Money {
         Money(amount: withholdingTax, currency: resolvedCurrency)
     }
 
     /// True when the payment is informational only — the holding has no shares
     /// (typically status `.estudo`), so we show the per-share amount instead
     /// of an earnings figure.
-    var isInformational: Bool {
+    public var isInformational: Bool {
         totalAmount == 0
     }
 
-    init(
+    public init(
         exDate: Date,
         paymentDate: Date,
         amountPerShare: Decimal,

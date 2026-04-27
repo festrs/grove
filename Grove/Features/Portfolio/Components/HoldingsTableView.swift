@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct HoldingsTableView: View {
     let holdings: [Holding]

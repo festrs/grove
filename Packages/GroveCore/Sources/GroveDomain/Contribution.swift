@@ -2,19 +2,19 @@ import Foundation
 import SwiftData
 
 @Model
-final class Contribution {
-    var date: Date
-    var amount: Decimal
-    var shares: Decimal
-    var pricePerShare: Decimal
+public final class Contribution {
+    public var date: Date
+    public var amount: Decimal
+    public var shares: Decimal
+    public var pricePerShare: Decimal
 
-    var holding: Holding?
+    public var holding: Holding?
 
-    var pricePerShareMoney: Money {
+    public var pricePerShareMoney: Money {
         Money(amount: pricePerShare, currency: holding?.currency ?? .brl)
     }
 
-    init(
+    public init(
         date: Date = .now,
         amount: Decimal,
         shares: Decimal,

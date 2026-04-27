@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 struct SetTargetsStepView: View {
     @Bindable var viewModel: OnboardingViewModel

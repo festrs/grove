@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 struct SetStatusStepView: View {
     @Bindable var viewModel: OnboardingViewModel

@@ -2,6 +2,7 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import GroveDomain
 
 struct DebugFloatingButton: View {
     @State private var showingSheet = false

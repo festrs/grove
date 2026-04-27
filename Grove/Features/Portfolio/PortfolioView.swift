@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
+import GroveRepositories
 
 struct PortfolioView: View {
     @Environment(\.modelContext) private var modelContext

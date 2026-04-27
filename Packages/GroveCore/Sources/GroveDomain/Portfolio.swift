@@ -2,18 +2,18 @@ import Foundation
 import SwiftData
 
 @Model
-final class Portfolio {
-    var name: String
-    var createdAt: Date
+public final class Portfolio {
+    public var name: String
+    public var createdAt: Date
 
     /// Asset class allocation targets as JSON: {"acoesBR": 40, "fiis": 30, ...}
     /// Must sum to 100. This is the source of truth for rebalancing.
-    var classAllocationJSON: String = "{}"
+    public var classAllocationJSON: String = "{}"
 
     @Relationship(deleteRule: .cascade, inverse: \Holding.portfolio)
-    var holdings: [Holding]
+    public var holdings: [Holding]
 
-    init(name: String = "Meu Portfolio", createdAt: Date = .now) {
+    public init(name: String = "Meu Portfolio", createdAt: Date = .now) {
         self.name = name
         self.createdAt = createdAt
         self.classAllocationJSON = "{}"
@@ -22,7 +22,7 @@ final class Portfolio {
 
     // MARK: - Class Allocation Accessors
 
-    var classAllocations: [AssetClassType: Double] {
+    public var classAllocations: [AssetClassType: Double] {
         get {
             guard let data = classAllocationJSON.data(using: .utf8),
                   let dict = try? JSONDecoder().decode([String: Double].self, from: data) else {
@@ -45,7 +45,7 @@ final class Portfolio {
         }
     }
 
-    func allocationPercent(for assetClass: AssetClassType) -> Double {
+    public func allocationPercent(for assetClass: AssetClassType) -> Double {
         classAllocations[assetClass] ?? 0
     }
 }

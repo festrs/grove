@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
+import GroveServices
+import GroveRepositories
 
 enum DashboardDestination: Hashable {
     case incomeHistory

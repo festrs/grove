@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 // ============================================================
 // MARK: - Shared: Weight row data & total footer

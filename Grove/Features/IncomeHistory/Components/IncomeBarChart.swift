@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import GroveDomain
 
 struct IncomeBarChart: View {
     let summaries: [MonthlyDividendSummary]

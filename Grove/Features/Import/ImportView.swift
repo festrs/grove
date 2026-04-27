@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import GroveDomain
 
 /// Reusable import component used by both onboarding and portfolio import.
 /// Handles text/file input → AI analysis → preview with checkboxes.

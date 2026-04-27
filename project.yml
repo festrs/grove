@@ -37,6 +37,8 @@ packages:
   AsyncAlgorithms:
     url: https://github.com/apple/swift-async-algorithms.git
     from: "1.0.0"
+  GroveCore:
+    path: Packages/GroveCore
 
 targets:
   Grove:
@@ -71,6 +73,12 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
     dependencies:
       - package: AsyncAlgorithms
+      - package: GroveCore
+        product: GroveDomain
+      - package: GroveCore
+        product: GroveServices
+      - package: GroveCore
+        product: GroveRepositories
 
   GroveTests:
     type: bundle.unit-test

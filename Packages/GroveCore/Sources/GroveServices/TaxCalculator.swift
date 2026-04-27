@@ -1,23 +1,24 @@
 import Foundation
+import GroveDomain
 
-struct TaxCalculator {
+public struct TaxCalculator {
     /// Returns the net multiplier for a given asset class
-    static func netMultiplier(for assetClass: AssetClassType) -> Decimal {
+    public static func netMultiplier(for assetClass: AssetClassType) -> Decimal {
         assetClass.defaultTaxTreatment.netMultiplier
     }
 
     /// Calculate net income from gross income for a given asset class
-    static func netIncome(gross: Decimal, assetClass: AssetClassType) -> Decimal {
+    public static func netIncome(gross: Decimal, assetClass: AssetClassType) -> Decimal {
         gross * netMultiplier(for: assetClass)
     }
 
     /// Calculate withholding tax amount
-    static func withholdingTax(gross: Decimal, assetClass: AssetClassType) -> Decimal {
+    public static func withholdingTax(gross: Decimal, assetClass: AssetClassType) -> Decimal {
         gross * (1 - netMultiplier(for: assetClass))
     }
 
     /// Decimal-keyed breakdown — tax math is currency-agnostic per class.
-    static func taxBreakdown(grossByClass: [AssetClassType: Decimal]) -> TaxBreakdownResult {
+    public static func taxBreakdown(grossByClass: [AssetClassType: Decimal]) -> TaxBreakdownResult {
         var totalGross: Decimal = 0
         var totalTax: Decimal = 0
         var details: [TaxBreakdownDetail] = []
@@ -45,7 +46,7 @@ struct TaxCalculator {
 
     /// Money-aware breakdown — each class is taxed in its own currency, then summed
     /// in the display currency via FX. Returned details remain native per class.
-    static func taxBreakdown(
+    public static func taxBreakdown(
         grossByClass: [AssetClassType: Money],
         displayCurrency: Currency,
         rates: any ExchangeRates
@@ -79,32 +80,60 @@ struct TaxCalculator {
     }
 }
 
-struct TaxBreakdownResult {
-    let totalGross: Decimal
-    let totalTax: Decimal
-    let totalNet: Decimal
-    let details: [TaxBreakdownDetail]
+public struct TaxBreakdownResult {
+    public let totalGross: Decimal
+    public let totalTax: Decimal
+    public let totalNet: Decimal
+    public let details: [TaxBreakdownDetail]
+
+    public init(totalGross: Decimal, totalTax: Decimal, totalNet: Decimal, details: [TaxBreakdownDetail]) {
+        self.totalGross = totalGross
+        self.totalTax = totalTax
+        self.totalNet = totalNet
+        self.details = details
+    }
 }
 
-struct TaxBreakdownDetail: Identifiable {
-    var id: String { assetClass.rawValue }
-    let assetClass: AssetClassType
-    let gross: Decimal
-    let tax: Decimal
-    let net: Decimal
+public struct TaxBreakdownDetail: Identifiable {
+    public var id: String { assetClass.rawValue }
+    public let assetClass: AssetClassType
+    public let gross: Decimal
+    public let tax: Decimal
+    public let net: Decimal
+
+    public init(assetClass: AssetClassType, gross: Decimal, tax: Decimal, net: Decimal) {
+        self.assetClass = assetClass
+        self.gross = gross
+        self.tax = tax
+        self.net = net
+    }
 }
 
-struct MoneyTaxBreakdown {
-    let totalGross: Money
-    let totalTax: Money
-    let totalNet: Money
-    let details: [MoneyTaxBreakdownDetail]
+public struct MoneyTaxBreakdown {
+    public let totalGross: Money
+    public let totalTax: Money
+    public let totalNet: Money
+    public let details: [MoneyTaxBreakdownDetail]
+
+    public init(totalGross: Money, totalTax: Money, totalNet: Money, details: [MoneyTaxBreakdownDetail]) {
+        self.totalGross = totalGross
+        self.totalTax = totalTax
+        self.totalNet = totalNet
+        self.details = details
+    }
 }
 
-struct MoneyTaxBreakdownDetail: Identifiable {
-    var id: String { assetClass.rawValue }
-    let assetClass: AssetClassType
-    let gross: Money
-    let tax: Money
-    let net: Money
+public struct MoneyTaxBreakdownDetail: Identifiable {
+    public var id: String { assetClass.rawValue }
+    public let assetClass: AssetClassType
+    public let gross: Money
+    public let tax: Money
+    public let net: Money
+
+    public init(assetClass: AssetClassType, gross: Money, tax: Money, net: Money) {
+        self.assetClass = assetClass
+        self.gross = gross
+        self.tax = tax
+        self.net = net
+    }
 }

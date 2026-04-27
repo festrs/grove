@@ -1,4 +1,5 @@
 import Foundation
+import GroveDomain
 
 extension Holding {
     // MARK: - Acoes BR

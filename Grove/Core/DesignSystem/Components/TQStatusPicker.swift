@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 /// Compact capsule-style status picker matching `TQAssetClassPicker` visual pattern.
 struct TQStatusPicker: View {

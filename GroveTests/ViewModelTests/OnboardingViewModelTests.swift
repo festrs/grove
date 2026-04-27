@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import SwiftData
+import GroveDomain
 @testable import Grove
 
 struct OnboardingViewModelTests {

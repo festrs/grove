@@ -1,5 +1,7 @@
 import Foundation
 import SwiftData
+import GroveDomain
+import GroveRepositories
 
 @Observable
 final class PortfolioViewModel {

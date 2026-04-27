@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 /// Sheet shown after selecting a search result from the portfolio search bar.
 /// Collects quantity, price, and asset class to add the holding.

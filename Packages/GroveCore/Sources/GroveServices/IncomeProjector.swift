@@ -1,19 +1,36 @@
 import Foundation
+import GroveDomain
 
-struct IncomeProjection {
-    let currentMonthlyNet: Money
-    let currentMonthlyGross: Money
-    let goalMonthly: Money
-    let progressPercent: Decimal
-    let estimatedMonthsToGoal: Int?
-    let estimatedYearsToGoal: Decimal?
+public struct IncomeProjection {
+    public let currentMonthlyNet: Money
+    public let currentMonthlyGross: Money
+    public let goalMonthly: Money
+    public let progressPercent: Decimal
+    public let estimatedMonthsToGoal: Int?
+    public let estimatedYearsToGoal: Decimal?
+
+    public init(
+        currentMonthlyNet: Money,
+        currentMonthlyGross: Money,
+        goalMonthly: Money,
+        progressPercent: Decimal,
+        estimatedMonthsToGoal: Int?,
+        estimatedYearsToGoal: Decimal?
+    ) {
+        self.currentMonthlyNet = currentMonthlyNet
+        self.currentMonthlyGross = currentMonthlyGross
+        self.goalMonthly = goalMonthly
+        self.progressPercent = progressPercent
+        self.estimatedMonthsToGoal = estimatedMonthsToGoal
+        self.estimatedYearsToGoal = estimatedYearsToGoal
+    }
 }
 
-struct IncomeProjector {
+public struct IncomeProjector {
     /// Calculate current passive income and time to goal.
     /// Goal is provided as Money so its currency carries semantics.
     /// Aggregates and projections render in `displayCurrency`.
-    static func project(
+    public static func project(
         holdings: [Holding],
         incomeGoal: Money,
         monthlyContribution: Money,

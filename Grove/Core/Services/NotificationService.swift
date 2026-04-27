@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import GroveDomain
 
 /// Allows notifications to display as banners even when the app is in the foreground.
 final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {

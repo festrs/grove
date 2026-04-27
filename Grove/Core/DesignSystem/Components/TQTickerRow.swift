@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 /// Unified ticker row used across the app for consistent holding/asset display.
 ///

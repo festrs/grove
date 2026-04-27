@@ -1,5 +1,7 @@
 import Foundation
 import SwiftData
+import GroveDomain
+import GroveServices
 
 @Observable
 final class IncomeHistoryViewModel {

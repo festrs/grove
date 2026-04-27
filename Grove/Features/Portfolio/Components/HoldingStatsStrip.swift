@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 /// Horizontal scrolling stat cards strip — Apple Stocks style.
 /// Combines portfolio stats and fundamentals into a single scrollable row.

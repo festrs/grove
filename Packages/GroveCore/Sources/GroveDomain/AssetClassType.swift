@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum AssetClassType: String, Codable, CaseIterable, Identifiable {
+public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendable {
     case acoesBR
     case fiis
     case usStocks
@@ -8,9 +8,9 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
     case crypto
     case rendaFixa
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .acoesBR: "Brazilian Stocks"
         case .fiis: "FIIs"
@@ -21,7 +21,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var shortName: String {
+    public var shortName: String {
         switch self {
         case .acoesBR: "BR"
         case .fiis: "FIIs"
@@ -32,7 +32,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .acoesBR: "chart.line.uptrend.xyaxis"
         case .fiis: "building.2"
@@ -43,7 +43,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var color: Color {
+    public var color: Color {
         switch self {
         case .acoesBR: .blue
         case .fiis: .green
@@ -54,7 +54,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var defaultCurrency: Currency {
+    public var defaultCurrency: Currency {
         switch self {
         case .acoesBR, .fiis, .rendaFixa: .brl
         case .usStocks, .reits: .usd
@@ -62,7 +62,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var defaultTaxTreatment: TaxTreatment {
+    public var defaultTaxTreatment: TaxTreatment {
         switch self {
         case .acoesBR: .exempt
         case .fiis: .exempt
@@ -74,7 +74,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
     }
 
     /// Whether this asset class pays dividends
-    var hasDividends: Bool {
+    public var hasDividends: Bool {
         switch self {
         case .acoesBR, .fiis, .usStocks, .reits: true
         case .crypto, .rendaFixa: false
@@ -82,7 +82,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
     }
 
     /// Whether this asset class has tradable market prices with history
-    var hasPriceHistory: Bool {
+    public var hasPriceHistory: Bool {
         switch self {
         case .acoesBR, .fiis, .usStocks, .reits, .crypto: true
         case .rendaFixa: false
@@ -90,7 +90,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
     }
 
     /// Whether this asset class has fundamentals data (equity-like assets only)
-    var hasFundamentals: Bool {
+    public var hasFundamentals: Bool {
         switch self {
         case .acoesBR, .usStocks: true
         case .fiis, .reits, .crypto, .rendaFixa: false
@@ -99,7 +99,7 @@ enum AssetClassType: String, Codable, CaseIterable, Identifiable {
 
     /// Auto-detect asset class from ticker string
     /// Detect asset class from ticker and optional API type field.
-    static func detect(from ticker: String, apiType: String? = nil) -> AssetClassType? {
+    public static func detect(from ticker: String, apiType: String? = nil) -> AssetClassType? {
         // Strip exchange suffix (.SA for B3)
         let clean = ticker.uppercased()
             .trimmingCharacters(in: .whitespaces)

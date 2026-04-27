@@ -1,4 +1,6 @@
 import SwiftUI
+import GroveDomain
+import GroveServices
 
 struct HeroCard: View {
     let projection: IncomeProjection

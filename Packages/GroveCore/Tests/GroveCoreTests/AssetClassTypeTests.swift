@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import Grove
+import GroveDomain
 
 struct AssetClassTypeTests {
 

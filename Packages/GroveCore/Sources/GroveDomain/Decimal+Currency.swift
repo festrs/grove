@@ -5,12 +5,12 @@ import Foundation
 /// Access is single-threaded — these helpers run on the main actor (UI) and
 /// from synchronous formatting paths; do NOT mutate from background tasks.
 @MainActor
-enum Formatters {
+public enum Formatters {
     private static var currencyByRaw: [String: NumberFormatter] = [:]
     private static var decimalByRaw: [String: NumberFormatter] = [:]
     private static var percentByDecimals: [Int: NumberFormatter] = [:]
 
-    static func currency(_ currency: Currency) -> NumberFormatter {
+    public static func currency(_ currency: Currency) -> NumberFormatter {
         if let cached = currencyByRaw[currency.rawValue] { return cached }
         let f = NumberFormatter()
         f.numberStyle = .currency
@@ -22,7 +22,7 @@ enum Formatters {
         return f
     }
 
-    static func decimal(_ currency: Currency) -> NumberFormatter {
+    public static func decimal(_ currency: Currency) -> NumberFormatter {
         if let cached = decimalByRaw[currency.rawValue] { return cached }
         let f = NumberFormatter()
         f.numberStyle = .decimal
@@ -33,7 +33,7 @@ enum Formatters {
         return f
     }
 
-    static func percent(decimals: Int) -> NumberFormatter {
+    public static func percent(decimals: Int) -> NumberFormatter {
         if let cached = percentByDecimals[decimals] { return cached }
         let f = NumberFormatter()
         f.numberStyle = .percent
@@ -46,17 +46,17 @@ enum Formatters {
 }
 
 extension Decimal {
-    func formatted(as currency: Currency) -> String {
+    public func formatted(as currency: Currency) -> String {
         let formatter = MainActor.assumeIsolated { Formatters.currency(currency) }
         return formatter.string(from: self as NSDecimalNumber) ?? "\(currency.symbol) 0,00"
     }
 
-    func formattedPercent(decimals: Int = 1) -> String {
+    public func formattedPercent(decimals: Int = 1) -> String {
         let formatter = MainActor.assumeIsolated { Formatters.percent(decimals: decimals) }
         return formatter.string(from: self as NSDecimalNumber) ?? "0%"
     }
 
-    func formattedCompact() -> String {
+    public func formattedCompact() -> String {
         let doubleValue = NSDecimalNumber(decimal: self).doubleValue
         if abs(doubleValue) >= 1_000_000 {
             return String(format: "%.1fM", doubleValue / 1_000_000)

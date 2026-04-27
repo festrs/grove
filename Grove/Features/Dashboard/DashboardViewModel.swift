@@ -1,5 +1,8 @@
 import Foundation
 import SwiftData
+import GroveDomain
+import GroveServices
+import GroveRepositories
 
 @Observable
 final class DashboardViewModel {

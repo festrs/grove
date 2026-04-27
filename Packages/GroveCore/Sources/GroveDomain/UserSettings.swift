@@ -2,50 +2,50 @@ import Foundation
 import SwiftData
 
 @Model
-final class UserSettings {
-    var monthlyIncomeGoal: Decimal
-    var monthlyCostOfLiving: Decimal
-    var emergencyReserveTarget: Decimal
-    var emergencyReserveCurrent: Decimal
-    var hasCompletedOnboarding: Bool
-    var preferredCurrencyRaw: String
-    var recommendationCount: Int = 2
+public final class UserSettings {
+    public var monthlyIncomeGoal: Decimal
+    public var monthlyCostOfLiving: Decimal
+    public var emergencyReserveTarget: Decimal
+    public var emergencyReserveCurrent: Decimal
+    public var hasCompletedOnboarding: Bool
+    public var preferredCurrencyRaw: String
+    public var recommendationCount: Int = 2
 
-    var monthlyIncomeGoalCurrencyRaw: String = Currency.brl.rawValue
-    var monthlyCostOfLivingCurrencyRaw: String = Currency.brl.rawValue
-    var emergencyReserveTargetCurrencyRaw: String = Currency.brl.rawValue
-    var emergencyReserveCurrentCurrencyRaw: String = Currency.brl.rawValue
+    public var monthlyIncomeGoalCurrencyRaw: String = Currency.brl.rawValue
+    public var monthlyCostOfLivingCurrencyRaw: String = Currency.brl.rawValue
+    public var emergencyReserveTargetCurrencyRaw: String = Currency.brl.rawValue
+    public var emergencyReserveCurrentCurrencyRaw: String = Currency.brl.rawValue
 
     /// Global asset class allocation targets as JSON: {"acoesBR": 40, "fiis": 30, ...}
     /// Must sum to 100. Single source of truth for rebalancing across all portfolios.
-    var classAllocationJSON: String = "{}"
+    public var classAllocationJSON: String = "{}"
 
-    var preferredCurrency: Currency {
+    public var preferredCurrency: Currency {
         get { Currency(rawValue: preferredCurrencyRaw) ?? .brl }
         set { preferredCurrencyRaw = newValue.rawValue }
     }
 
-    var monthlyIncomeGoalCurrency: Currency {
+    public var monthlyIncomeGoalCurrency: Currency {
         get { Currency(rawValue: monthlyIncomeGoalCurrencyRaw) ?? .brl }
         set { monthlyIncomeGoalCurrencyRaw = newValue.rawValue }
     }
 
-    var monthlyCostOfLivingCurrency: Currency {
+    public var monthlyCostOfLivingCurrency: Currency {
         get { Currency(rawValue: monthlyCostOfLivingCurrencyRaw) ?? .brl }
         set { monthlyCostOfLivingCurrencyRaw = newValue.rawValue }
     }
 
-    var emergencyReserveTargetCurrency: Currency {
+    public var emergencyReserveTargetCurrency: Currency {
         get { Currency(rawValue: emergencyReserveTargetCurrencyRaw) ?? .brl }
         set { emergencyReserveTargetCurrencyRaw = newValue.rawValue }
     }
 
-    var emergencyReserveCurrentCurrency: Currency {
+    public var emergencyReserveCurrentCurrency: Currency {
         get { Currency(rawValue: emergencyReserveCurrentCurrencyRaw) ?? .brl }
         set { emergencyReserveCurrentCurrencyRaw = newValue.rawValue }
     }
 
-    var monthlyIncomeGoalMoney: Money {
+    public var monthlyIncomeGoalMoney: Money {
         get { Money(amount: monthlyIncomeGoal, currency: monthlyIncomeGoalCurrency) }
         set {
             monthlyIncomeGoal = newValue.amount
@@ -53,7 +53,7 @@ final class UserSettings {
         }
     }
 
-    var monthlyCostOfLivingMoney: Money {
+    public var monthlyCostOfLivingMoney: Money {
         get { Money(amount: monthlyCostOfLiving, currency: monthlyCostOfLivingCurrency) }
         set {
             monthlyCostOfLiving = newValue.amount
@@ -61,7 +61,7 @@ final class UserSettings {
         }
     }
 
-    var emergencyReserveTargetMoney: Money {
+    public var emergencyReserveTargetMoney: Money {
         get { Money(amount: emergencyReserveTarget, currency: emergencyReserveTargetCurrency) }
         set {
             emergencyReserveTarget = newValue.amount
@@ -69,7 +69,7 @@ final class UserSettings {
         }
     }
 
-    var emergencyReserveCurrentMoney: Money {
+    public var emergencyReserveCurrentMoney: Money {
         get { Money(amount: emergencyReserveCurrent, currency: emergencyReserveCurrentCurrency) }
         set {
             emergencyReserveCurrent = newValue.amount
@@ -77,7 +77,7 @@ final class UserSettings {
         }
     }
 
-    var classAllocations: [AssetClassType: Double] {
+    public var classAllocations: [AssetClassType: Double] {
         get {
             guard let data = classAllocationJSON.data(using: .utf8),
                   let dict = try? JSONDecoder().decode([String: Double].self, from: data) else {
@@ -100,7 +100,7 @@ final class UserSettings {
         }
     }
 
-    init(
+    public init(
         monthlyIncomeGoal: Decimal = 10_000,
         monthlyCostOfLiving: Decimal = 15_000,
         emergencyReserveTarget: Decimal = 180_000,

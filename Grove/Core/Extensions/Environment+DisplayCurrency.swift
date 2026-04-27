@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 private struct DisplayCurrencyKey: EnvironmentKey {
     static let defaultValue: Currency = .brl

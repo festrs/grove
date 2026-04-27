@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 struct CompanyInfoCard: View {
     let holding: Holding

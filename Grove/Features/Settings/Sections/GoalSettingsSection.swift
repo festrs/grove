@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 struct GoalSettingsSection: View {
     @Bindable var settings: UserSettings

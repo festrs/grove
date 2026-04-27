@@ -1,30 +1,70 @@
 import Foundation
 import SwiftData
+import GroveDomain
+import GroveServices
 
-struct PortfolioSummary {
-    let totalValue: Money
-    let monthlyIncomeGross: Money
-    let monthlyIncomeNet: Money
-    let allocationByClass: [AssetClassAllocation]
-    let studyCount: Int
-    let activeCount: Int
-    let quarantineCount: Int
-    let sellingCount: Int
+public struct PortfolioSummary {
+    public let totalValue: Money
+    public let monthlyIncomeGross: Money
+    public let monthlyIncomeNet: Money
+    public let allocationByClass: [AssetClassAllocation]
+    public let studyCount: Int
+    public let activeCount: Int
+    public let quarantineCount: Int
+    public let sellingCount: Int
+
+    public init(
+        totalValue: Money,
+        monthlyIncomeGross: Money,
+        monthlyIncomeNet: Money,
+        allocationByClass: [AssetClassAllocation],
+        studyCount: Int,
+        activeCount: Int,
+        quarantineCount: Int,
+        sellingCount: Int
+    ) {
+        self.totalValue = totalValue
+        self.monthlyIncomeGross = monthlyIncomeGross
+        self.monthlyIncomeNet = monthlyIncomeNet
+        self.allocationByClass = allocationByClass
+        self.studyCount = studyCount
+        self.activeCount = activeCount
+        self.quarantineCount = quarantineCount
+        self.sellingCount = sellingCount
+    }
 }
 
-struct AssetClassAllocation: Identifiable {
-    var id: String { assetClass.rawValue }
-    let assetClass: AssetClassType
-    let currentValue: Money
-    let currentPercent: Decimal
-    let targetPercent: Decimal
-    let drift: Decimal // current - target (positive = overweight)
+public struct AssetClassAllocation: Identifiable {
+    public var id: String { assetClass.rawValue }
+    public let assetClass: AssetClassType
+    public let currentValue: Money
+    public let currentPercent: Decimal
+    public let targetPercent: Decimal
+    public let drift: Decimal // current - target (positive = overweight)
+
+    public init(
+        assetClass: AssetClassType,
+        currentValue: Money,
+        currentPercent: Decimal,
+        targetPercent: Decimal,
+        drift: Decimal
+    ) {
+        self.assetClass = assetClass
+        self.currentValue = currentValue
+        self.currentPercent = currentPercent
+        self.targetPercent = targetPercent
+        self.drift = drift
+    }
 }
 
-struct PortfolioRepository {
-    let modelContext: ModelContext
+public struct PortfolioRepository {
+    public let modelContext: ModelContext
 
-    func fetchDefaultPortfolio() throws -> Portfolio? {
+    public init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+    }
+
+    public func fetchDefaultPortfolio() throws -> Portfolio? {
         var descriptor = FetchDescriptor<Portfolio>(
             sortBy: [SortDescriptor(\.createdAt)]
         )
@@ -32,21 +72,21 @@ struct PortfolioRepository {
         return try modelContext.fetch(descriptor).first
     }
 
-    func fetchAllPortfolios() throws -> [Portfolio] {
+    public func fetchAllPortfolios() throws -> [Portfolio] {
         let descriptor = FetchDescriptor<Portfolio>(
             sortBy: [SortDescriptor(\.createdAt)]
         )
         return try modelContext.fetch(descriptor)
     }
 
-    func fetchAllHoldings() throws -> [Holding] {
+    public func fetchAllHoldings() throws -> [Holding] {
         let descriptor = FetchDescriptor<Holding>(
             sortBy: [SortDescriptor(\.ticker)]
         )
         return try modelContext.fetch(descriptor)
     }
 
-    func computeSummary(
+    public func computeSummary(
         holdings: [Holding],
         classAllocations: [AssetClassType: Double] = [:],
         displayCurrency: Currency,
@@ -110,7 +150,7 @@ struct PortfolioRepository {
         )
     }
 
-    func fetchSettings() throws -> UserSettings {
+    public func fetchSettings() throws -> UserSettings {
         var descriptor = FetchDescriptor<UserSettings>()
         descriptor.fetchLimit = 1
         if let existing = try modelContext.fetch(descriptor).first {

@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import GroveDomain
 
 struct ImportPortfolioView: View {
     @Environment(\.dismiss) private var dismiss

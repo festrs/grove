@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct NextDividendCard: View {
     let dividends: [DividendPayment]

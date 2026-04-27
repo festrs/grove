@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct NewTransactionView: View {
     @Environment(\.modelContext) private var modelContext
