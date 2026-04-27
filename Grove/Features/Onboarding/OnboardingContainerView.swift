@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct OnboardingContainerView: View {
     @Environment(\.modelContext) private var modelContext
@@ -45,6 +46,7 @@ struct OnboardingContainerView: View {
             }
         }
         .background(Color.tqBackground)
+        .onAppear { viewModel.loadExistingAllocations(modelContext: modelContext) }
     }
 
     // MARK: - Progress Bar
@@ -69,7 +71,7 @@ struct OnboardingContainerView: View {
             } label: {
                 HStack(spacing: Theme.Spacing.xs) {
                     Image(systemName: "chevron.left")
-                    Text("Voltar")
+                    Text("Back")
                 }
                 .font(.body.weight(.medium))
                 .foregroundStyle(Color.tqSecondaryText)
@@ -84,7 +86,7 @@ struct OnboardingContainerView: View {
                     withAnimation { viewModel.advance() }
                 } label: {
                     HStack(spacing: Theme.Spacing.xs) {
-                        Text("Proximo")
+                        Text("Next")
                         Image(systemName: "chevron.right")
                     }
                     .font(.body.weight(.semibold))
@@ -101,7 +103,7 @@ struct OnboardingContainerView: View {
                 } label: {
                     HStack(spacing: Theme.Spacing.xs) {
                         Image(systemName: "checkmark.circle.fill")
-                        Text("Concluir")
+                        Text("Complete")
                     }
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.white)

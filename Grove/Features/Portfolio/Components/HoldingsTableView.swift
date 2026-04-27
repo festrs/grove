@@ -1,19 +1,21 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct HoldingsTableView: View {
     let holdings: [Holding]
-    let totalValue: Decimal
+    let totalValue: Money
     var onSelect: (PersistentIdentifier) -> Void = { _ in }
     var onChangeStatus: (Holding, HoldingStatus) -> Void = { _, _ in }
     var onBuy: (Holding) -> Void = { _ in }
     var onSell: (Holding) -> Void = { _ in }
     var onRemove: (Holding) -> Void = { _ in }
 
+    @Environment(\.rates) private var rates
     @State private var sortOrder = [KeyPathComparator(\HoldingTableRow.ticker)]
 
     private var rows: [HoldingTableRow] {
-        holdings.map { HoldingTableRow(holding: $0, totalValue: totalValue) }
+        holdings.map { HoldingTableRow(holding: $0, totalValue: totalValue, rates: rates) }
     }
 
     private var sortedRows: [HoldingTableRow] {
@@ -44,19 +46,19 @@ struct HoldingsTableView: View {
             }
             .width(min: 120, ideal: 160)
 
-            TableColumn("Qtd", value: \.quantityValue) { row in
+            TableColumn("Qty", value: \.quantityValue) { row in
                 Text("\(row.holding.quantity)")
                     .monospacedDigit()
             }
             .width(min: 50, ideal: 70)
 
-            TableColumn("Preco", value: \.priceValue) { row in
-                Text(row.holding.currentPrice.formatted(as: row.holding.currency))
+            TableColumn("Price", value: \.priceValue) { row in
+                Text(row.holding.priceMoney.formatted())
                     .monospacedDigit()
             }
             .width(min: 80, ideal: 100)
 
-            TableColumn("Ganho", value: \.gainValue) { row in
+            TableColumn("Gain", value: \.gainValue) { row in
                 let gain = row.holding.gainLossPercent
                 HStack(spacing: 2) {
                     Image(systemName: gain >= 0 ? "arrow.up.right" : "arrow.down.right")
@@ -74,15 +76,15 @@ struct HoldingsTableView: View {
             }
             .width(min: 80, ideal: 90)
 
-            TableColumn("Alocacao", value: \.allocationValue) { row in
+            TableColumn("Allocation", value: \.allocationValue) { row in
                 Text(row.allocation.formattedPercent())
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
             .width(min: 70, ideal: 80)
 
-            TableColumn("Renda/mes", value: \.incomeValue) { row in
-                Text(row.holding.estimatedMonthlyIncomeNet.formattedBRL())
+            TableColumn("Income/Mo", value: \.incomeValue) { row in
+                Text(row.holding.estimatedMonthlyIncomeNetMoney.formatted())
                     .monospacedDigit()
                     .foregroundStyle(Color.tqAccentGreen)
             }
@@ -109,13 +111,13 @@ struct HoldingsTableView: View {
         Button {
             onBuy(holding)
         } label: {
-            Label("Comprar", systemImage: "plus.circle.fill")
+            Label("Buy", systemImage: "plus.circle.fill")
         }
 
         Button {
             onSell(holding)
         } label: {
-            Label("Vender", systemImage: "minus.circle.fill")
+            Label("Sell", systemImage: "minus.circle.fill")
         }
 
         Divider()
@@ -136,7 +138,7 @@ struct HoldingsTableView: View {
         Button(role: .destructive) {
             onRemove(holding)
         } label: {
-            Label("Remover", systemImage: "trash")
+            Label("Remove", systemImage: "trash")
         }
     }
 }
@@ -145,7 +147,8 @@ struct HoldingsTableView: View {
 
 struct HoldingTableRow: Identifiable, Comparable {
     let holding: Holding
-    let totalValue: Decimal
+    let totalValue: Money
+    let rates: any ExchangeRates
 
     var id: PersistentIdentifier { holding.persistentModelID }
     var ticker: String { holding.ticker }
@@ -156,9 +159,13 @@ struct HoldingTableRow: Identifiable, Comparable {
     var allocationValue: Double { NSDecimalNumber(decimal: allocation).doubleValue }
 
     var allocation: Decimal {
-        guard totalValue > 0 else { return 0 }
-        let brl = holding.currency == .usd ? holding.currentValue * 5.12 : holding.currentValue
-        return (brl / totalValue) * 100
+        guard totalValue.amount > 0 else { return 0 }
+        let displayValue = holding.currentValueMoney.converted(to: totalValue.currency, using: rates).amount
+        return (displayValue / totalValue.amount) * 100
+    }
+
+    static func == (lhs: HoldingTableRow, rhs: HoldingTableRow) -> Bool {
+        lhs.id == rhs.id
     }
 
     static func < (lhs: HoldingTableRow, rhs: HoldingTableRow) -> Bool {

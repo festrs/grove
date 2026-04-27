@@ -2,13 +2,14 @@
 import UIKit
 #endif
 import Foundation
+import Security
 
 enum DeviceIdentifier {
 
-    private static let storageKey = "com.grove.deviceID"
+    private static let keychainKey = "com.grove.deviceID"
 
     static var current: String {
-        if let stored = UserDefaults.standard.string(forKey: storageKey) {
+        if let stored = readFromKeychain() {
             return stored
         }
         #if canImport(UIKit)
@@ -16,7 +17,34 @@ enum DeviceIdentifier {
         #else
         let id = UUID().uuidString
         #endif
-        UserDefaults.standard.set(id, forKey: storageKey)
+        saveToKeychain(id)
         return id
+    }
+
+    // MARK: - Keychain
+
+    private static func readFromKeychain() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: keychainKey,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func saveToKeychain(_ value: String) {
+        let data = Data(value.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: keychainKey,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+        ]
+        SecItemDelete(query as CFDictionary)
+        SecItemAdd(query as CFDictionary, nil)
     }
 }

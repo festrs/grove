@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import GroveDomain
 
 /// Reusable import component used by both onboarding and portfolio import.
 /// Handles text/file input → AI analysis → preview with checkboxes.
@@ -9,14 +10,17 @@ struct ImportView: View {
 
     var showFileOption: Bool = true
     var existingTickers: Set<String> = []
-    var confirmLabel: String = "Importar"
+    var confirmLabel: String = "Import"
     var onConfirm: ([ImportedPosition]) -> Void
 
     var body: some View {
-        if viewModel.positions.isEmpty {
-            inputPhase
-        } else {
-            previewPhase
+        VStack {
+            if viewModel.positions.isEmpty {
+                inputPhase
+            } else {
+                previewPhase
+            }
+            Spacer()
         }
     }
 
@@ -25,9 +29,9 @@ struct ImportView: View {
     private var inputPhase: some View {
         VStack(spacing: Theme.Spacing.sm) {
             if showFileOption {
-                Picker("Modo", selection: $viewModel.inputMode) {
-                    Text("Texto").tag(ImportInputMode.text)
-                    Text("Arquivo").tag(ImportInputMode.file)
+                Picker("Mode", selection: $viewModel.inputMode) {
+                    Text("Text").tag(ImportInputMode.text)
+                    Text("File").tag(ImportInputMode.file)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, Theme.Spacing.lg)
@@ -41,7 +45,7 @@ struct ImportView: View {
 
             analyzeButton
         }
-        .alert("Erro", isPresented: $viewModel.showingError) {
+        .alert("Error", isPresented: $viewModel.showingError) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage)
@@ -50,7 +54,7 @@ struct ImportView: View {
 
     private var textInput: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            Text("Cole o texto do seu extrato ou lista de ativos")
+            Text("Paste your statement or asset list text")
                 .font(.system(size: Theme.FontSize.caption))
                 .foregroundStyle(Color.tqSecondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,7 +69,7 @@ struct ImportView: View {
                 .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
                 .padding(.horizontal, Theme.Spacing.lg)
 
-            Text("Aceita qualquer formato: tickers, CSV, extrato B3, texto copiado de planilha...")
+            Text("Accepts any format: tickers, CSV, B3 statement, spreadsheet text...")
                 .font(.system(size: Theme.FontSize.caption))
                 .foregroundStyle(Color.tqSecondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,22 +88,22 @@ struct ImportView: View {
                     if let filename = viewModel.selectedFilename {
                         Text(filename)
                             .font(.headline)
-                        Button("Trocar arquivo") {
+                        Button("Change File") {
                             viewModel.showingFilePicker = true
                         }
                         .font(.subheadline)
                     } else {
-                        Text("Selecione um arquivo de extrato")
+                        Text("Select a statement file")
                             .font(.subheadline)
                             .foregroundStyle(Color.tqSecondaryText)
-                        Button("Escolher arquivo") {
+                        Button("Choose File") {
                             viewModel.showingFilePicker = true
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(Color.tqAccentGreen)
                     }
 
-                    Text("Formatos: .xlsx, .csv, .txt")
+                    Text("Formats: .xlsx, .csv, .txt")
                         .font(.caption)
                         .foregroundStyle(Color.tqSecondaryText)
                 }
@@ -124,12 +128,12 @@ struct ImportView: View {
                 if viewModel.isLoading {
                     HStack(spacing: Theme.Spacing.xs) {
                         ProgressView().tint(.white)
-                        Text("Analisando...")
+                        Text("Analyzing...")
                     }
                 } else {
                     HStack(spacing: Theme.Spacing.xs) {
                         Image(systemName: "sparkles")
-                        Text("Analisar")
+                        Text("Analyze")
                     }
                 }
             }
@@ -149,25 +153,31 @@ struct ImportView: View {
     private var previewPhase: some View {
         VStack(spacing: Theme.Spacing.sm) {
             HStack {
-                Text("\(viewModel.positions.count) ativos encontrados")
+                Text("\(viewModel.positions.count) assets found")
                     .font(.system(size: Theme.FontSize.caption, weight: .medium))
                     .foregroundStyle(Color.tqSecondaryText)
                 Spacer()
-                Button("Voltar") { viewModel.reset() }
+                Button("Back") { viewModel.reset() }
                     .font(.system(size: Theme.FontSize.caption))
                     .foregroundStyle(Color.tqSecondaryText)
             }
             .padding(.horizontal, Theme.Spacing.lg)
 
+            if let max = viewModel.maxSelectable {
+                Text("Free plan: select up to \(max) asset\(max == 1 ? "" : "s")")
+                    .font(.system(size: Theme.FontSize.caption))
+                    .foregroundStyle(viewModel.selectedTickers.count >= max ? Color.orange : Color.tqSecondaryText)
+                    .padding(.horizontal, Theme.Spacing.lg)
+            }
+
             ScrollView {
-                LazyVStack(spacing: Theme.Spacing.xs) {
+                VStack(spacing: Theme.Spacing.xs) {
                     ForEach(viewModel.positions) { position in
                         positionRow(position)
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
             }
-            .frame(maxHeight: 220)
 
             Button {
                 let selected = viewModel.selectedPositions
@@ -175,7 +185,7 @@ struct ImportView: View {
                 viewModel.reset()
             } label: {
                 let count = viewModel.selectedTickers.count
-                Text("\(confirmLabel) \(count) ativo\(count == 1 ? "" : "s")")
+                Text("\(confirmLabel) \(count) asset\(count == 1 ? "" : "s")")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -196,44 +206,17 @@ struct ImportView: View {
             guard !alreadyAdded else { return }
             viewModel.toggleSelection(position.ticker)
         } label: {
-            TQCard {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Image(systemName: alreadyAdded ? "checkmark.circle.fill" : isSelected ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(alreadyAdded ? Color.tqSecondaryText : isSelected ? Color.tqAccentGreen : Color.tqSecondaryText)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: Theme.Spacing.xs) {
-                            Text(position.displayTicker)
-                                .font(.system(size: Theme.FontSize.body, weight: .semibold))
-                            Text(position.assetClassType.shortName)
-                                .font(.system(size: 10))
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(position.assetClassType.color.opacity(0.2))
-                                .clipShape(Capsule())
-                        }
-                        if !position.displayName.isEmpty {
-                            Text(position.displayName)
-                                .font(.system(size: Theme.FontSize.caption))
-                                .foregroundStyle(Color.tqSecondaryText)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    Spacer()
-
-                    if position.quantity > 0 {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("\(position.quantity) cotas")
-                                .font(.system(size: Theme.FontSize.caption))
-                            Text(Decimal(position.totalValue).formattedBRL())
-                                .font(.system(size: Theme.FontSize.caption))
-                                .foregroundStyle(Color.tqSecondaryText)
-                        }
-                    }
-                }
-            }
-            .opacity(alreadyAdded ? 0.5 : 1)
+            TQTickerRow(
+                ticker: position.displayTicker,
+                subtitle: position.displayName,
+                assetClass: position.assetClassType,
+                showCheckbox: true,
+                isSelected: isSelected || alreadyAdded,
+                isDisabled: alreadyAdded,
+                showClassBadge: true,
+                trailingTitle: position.quantity > 0 ? "\(position.quantity) shares" : nil,
+                trailingSubtitle: position.quantity > 0 ? Money(amount: Decimal(position.totalValue), currency: .brl).formatted() : nil
+            )
         }
         .buttonStyle(.plain)
         .disabled(alreadyAdded)

@@ -1,11 +1,15 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
+import GroveRepositories
 
 struct PortfolioView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
     @Environment(\.syncService) private var syncService
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @Query private var holdings: [Holding]
     @State private var viewModel = PortfolioViewModel()
     @State private var isSearching = false
@@ -41,7 +45,9 @@ struct PortfolioView: View {
                         portfolioSelector
                         Spacer()
                         HStack(spacing: 12) {
-                            Button { withAnimation { isSearching = true } } label: {
+                            Button {
+                                isSearching = true
+                            } label: {
                                 Image(systemName: "magnifyingglass")
                                     .fontWeight(.semibold)
                             }
@@ -50,18 +56,18 @@ struct PortfolioView: View {
                                 Button {
                                     viewModel.showingEditPortfolio = true
                                 } label: {
-                                    Label("Editar portfolio", systemImage: "pencil")
+                                    Label("Edit Portfolio", systemImage: "pencil")
                                 }
                                 Button {
                                     viewModel.showingNewPortfolio = true
                                 } label: {
-                                    Label("Novo portfolio", systemImage: "folder.badge.plus")
+                                    Label("New Portfolio", systemImage: "folder.badge.plus")
                                 }
                                 Divider()
                                 Button {
                                     showingImport = true
                                 } label: {
-                                    Label("Importar", systemImage: "square.and.arrow.down")
+                                    Label("Import", systemImage: "square.and.arrow.down")
                                 }
                             } label: {
                                 Image(systemName: "ellipsis.circle")
@@ -111,7 +117,7 @@ struct PortfolioView: View {
             .toolbar(isSearching ? .hidden : .visible, for: .tabBar)
             .toolbar(.hidden, for: .navigationBar)
             #endif
-            .animation(.easeInOut(duration: 0.3), value: isSearching)
+            .animation(.easeInOut(duration: 0.18), value: isSearching)
             .navigationDestination(for: PersistentIdentifier.self) { id in
                 HoldingDetailView(holdingID: id)
             }
@@ -121,7 +127,7 @@ struct PortfolioView: View {
                     if wasAdded && !recentlyAdded.contains(where: { $0.symbol == result.symbol }) {
                         withAnimation { recentlyAdded.insert(result, at: 0) }
                     }
-                    viewModel.loadData(modelContext: modelContext)
+                    viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 }
             }) {
                 if let result = viewModel.selectedSearchResult {
@@ -135,61 +141,70 @@ struct PortfolioView: View {
             }
             .sheet(isPresented: $viewModel.showingNewPortfolio) {
                 NewPortfolioSheet { name in
-                    viewModel.createPortfolio(name: name, modelContext: modelContext)
+                    viewModel.createPortfolio(name: name, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 }
             }
-            .sheet(item: $holdingToBuy, onDismiss: { viewModel.loadData(modelContext: modelContext) }) { holding in
+            .sheet(item: $holdingToBuy, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) { holding in
                 NewTransactionView(transactionType: .buy, preselectedHolding: holding)
             }
-            .sheet(item: $holdingToSell, onDismiss: { viewModel.loadData(modelContext: modelContext) }) { holding in
+            .sheet(item: $holdingToSell, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) { holding in
                 NewTransactionView(transactionType: .sell, preselectedHolding: holding)
             }
-            .sheet(isPresented: $showingImport, onDismiss: { viewModel.loadData(modelContext: modelContext) }) {
+            .sheet(isPresented: $showingImport, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) {
                 if let portfolio = viewModel.selectedPortfolio {
                     ImportPortfolioView(portfolio: portfolio)
                 }
             }
             .alert(
-                "Remover ativo",
+                "Remove Asset",
                 isPresented: Binding(
                     get: { viewModel.holdingToRemove != nil },
                     set: { if !$0 { viewModel.holdingToRemove = nil } }
                 )
             ) {
-                Button("Cancelar", role: .cancel) { viewModel.holdingToRemove = nil }
-                Button("Remover", role: .destructive) {
+                Button("Cancel", role: .cancel) { viewModel.holdingToRemove = nil }
+                Button("Remove", role: .destructive) {
                     if let h = viewModel.holdingToRemove {
-                        viewModel.deleteHolding(h, modelContext: modelContext)
+                        viewModel.deleteHolding(h, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                         viewModel.holdingToRemove = nil
                     }
                 }
             } message: {
                 if let h = viewModel.holdingToRemove {
-                    Text("Remover \(h.ticker) do portfolio?")
+                    if h.contributions.isEmpty {
+                        Text("Remove \(h.ticker) from portfolio?")
+                    } else {
+                        Text("Remove \(h.ticker) from portfolio? All \(h.contributions.count) transaction(s) will also be deleted. This action cannot be undone.")
+                    }
                 }
             }
             .refreshable {
                 await syncService.syncAll(modelContext: modelContext, backendService: backendService)
-                viewModel.loadData(modelContext: modelContext)
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
             .task {
-                viewModel.loadData(modelContext: modelContext)
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 let service = backendService
                 debouncer.start { query in
                     (try? await service.searchStocks(query: query)) ?? []
                 }
             }
             .onChange(of: syncService.isSyncing) { _, syncing in
-                if !syncing { viewModel.loadData(modelContext: modelContext) }
+                if !syncing { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }
             }
             .onChange(of: holdings.count) {
-                viewModel.loadData(modelContext: modelContext)
+                guard !isSearching else { return }
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
             .onChange(of: searchText) { _, newValue in
                 debouncer.send(newValue)
             }
             .onChange(of: isSearching) { _, searching in
-                if searching { searchFocused = true }
+                if searching {
+                    DispatchQueue.main.async { searchFocused = true }
+                } else {
+                    searchFocused = false
+                }
             }
         }
     }
@@ -201,7 +216,7 @@ struct PortfolioView: View {
             if debouncer.isSearching {
                 HStack(spacing: 8) {
                     ProgressView()
-                    Text("Buscando...").foregroundStyle(.secondary)
+                    Text("Searching...").foregroundStyle(.secondary)
                 }
                 .padding(.vertical, Theme.Spacing.sm)
             }
@@ -216,29 +231,7 @@ struct PortfolioView: View {
                                 viewModel.showingAddDetails = true
                             }
                         } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: added ? "checkmark.circle.fill" : "plus.circle.fill")
-                                    .foregroundStyle(added ? Color.tqAccentGreen : Color.tqAccentGreen)
-                                    .font(.title3)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(result.displaySymbol)
-                                        .font(.headline)
-                                        .foregroundStyle(.primary)
-                                    let desc = result.displayDescription
-                                    if !desc.isEmpty {
-                                        Text(desc)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                Spacer()
-                                if added {
-                                    Text("Adicionado")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
+                            searchResultRow(result: result, added: added)
                         }
                         .disabled(added)
                         .padding(.horizontal, Theme.Spacing.md)
@@ -251,11 +244,73 @@ struct PortfolioView: View {
             }
 
             if !debouncer.isSearching && debouncer.results.isEmpty && searchText.count >= 2 {
-                Text("Nenhum resultado para \"\(searchText)\"")
+                Text("No results for \"\(searchText)\"")
                     .foregroundStyle(.secondary)
                     .padding(.vertical, Theme.Spacing.md)
             }
         }
+    }
+
+    @ViewBuilder
+    private func searchResultRow(result: StockSearchResultDTO, added: Bool) -> some View {
+        HStack(spacing: 12) {
+            searchResultLeadingIcon(for: result, added: added)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(result.displaySymbol)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    if let assetClass = result.inferredAssetClass {
+                        searchResultBadge(for: assetClass)
+                    }
+                }
+
+                let desc = result.displayDescription
+                if !desc.isEmpty {
+                    Text(desc)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            if added {
+                Text("Added")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func searchResultLeadingIcon(for result: StockSearchResultDTO, added: Bool) -> some View {
+        if added {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Color.tqAccentGreen)
+                .font(.title3)
+        } else if result.isCrypto {
+            // Crypto-specific glyph so the row reads as a token at a glance.
+            Image(systemName: "bitcoinsign.circle.fill")
+                .foregroundStyle(AssetClassType.crypto.color)
+                .font(.title3)
+        } else {
+            Image(systemName: "plus.circle.fill")
+                .foregroundStyle(Color.tqAccentGreen)
+                .font(.title3)
+        }
+    }
+
+    private func searchResultBadge(for assetClass: AssetClassType) -> some View {
+        Text(assetClass.displayName)
+            .font(.system(size: 10, weight: .semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(assetClass.color.opacity(0.18), in: Capsule())
+            .foregroundStyle(assetClass.color)
     }
 
     // MARK: - Bottom Search Bar
@@ -264,7 +319,7 @@ struct PortfolioView: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-            TextField("Ticker ou nome", text: $searchText)
+            TextField("Ticker or name", text: $searchText)
                 #if os(iOS)
                 .textInputAutocapitalization(.characters)
                 #endif
@@ -313,7 +368,7 @@ struct PortfolioView: View {
             // Right panel: sortable holdings table
             HoldingsTableView(
                 holdings: viewModel.filteredHoldings,
-                totalValue: viewModel.totalValueBRL,
+                totalValue: viewModel.totalValue,
                 onSelect: { id in
                     navigationPath.append(id)
                 },
@@ -339,7 +394,7 @@ struct PortfolioView: View {
         Menu {
             ForEach(viewModel.portfolios, id: \.persistentModelID) { portfolio in
                 Button {
-                    viewModel.selectPortfolio(portfolio, modelContext: modelContext)
+                    viewModel.selectPortfolio(portfolio, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 } label: {
                     HStack {
                         Text(portfolio.name)
@@ -362,10 +417,10 @@ struct PortfolioView: View {
 
     private var portfolioHeader: some View {
         VStack(spacing: 4) {
-            Text(viewModel.totalValueBRL.formattedBRL())
+            Text(viewModel.totalValue.formatted())
                 .font(.system(size: 32, weight: .bold, design: .rounded))
             if let summary = viewModel.summary {
-                Text("Renda mensal: \(summary.monthlyIncomeNet.formattedBRL())")
+                Text("Monthly income: \(summary.monthlyIncomeNet.formatted())")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
         }
@@ -407,14 +462,14 @@ struct PortfolioView: View {
 
     @ViewBuilder
     private var assetClassTabButtons: some View {
-        AssetClassTab(title: "Todos", isSelected: viewModel.selectedClass == nil, color: .tqAccentGreen) {
-            viewModel.selectClass(nil)
+        AssetClassTab(title: "All", isSelected: viewModel.selectedClass == nil, color: .tqAccentGreen) {
+            viewModel.selectClass(nil, displayCurrency: displayCurrency, rates: rates)
         }
         ForEach(AssetClassType.allCases) { classType in
             let count = viewModel.holdings.filter { $0.assetClass == classType }.count
             if count > 0 {
                 AssetClassTab(title: classType.displayName, isSelected: viewModel.selectedClass == classType, color: classType.color) {
-                    viewModel.selectClass(classType)
+                    viewModel.selectClass(classType, displayCurrency: displayCurrency, rates: rates)
                 }
             }
         }
@@ -425,29 +480,36 @@ struct PortfolioView: View {
             if viewModel.filteredHoldings.isEmpty && !isSearching {
                 TQEmptyState(
                     icon: "briefcase",
-                    title: "Nenhum ativo",
-                    message: "Busque um ticker para adicionar seu primeiro ativo.",
-                    actionTitle: "Buscar",
+                    title: "No Assets",
+                    message: "Search for a ticker to add your first asset.",
+                    actionTitle: "Search",
                     action: { withAnimation { isSearching = true } }
                 )
                 .padding(.top, 60)
             } else {
                 ForEach(viewModel.filteredHoldings, id: \.persistentModelID) { holding in
                     NavigationLink(value: holding.persistentModelID) {
-                        HoldingRow(holding: holding, totalValue: viewModel.totalValueBRL)
+                        HoldingRow(holding: holding, totalValue: viewModel.totalValue)
                     }
                     .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            viewModel.holdingToRemove = holding
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
                     .contextMenu {
                         Button {
                             holdingToBuy = holding
                         } label: {
-                            Label("Comprar", systemImage: "plus.circle.fill")
+                            Label("Buy", systemImage: "plus.circle.fill")
                         }
 
                         Button {
                             holdingToSell = holding
                         } label: {
-                            Label("Vender", systemImage: "minus.circle.fill")
+                            Label("Sell", systemImage: "minus.circle.fill")
                         }
 
                         Divider()
@@ -468,7 +530,7 @@ struct PortfolioView: View {
                         Button(role: .destructive) {
                             viewModel.holdingToRemove = holding
                         } label: {
-                            Label("Remover", systemImage: "trash")
+                            Label("Remove", systemImage: "trash")
                         }
                     }
                 }
@@ -488,20 +550,20 @@ struct NewPortfolioSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Nome do portfolio") {
-                    TextField("Ex: Aposentadoria, Filhos", text: $name)
+                Section("Portfolio Name") {
+                    TextField("E.g.: Retirement, Children", text: $name)
                 }
             }
-            .navigationTitle("Novo portfolio")
+            .navigationTitle("New Portfolio")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Criar") { onCreate(name); dismiss() }
+                    Button("Create") { onCreate(name); dismiss() }
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }

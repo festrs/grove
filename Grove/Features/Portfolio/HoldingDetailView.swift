@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct HoldingDetailView: View {
     let holdingID: PersistentIdentifier
@@ -17,75 +18,56 @@ struct HoldingDetailView: View {
     var body: some View {
         Group {
             if let holding {
-                ScrollView {
-                    VStack(spacing: Theme.Spacing.md) {
-                        headerCard(holding)
+                VStack(spacing: 0) {
+                    ScrollView {
+                        VStack(spacing: Theme.Spacing.md) {
+                            headerCard(holding)
 
-                        PriceChartView(ticker: holding.ticker, currency: holding.currency)
-                            .onAppearLoad()
+                            if holding.assetClass.hasPriceHistory {
+                                PriceChartView(ticker: holding.ticker, currency: holding.currency, backendService: backendService)
+                            }
 
-                        CompanyInfoCard(holding: holding)
+                            HoldingStatsStrip(
+                                holding: holding,
+                                fundamentals: fundamentals,
+                                isFundamentalsLoading: isFundamentalsLoading
+                            )
 
-                        if sizeClass == .regular {
-                            // Wide: stats + config in 2-col grid
-                            LazyVGrid(
-                                columns: [GridItem(.adaptive(minimum: Theme.Layout.regularCardMin), spacing: Theme.Spacing.md)],
-                                spacing: Theme.Spacing.md
-                            ) {
-                                statsCard(holding)
-                                assetClassSection(holding)
-                                statusSection(holding)
+                            CompanyInfoCard(holding: holding)
+
+                            if sizeClass == .regular {
+                                LazyVGrid(
+                                    columns: [GridItem(.adaptive(minimum: Theme.Layout.regularCardMin), spacing: Theme.Spacing.md)],
+                                    spacing: Theme.Spacing.md
+                                ) {
+                                    targetSection(holding)
+                                    transactionHistorySection(holding)
+                                    if holding.assetClass.hasDividends {
+                                        dividendHistorySection(holding)
+                                    }
+                                }
+                            } else {
                                 targetSection(holding)
-                            }
-
-                            if holding.assetClass.hasFundamentals {
-                                FundamentalsCard(fundamentals: fundamentals, isLoading: isFundamentalsLoading)
-                            }
-
-                            // Wide: histories side-by-side
-                            LazyVGrid(
-                                columns: [GridItem(.adaptive(minimum: Theme.Layout.regularCardMin), spacing: Theme.Spacing.md)],
-                                spacing: Theme.Spacing.md
-                            ) {
                                 transactionHistorySection(holding)
-                                dividendHistorySection(holding)
+                                if holding.assetClass.hasDividends {
+                                    dividendHistorySection(holding)
+                                }
                             }
-                        } else {
-                            statsCard(holding)
-
-                            if holding.assetClass.hasFundamentals {
-                                FundamentalsCard(fundamentals: fundamentals, isLoading: isFundamentalsLoading)
-                            }
-
-                            assetClassSection(holding)
-                            statusSection(holding)
-                            targetSection(holding)
-                            transactionHistorySection(holding)
-                            dividendHistorySection(holding)
                         }
+                        .padding(Theme.Spacing.md)
+                        .frame(maxWidth: Theme.Layout.maxContentWidth)
                     }
-                    .padding(Theme.Spacing.md)
-                    .frame(maxWidth: Theme.Layout.maxContentWidth)
+
+                    actionBar(holding)
                 }
-                .navigationTitle(holding.ticker)
+                .navigationTitle(holding.displayTicker)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
-                            Button {
-                                showingBuy = true
-                            } label: {
-                                Label("Comprar", systemImage: "plus.circle.fill")
-                            }
-                            Button {
-                                showingSell = true
-                            } label: {
-                                Label("Vender", systemImage: "minus.circle.fill")
-                            }
-                            Divider()
                             Button(role: .destructive) {
                                 showRemoveAlert = true
                             } label: {
-                                Label("Remover ativo", systemImage: "trash")
+                                Label("Remove Asset", systemImage: "trash")
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -98,13 +80,13 @@ struct HoldingDetailView: View {
                 .sheet(isPresented: $showingSell, onDismiss: reloadHolding) {
                     NewTransactionView(transactionType: .sell, preselectedHolding: holding)
                 }
-                .alert("Remover ativo", isPresented: $showRemoveAlert) {
-                    Button("Cancelar", role: .cancel) {}
-                    Button("Remover", role: .destructive) {
+                .alert("Remove Asset", isPresented: $showRemoveAlert) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Remove", role: .destructive) {
                         removeHolding()
                     }
                 } message: {
-                    Text("Tem certeza que deseja remover \(holding.ticker) do portfolio? Esta acao nao pode ser desfeita.")
+                    Text("Are you sure you want to remove \(holding.ticker) from your portfolio? This action cannot be undone.")
                 }
                 .refreshable {
                     await refreshPrice()
@@ -137,6 +119,34 @@ struct HoldingDetailView: View {
         }
         modelContext.delete(holding)
         dismiss()
+    }
+
+    private func actionBar(_ holding: Holding) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Button {
+                showingBuy = true
+            } label: {
+                Label("Buy", systemImage: "plus.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.tqAccentGreen)
+
+            Button {
+                showingSell = true
+            } label: {
+                Label("Sell", systemImage: "minus.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(.orange)
+            .disabled(!holding.hasPosition)
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm)
+        .background(.ultraThinMaterial)
     }
 
     private func refreshPrice() async {
@@ -172,7 +182,7 @@ struct HoldingDetailView: View {
             VStack(spacing: Theme.Spacing.sm) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(holding.ticker)
+                        Text(holding.displayTicker)
                             .font(.title)
                             .fontWeight(.bold)
                         Text(holding.displayName)
@@ -180,14 +190,23 @@ struct HoldingDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    TQStatusBadge(status: holding.status)
+                    if sizeClass == .regular {
+                        TQAssetClassPicker(selection: Binding(
+                            get: { holding.assetClass },
+                            set: { holding.assetClass = $0 }
+                        ))
+                        TQStatusPicker(selection: Binding(
+                            get: { holding.status },
+                            set: { holding.status = $0 }
+                        ))
+                    }
                 }
 
                 Divider()
 
                 HStack {
                     VStack(alignment: .leading) {
-                        Text("Preco atual")
+                        Text("Current Price")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(holding.currentPrice.formatted(as: holding.currency))
@@ -196,7 +215,7 @@ struct HoldingDetailView: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing) {
-                        Text("Quantidade")
+                        Text("Quantity")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text("\(holding.quantity)")
@@ -204,63 +223,31 @@ struct HoldingDetailView: View {
                             .fontWeight(.semibold)
                     }
                 }
-            }
-        }
-    }
 
-    private func statsCard(_ holding: Holding) -> some View {
-        TQCard {
-            VStack(spacing: Theme.Spacing.sm) {
-                statRow("Valor total", holding.currentValue.formatted(as: holding.currency))
-                statRow("Preco medio", holding.averagePrice.formatted(as: holding.currency))
-                statRow("DY estimado", holding.dividendYield.formattedPercent())
-                statRow("Renda mensal (liq.)", holding.estimatedMonthlyIncomeNet.formattedBRL())
-
-                let gl = holding.gainLossPercent
-                statRow("Ganho/Perda", "\(gl >= 0 ? "+" : "")\(gl.formattedPercent())",
-                        valueColor: gl >= 0 ? Color.tqPositive : Color.tqNegative)
-            }
-        }
-    }
-
-    private func statRow(_ label: String, _ value: String, valueColor: Color = .primary) -> some View {
-        HStack {
-            Text(label).font(.subheadline).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.subheadline).fontWeight(.medium).foregroundStyle(valueColor)
-        }
-    }
-
-    private func assetClassSection(_ holding: Holding) -> some View {
-        TQCard {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Classe do ativo").font(.headline)
-                Picker("Classe", selection: Binding(
-                    get: { holding.assetClass },
-                    set: { holding.assetClass = $0 }
-                )) {
-                    ForEach(AssetClassType.allCases) { ct in
-                        Label(ct.displayName, systemImage: ct.icon).tag(ct)
+                if sizeClass != .regular {
+                    VStack(spacing: Theme.Spacing.xs) {
+                        HStack {
+                            Text("Class")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TQAssetClassPicker(selection: Binding(
+                                get: { holding.assetClass },
+                                set: { holding.assetClass = $0 }
+                            ))
+                        }
+                        HStack {
+                            Text("Status")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            TQStatusPicker(selection: Binding(
+                                get: { holding.status },
+                                set: { holding.status = $0 }
+                            ))
+                        }
                     }
                 }
-            }
-        }
-    }
-
-    private func statusSection(_ holding: Holding) -> some View {
-        TQCard {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Status").font(.headline)
-                Picker("Status", selection: Binding(
-                    get: { holding.status },
-                    set: { holding.status = $0 }
-                )) {
-                    ForEach(HoldingStatus.allCases) { status in
-                        Text(status.displayName).tag(status)
-                    }
-                }
-                .pickerStyle(.segmented)
-                Text(holding.status.description).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -268,22 +255,22 @@ struct HoldingDetailView: View {
     private func targetSection(_ holding: Holding) -> some View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Peso na alocacao").font(.headline)
+                Text("Allocation Weight").font(.headline)
                 HStack {
                     Slider(
                         value: Binding(
                             get: { NSDecimalNumber(decimal: holding.targetPercent).doubleValue },
                             set: { holding.targetPercent = Decimal($0) }
                         ),
-                        in: 0...20, step: 1
+                        in: 1...5, step: 1
                     )
                     .tint(.tqAccentGreen)
-                    Text("\(NSDecimalNumber(decimal: holding.targetPercent).intValue)")
+                    Text("\(Int(NSDecimalNumber(decimal: holding.targetPercent).doubleValue))")
                         .font(.headline)
                         .monospacedDigit()
                         .frame(width: 30)
                 }
-                Text("Peso relativo para rebalanceamento. Todos os ativos comecam com peso 5.")
+                Text("Relative weight for rebalancing (1 = lowest, 5 = highest priority).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -293,18 +280,18 @@ struct HoldingDetailView: View {
     private func transactionHistorySection(_ holding: Holding) -> some View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Historico de transacoes").font(.headline)
+                Text("Transaction History").font(.headline)
 
                 let contributions = holding.contributions.sorted(by: { $0.date > $1.date })
                 if contributions.isEmpty {
-                    Text("Nenhuma transacao registrada.")
+                    Text("No transactions recorded.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .padding(.vertical, Theme.Spacing.sm)
                 } else {
                     ForEach(contributions.prefix(15), id: \.date) { c in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(c.shares > 0 ? "Compra" : "Venda")
+                                Text(c.shares > 0 ? "Buy" : "Sell")
                                     .font(.caption).fontWeight(.medium)
                                     .foregroundStyle(c.shares > 0 ? Color.tqAccentGreen : Color.orange)
                                 Text(c.date, style: .date)
@@ -312,28 +299,29 @@ struct HoldingDetailView: View {
                             }
                             Spacer()
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text("\(c.shares > 0 ? "+" : "")\(c.shares) cotas")
+                                Text("\(c.shares > 0 ? "+" : "")\(c.shares) shares")
                                     .font(.subheadline).fontWeight(.medium)
-                                Text(c.pricePerShare.formatted(as: holding.currency) + "/cota")
+                                Text(c.pricePerShare.formatted(as: holding.currency) + "/share")
                                     .font(.caption2).foregroundStyle(.secondary)
                             }
                         }
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private func dividendHistorySection(_ holding: Holding) -> some View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Historico de dividendos").font(.headline)
+                Text("Dividend History").font(.headline)
 
                 if holding.dividends.isEmpty {
-                    VStack(spacing: Theme.Spacing.xs) {
-                        Text("Renda mensal estimada")
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("Estimated Monthly Income")
                             .font(.subheadline).foregroundStyle(.secondary)
-                        Text(holding.estimatedMonthlyIncomeNet.formattedBRL())
+                        Text(holding.estimatedMonthlyIncomeNetMoney.formatted())
                             .font(.headline).foregroundStyle(Color.tqAccentGreen)
                     }
                     .padding(.vertical, Theme.Spacing.sm)
@@ -347,13 +335,14 @@ struct HoldingDetailView: View {
                                     .font(.caption2).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text(div.netAmount.formattedBRL())
+                            Text(div.netAmountMoney.formatted())
                                 .font(.subheadline).fontWeight(.medium)
                                 .foregroundStyle(Color.tqAccentGreen)
                         }
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

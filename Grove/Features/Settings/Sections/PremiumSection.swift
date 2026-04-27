@@ -2,12 +2,12 @@ import SwiftUI
 
 struct PremiumSection: View {
     var body: some View {
-        Section("Plano") {
+        Section("Plan") {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Gratuito")
+                    Text("Free")
                         .font(.headline)
-                    Text("Ate 10 ativos, 1 portfolio")
+                    Text("Up to 10 assets, 1 portfolio")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -21,10 +21,10 @@ struct PremiumSection: View {
             }
 
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Premium - R$ 9,90/mes")
+                Text("Premium - R$ 9.90/month")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                Text("Ativos ilimitados, multiplos portfolios, widgets, notificacoes, exportacao")
+                Text("Unlimited assets, multiple portfolios, widgets, notifications, export")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

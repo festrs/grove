@@ -1,4 +1,5 @@
 import Foundation
+import GroveDomain
 
 actor BackendService: BackendServiceProtocol {
 
@@ -76,10 +77,20 @@ actor BackendService: BackendServiceProtocol {
         ])
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 30
         for (key, value) in apiHeaders {
             request.setValue(value, forHTTPHeaderField: key)
         }
-        let (_, response) = try await URLSession.shared.data(for: request)
+
+        let response: URLResponse
+        do {
+            (_, response) = try await URLSession.shared.data(for: request)
+        } catch let urlError as URLError {
+            throw APIError.networkError(urlError)
+        } catch {
+            throw APIError.unknown(error.localizedDescription)
+        }
+
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw APIError.unknown("Failed to track symbol")
         }
@@ -97,10 +108,20 @@ actor BackendService: BackendServiceProtocol {
         ])
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 30
         for (key, value) in apiHeaders {
             request.setValue(value, forHTTPHeaderField: key)
         }
-        let (_, response) = try await URLSession.shared.data(for: request)
+
+        let response: URLResponse
+        do {
+            (_, response) = try await URLSession.shared.data(for: request)
+        } catch let urlError as URLError {
+            throw APIError.networkError(urlError)
+        } catch {
+            throw APIError.unknown(error.localizedDescription)
+        }
+
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw APIError.unknown("Failed to sync tracked symbols")
         }
@@ -129,6 +150,7 @@ actor BackendService: BackendServiceProtocol {
         let boundary = UUID().uuidString
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 120
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         for (key, value) in apiHeaders {
             request.setValue(value, forHTTPHeaderField: key)
@@ -137,21 +159,21 @@ actor BackendService: BackendServiceProtocol {
         var body = Data()
 
         if let fileData, let filename {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+            body.append(Data("--\(boundary)\r\n".utf8))
+            body.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".utf8))
+            body.append(Data("Content-Type: application/octet-stream\r\n\r\n".utf8))
             body.append(fileData)
-            body.append("\r\n".data(using: .utf8)!)
+            body.append(Data("\r\n".utf8))
         }
 
         if let text, !text.isEmpty {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"text\"\r\n\r\n".data(using: .utf8)!)
-            body.append(text.data(using: .utf8)!)
-            body.append("\r\n".data(using: .utf8)!)
+            body.append(Data("--\(boundary)\r\n".utf8))
+            body.append(Data("Content-Disposition: form-data; name=\"text\"\r\n\r\n".utf8))
+            body.append(Data(text.utf8))
+            body.append(Data("\r\n".utf8))
         }
 
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(Data("--\(boundary)--\r\n".utf8))
         request.httpBody = body
 
         let data: Data

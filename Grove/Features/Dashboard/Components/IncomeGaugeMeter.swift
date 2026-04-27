@@ -1,8 +1,12 @@
 import SwiftUI
+import GroveDomain
+import GroveServices
 
 struct IncomeGaugeMeter: View {
     let projection: IncomeProjection
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     private var progressValue: Double {
         NSDecimalNumber(decimal: projection.progressPercent).doubleValue / 100.0
@@ -25,13 +29,13 @@ struct IncomeGaugeMeter: View {
                     )
 
                     VStack(spacing: Theme.Spacing.xs) {
-                        Text(projection.currentMonthlyNet.formattedBRL())
+                        Text(projection.currentMonthlyNet.formatted(in: displayCurrency, using: rates))
                             .font(.system(size: Theme.FontSize.title2, weight: .bold))
                             .foregroundStyle(goalReached ? Color.tqPositive : .primary)
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
 
-                        Text("/mes")
+                        Text("/month")
                             .font(.system(size: Theme.FontSize.caption))
                             .foregroundStyle(Color.tqSecondaryText)
                     }
@@ -41,22 +45,22 @@ struct IncomeGaugeMeter: View {
 
                 // Progress percent and goal
                 VStack(spacing: Theme.Spacing.xs) {
-                    Text("\(projection.progressPercent.formattedPercent(decimals: 2)) de \(projection.goalMonthly.formattedBRL())")
+                    Text("\(projection.progressPercent.formattedPercent(decimals: 2)) of \(projection.goalMonthly.formatted(in: displayCurrency, using: rates))")
                         .font(.system(size: Theme.FontSize.body, weight: .medium))
                         .foregroundStyle(.primary)
 
                     // Estimated time or goal reached
                     if goalReached {
-                        Label("Meta atingida!", systemImage: "checkmark.seal.fill")
+                        Label("Goal reached!", systemImage: "checkmark.seal.fill")
                             .font(.system(size: Theme.FontSize.body, weight: .semibold))
                             .foregroundStyle(Color.tqPositive)
                     } else if let years = projection.estimatedYearsToGoal {
                         let formatted = String(format: "%.1f", NSDecimalNumber(decimal: years).doubleValue)
-                        Text("~\(formatted) anos para tranquilidade")
+                        Text("~\(formatted) years to financial freedom")
                             .font(.system(size: Theme.FontSize.caption))
                             .foregroundStyle(Color.tqSecondaryText)
                     } else {
-                        Text("Continue aportando para alcancar sua meta")
+                        Text("Keep investing to reach your goal")
                             .font(.system(size: Theme.FontSize.caption))
                             .foregroundStyle(Color.tqSecondaryText)
                     }
@@ -71,9 +75,9 @@ struct IncomeGaugeMeter: View {
 #Preview("Em progresso") {
     IncomeGaugeMeter(
         projection: IncomeProjection(
-            currentMonthlyNet: 5_840,
-            currentMonthlyGross: 7_200,
-            goalMonthly: 10_000,
+            currentMonthlyNet: Money(amount: 5_840, currency: .brl),
+            currentMonthlyGross: Money(amount: 7_200, currency: .brl),
+            goalMonthly: Money(amount: 10_000, currency: .brl),
             progressPercent: 58.4,
             estimatedMonthsToGoal: 38,
             estimatedYearsToGoal: 3.2
@@ -85,9 +89,9 @@ struct IncomeGaugeMeter: View {
 #Preview("Meta atingida") {
     IncomeGaugeMeter(
         projection: IncomeProjection(
-            currentMonthlyNet: 10_500,
-            currentMonthlyGross: 13_000,
-            goalMonthly: 10_000,
+            currentMonthlyNet: Money(amount: 10_500, currency: .brl),
+            currentMonthlyGross: Money(amount: 13_000, currency: .brl),
+            goalMonthly: Money(amount: 10_000, currency: .brl),
             progressPercent: 100,
             estimatedMonthsToGoal: 0,
             estimatedYearsToGoal: 0

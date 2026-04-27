@@ -1,33 +1,88 @@
 import Foundation
 import SwiftData
+import GroveDomain
+import GroveServices
+import GroveRepositories
+
+enum RebalancingEmptyReason {
+    case noAportarHoldings
+    case noPortfolioValue
+    case noAllocations
+    case unknown
+}
 
 @Observable
 final class RebalancingViewModel {
     var investmentAmountText = ""
     var suggestions: [RebalancingSuggestion] = []
-    var totalAllocated: Decimal = 0
+    var totalAllocated: Money = .zero(in: .brl)
     var hasCalculated = false
     var isRegistering = false
+    var emptyReason: RebalancingEmptyReason?
 
-    var investmentAmount: Decimal {
+    var investmentAmountDecimal: Decimal {
         let cleaned = investmentAmountText
             .replacingOccurrences(of: ".", with: "")
             .replacingOccurrences(of: ",", with: ".")
         return Decimal(string: cleaned) ?? 0
     }
 
-    func calculate(modelContext: ModelContext, exchangeRate: Decimal = 5.12) {
+    func investmentAmount(in currency: Currency) -> Money {
+        Money(amount: investmentAmountDecimal, currency: currency)
+    }
+
+    func calculate(modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
+        let amount = investmentAmount(in: displayCurrency)
+
         do {
             suggestions = try RebalancingEngine.suggestions(
                 modelContext: modelContext,
-                investmentAmount: investmentAmount,
-                exchangeRate: exchangeRate
+                investmentAmount: amount,
+                rates: rates
             )
-            totalAllocated = suggestions.reduce(Decimal.zero) { $0 + $1.amount }
+            let allocated = suggestions.map { $0.amount }.sum(in: displayCurrency, using: rates)
+            totalAllocated = allocated
             hasCalculated = true
+
+            if suggestions.isEmpty {
+                emptyReason = diagnoseEmpty(modelContext: modelContext)
+            } else {
+                emptyReason = nil
+            }
         } catch {
             suggestions = []
+            hasCalculated = true
+            emptyReason = .unknown
         }
+    }
+
+    private func diagnoseEmpty(modelContext: ModelContext) -> RebalancingEmptyReason {
+        let repo = PortfolioRepository(modelContext: modelContext)
+        let holdingRepo = HoldingRepository(modelContext: modelContext)
+
+        guard let settings = try? repo.fetchSettings(),
+              !settings.classAllocations.isEmpty else {
+            return .noAllocations
+        }
+
+        guard let holdings = try? holdingRepo.fetchAll() else {
+            return .unknown
+        }
+
+        let aportar = holdings.filter { $0.status == .aportar }
+        let aportarWithPrice = aportar.filter { $0.currentPrice > 0 }
+
+        if aportarWithPrice.isEmpty {
+            return .noAportarHoldings
+        }
+
+        let totalValue = holdings.filter { $0.status != .vender }
+            .reduce(Decimal.zero) { $0 + $1.currentValue }
+        if totalValue <= 0 {
+            return .noPortfolioValue
+        }
+
+        return .unknown
     }
 
     func registerContributions(modelContext: ModelContext) {
@@ -43,7 +98,7 @@ final class RebalancingViewModel {
 
             let contribution = Contribution(
                 date: .now,
-                amount: suggestion.amount,
+                amount: suggestion.amount.amount,
                 shares: Decimal(suggestion.sharesToBuy),
                 pricePerShare: holding.currentPrice
             )

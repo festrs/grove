@@ -1,48 +1,23 @@
 import SwiftUI
+import GroveDomain
 
 struct HoldingRow: View {
     let holding: Holding
-    let totalValue: Decimal
-    var exchangeRate: Decimal = 5.12
-
-    private var brlValue: Decimal {
-        holding.currency == .usd ? holding.currentValue * exchangeRate : holding.currentValue
-    }
-
-    private var currentPercent: Decimal {
-        guard totalValue > 0 else { return 0 }
-        return (brlValue / totalValue) * 100
-    }
+    let totalValue: Money
 
     private var gainLoss: Decimal { holding.gainLossPercent }
 
     var body: some View {
         HStack(spacing: 12) {
-            // Left: icon + ticker + name
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(holding.assetClass.color.opacity(0.15))
-                    .frame(width: 40, height: 40)
-                    .overlay {
-                        Image(systemName: holding.assetClass.icon)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(holding.assetClass.color)
-                    }
+            TQTickerRow(
+                ticker: holding.displayTicker,
+                subtitle: "\(holding.quantity) shares",
+                assetClass: holding.assetClass,
+                showIcon: true
+            )
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(holding.ticker)
-                        .font(.system(.body, weight: .semibold))
-                    Text("\(holding.quantity) cotas")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            // Right: price + gain/loss badge
             VStack(alignment: .trailing, spacing: 4) {
-                Text(holding.currentPrice.formatted(as: holding.currency))
+                Text(holding.priceMoney.formatted())
                     .font(.system(.body, weight: .semibold))
 
                 HStack(spacing: 2) {

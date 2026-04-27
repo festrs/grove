@@ -1,10 +1,14 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
+import GroveServices
 
 struct IncomeHistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.syncService) private var syncService
     @Environment(\.backendService) private var backendService
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @State private var viewModel = IncomeHistoryViewModel()
 
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -12,7 +16,6 @@ struct IncomeHistoryView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.md) {
-                // Summary cards: side-by-side on wide screens
                 LazyVGrid(
                     columns: [GridItem(.adaptive(minimum: 280), spacing: Theme.Spacing.md)],
                     spacing: Theme.Spacing.md
@@ -21,7 +24,6 @@ struct IncomeHistoryView: View {
                     monthlySummaryCard
                 }
 
-                // Asset class breakdown: grid on wide screens
                 if let breakdown = viewModel.taxBreakdown {
                     LazyVGrid(
                         columns: [GridItem(.adaptive(minimum: 280), spacing: Theme.Spacing.md)],
@@ -36,16 +38,16 @@ struct IncomeHistoryView: View {
             .padding(Theme.Spacing.md)
             .frame(maxWidth: Theme.Layout.maxContentWidth)
         }
-        .navigationTitle("Renda Passiva")
+        .navigationTitle("Passive Income")
         .refreshable {
             await syncService.syncAll(modelContext: modelContext, backendService: backendService)
-            viewModel.loadData(modelContext: modelContext)
+            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
         }
         .task {
-            viewModel.loadData(modelContext: modelContext)
+            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
         }
         .onChange(of: syncService.isSyncing) { _, syncing in
-            if !syncing { viewModel.loadData(modelContext: modelContext) }
+            if !syncing { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }
         }
     }
 
@@ -53,10 +55,10 @@ struct IncomeHistoryView: View {
         TQCard {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Renda anual estimada")
+                    Text("Estimated Annual Income")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(viewModel.totalAnnualBRL.formattedBRL())
+                    Text(viewModel.totalAnnual.formatted())
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundStyle(Color.tqAccentGreen)
@@ -73,20 +75,20 @@ struct IncomeHistoryView: View {
         TQCard {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Renda mensal estimada")
+                    Text("Estimated Monthly Income")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(viewModel.monthlyIncomeBRL.formattedBRL())
+                    Text(viewModel.monthlyIncome.formatted())
                         .font(.title3)
                         .fontWeight(.bold)
                 }
                 Spacer()
-                Text("/mes").font(.caption).foregroundStyle(.secondary)
+                Text("/month").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
 
-    private func assetClassCard(_ detail: TaxBreakdownDetail) -> some View {
+    private func assetClassCard(_ detail: MoneyTaxBreakdownDetail) -> some View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 HStack {
@@ -94,13 +96,13 @@ struct IncomeHistoryView: View {
                     Text(detail.assetClass.displayName).font(.headline)
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(detail.gross.formattedBRL())
+                        Text(detail.gross.formatted())
                             .font(.subheadline).fontWeight(.semibold)
-                        if detail.tax > 0 {
-                            Text("-\(detail.tax.formattedBRL()) IR")
+                        if detail.tax.amount > 0 {
+                            Text("-\(detail.tax.formatted()) IR")
                                 .font(.caption2).foregroundStyle(.red)
                         }
-                        Text(detail.net.formattedBRL())
+                        Text(detail.net.formatted())
                             .font(.caption).foregroundStyle(Color.tqAccentGreen)
                     }
                 }

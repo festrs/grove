@@ -1,5 +1,8 @@
 import Foundation
 import SwiftData
+import GroveDomain
+import GroveServices
+import GroveRepositories
 
 @Observable
 final class DashboardViewModel {
@@ -10,7 +13,7 @@ final class DashboardViewModel {
     var isLoading = false
     var error: String?
 
-    func loadData(modelContext: ModelContext) {
+    func loadData(modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
         isLoading = true
         error = nil
 
@@ -21,17 +24,30 @@ final class DashboardViewModel {
             let holdings = try portfolioRepo.fetchAllHoldings()
             let settings = try portfolioRepo.fetchSettings()
 
-            let computedSummary = portfolioRepo.computeSummary(holdings: holdings, classAllocations: settings.classAllocations)
+            let computedSummary = portfolioRepo.computeSummary(
+                holdings: holdings,
+                classAllocations: settings.classAllocations,
+                displayCurrency: displayCurrency,
+                rates: rates
+            )
             summary = computedSummary
 
             projection = IncomeProjector.project(
                 holdings: holdings,
-                incomeGoal: settings.monthlyIncomeGoal
+                incomeGoal: settings.monthlyIncomeGoalMoney,
+                monthlyContribution: Money(amount: 5_000, currency: displayCurrency),
+                displayCurrency: displayCurrency,
+                rates: rates
             )
 
+            let totalValueAmount = computedSummary.totalValue.amount
+            let goalAmount = settings.monthlyIncomeGoalMoney.converted(to: displayCurrency, using: rates).amount
+            let rankingAmountValue = max(totalValueAmount, goalAmount, 1000)
+            let rankingAmount = Money(amount: rankingAmountValue, currency: displayCurrency)
             topSuggestions = try RebalancingEngine.suggestions(
                 modelContext: modelContext,
-                investmentAmount: computedSummary.totalValueBRL
+                investmentAmount: rankingAmount,
+                rates: rates
             )
 
             nextDividends = try dividendRepo.upcomingDividends(days: 30)

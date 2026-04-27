@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 struct NotificationSettingsSection: View {
     @AppStorage("notif_dividends") private var dividendAlerts = true
@@ -7,11 +8,21 @@ struct NotificationSettingsSection: View {
     @AppStorage("notif_drift") private var driftAlerts = false
 
     var body: some View {
-        Section("Notificacoes") {
-            Toggle("Dividendos recebidos", isOn: $dividendAlerts)
-            Toggle("Lembrete mensal de aporte", isOn: $monthlyReminder)
-            Toggle("Marcos da meta (25%, 50%...)", isOn: $milestoneAlerts)
-            Toggle("Alerta de desvio de alocacao", isOn: $driftAlerts)
+        Section("Notifications") {
+            Toggle("Received Dividends", isOn: $dividendAlerts)
+            Toggle("Monthly Investment Reminder", isOn: $monthlyReminder)
+                .onChange(of: monthlyReminder) { _, enabled in
+                    Task {
+                        if enabled {
+                            await NotificationService.shared.scheduleMonthlyRebalancingReminder()
+                        } else {
+                            UNUserNotificationCenter.current()
+                                .removePendingNotificationRequests(withIdentifiers: ["monthly-rebalancing"])
+                        }
+                    }
+                }
+            Toggle("Goal Milestones (25%, 50%...)", isOn: $milestoneAlerts)
+            Toggle("Allocation Drift Alert", isOn: $driftAlerts)
         }
     }
 }

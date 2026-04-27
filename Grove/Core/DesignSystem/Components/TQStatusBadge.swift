@@ -1,4 +1,5 @@
 import SwiftUI
+import GroveDomain
 
 struct TQStatusBadge: View {
     let status: HoldingStatus

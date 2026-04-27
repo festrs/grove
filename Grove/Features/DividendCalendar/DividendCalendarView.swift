@@ -1,11 +1,14 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct DividendCalendarView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
     @Environment(\.syncService) private var syncService
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @Query private var dividends: [DividendPayment]
     @State private var viewModel = DividendCalendarViewModel()
 
@@ -17,20 +20,20 @@ struct DividendCalendarView: View {
                 compactCalendarLayout
             }
         }
-        .navigationTitle("Dividendos")
+        .navigationTitle("Dividends")
         .refreshable {
             await syncService.syncAll(modelContext: modelContext, backendService: backendService)
-            viewModel.loadFromLocal(modelContext: modelContext)
+            viewModel.loadFromLocal(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
         }
         .task {
-            viewModel.loadFromLocal(modelContext: modelContext)
+            viewModel.loadFromLocal(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
         }
         .onChange(of: dividends.count) {
-            viewModel.loadFromLocal(modelContext: modelContext)
+            viewModel.loadFromLocal(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
         }
         .onChange(of: syncService.isSyncing) { _, syncing in
             if !syncing {
-                viewModel.loadFromLocal(modelContext: modelContext)
+                viewModel.loadFromLocal(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
         }
     }
@@ -114,10 +117,10 @@ struct DividendCalendarView: View {
         TQCard {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Total do mes")
+                    Text("Monthly Total")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Text(viewModel.monthlyTotal.formattedBRL())
+                    Text(viewModel.monthlyTotal.formatted())
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundStyle(Color.tqAccentGreen)
@@ -134,12 +137,12 @@ struct DividendCalendarView: View {
     private var dayDetailCard: some View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                let total = viewModel.dividendsForDay.reduce(Decimal.zero) { $0 + $1.amount }
+                let total = viewModel.dividendsForDay.map { $0.amount }.sum(in: displayCurrency, using: rates)
                 HStack {
-                    Text("Dividendos do dia")
+                    Text("Daily Dividends")
                         .font(.headline)
                     Spacer()
-                    Text(total.formattedBRL())
+                    Text(total.formatted())
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.tqAccentGreen)
@@ -156,7 +159,7 @@ struct DividendCalendarView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(div.amount.formattedBRL())
+                        Text(div.amount.formatted())
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .foregroundStyle(Color.tqAccentGreen)

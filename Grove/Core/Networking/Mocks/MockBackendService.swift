@@ -1,4 +1,5 @@
 import Foundation
+import GroveDomain
 
 actor MockBackendService: BackendServiceProtocol {
 

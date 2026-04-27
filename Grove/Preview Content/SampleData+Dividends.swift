@@ -1,4 +1,5 @@
 import Foundation
+import GroveDomain
 
 enum SampleDividends {
     static func generate(for holdings: [Holding]) -> [DividendPayment] {

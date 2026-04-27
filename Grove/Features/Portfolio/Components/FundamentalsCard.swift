@@ -8,7 +8,7 @@ struct FundamentalsCard: View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 HStack {
-                    Text("Fundamentos")
+                    Text("Fundamentals")
                         .font(.headline)
                     Spacer()
                     if let score = fundamentals?.compositeScore {
@@ -23,12 +23,12 @@ struct FundamentalsCard: View {
                     metricsGrid(fundamentals)
 
                     if let updatedAt = fundamentals.updatedAt {
-                        Text("Atualizado: \(formatDate(updatedAt))")
+                        Text("Updated: \(formatDate(updatedAt))")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
                 } else {
-                    Text("Dados fundamentalistas indisponiveis")
+                    Text("Fundamental data unavailable")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 80)
@@ -65,7 +65,7 @@ struct FundamentalsCard: View {
         ) {
             if let profitable = data.profitableYearsPct {
                 metricItem(
-                    label: "Lucros consistentes",
+                    label: "Consistent Profits",
                     value: String(format: "%.0f%%", profitable),
                     rating: data.profitRating,
                     color: ratingColor(for: profitable, thresholds: (80, 50))
@@ -74,7 +74,7 @@ struct FundamentalsCard: View {
 
             if let epsGrowth = data.epsGrowthPct {
                 metricItem(
-                    label: "Crescimento LPA",
+                    label: "EPS Growth",
                     value: String(format: "%+.1f%%", epsGrowth),
                     rating: data.epsRating,
                     color: ratingColor(for: epsGrowth, thresholds: (5, 0))
@@ -83,7 +83,7 @@ struct FundamentalsCard: View {
 
             if let netDebt = data.currentNetDebtEbitda {
                 metricItem(
-                    label: "Div. liq./EBITDA",
+                    label: "Net Debt/EBITDA",
                     value: String(format: "%.1fx", netDebt),
                     rating: data.debtRating,
                     color: debtColor(netDebt)
@@ -92,8 +92,8 @@ struct FundamentalsCard: View {
 
             if let ipoYears = data.ipoYears {
                 metricItem(
-                    label: "Anos de bolsa",
-                    value: "\(ipoYears) anos",
+                    label: "Years Listed",
+                    value: "\(ipoYears) yrs",
                     rating: data.ipoRating,
                     color: ratingColor(for: Double(ipoYears), thresholds: (10, 5))
                 )

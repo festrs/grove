@@ -1,37 +1,65 @@
 import SwiftUI
+import GroveDomain
 
 struct GoalSettingsSection: View {
     @Bindable var settings: UserSettings
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     var body: some View {
-        Section("Metas") {
+        Section("Goals") {
             TQCurrencyField(
-                title: "Renda passiva mensal",
-                value: $settings.monthlyIncomeGoal
+                title: "Monthly Passive Income",
+                currency: displayCurrency,
+                value: binding(for: \.monthlyIncomeGoal, currency: \.monthlyIncomeGoalCurrency)
             )
 
             TQCurrencyField(
-                title: "Custo de vida mensal",
-                value: $settings.monthlyCostOfLiving
+                title: "Monthly Cost of Living",
+                currency: displayCurrency,
+                value: binding(for: \.monthlyCostOfLiving, currency: \.monthlyCostOfLivingCurrency)
             )
 
             TQCurrencyField(
-                title: "Reserva de emergencia (alvo)",
-                value: $settings.emergencyReserveTarget
+                title: "Emergency Reserve (Target)",
+                currency: displayCurrency,
+                value: binding(for: \.emergencyReserveTarget, currency: \.emergencyReserveTargetCurrency)
             )
 
             TQCurrencyField(
-                title: "Reserva de emergencia (atual)",
-                value: $settings.emergencyReserveCurrent
+                title: "Emergency Reserve (Current)",
+                currency: displayCurrency,
+                value: binding(for: \.emergencyReserveCurrent, currency: \.emergencyReserveCurrentCurrency)
             )
         }
 
-        Section("Rebalanceamento") {
+        // Goal fields always edit in the user's chosen displayCurrency.
+        // The stored amount is converted via FX for display, and on edit we
+        // overwrite both amount and per-field currency in displayCurrency.
+        // This keeps the symbol next to the value consistent with the rest of the app.
+
+        Section("Rebalancing") {
             Stepper(
-                "Recomendacoes por aporte: \(settings.recommendationCount)",
+                "Recommendations per investment: \(settings.recommendationCount)",
                 value: $settings.recommendationCount,
                 in: 1...10
             )
         }
+    }
+
+    private func binding(
+        for amount: ReferenceWritableKeyPath<UserSettings, Decimal>,
+        currency: ReferenceWritableKeyPath<UserSettings, Currency>
+    ) -> Binding<Decimal> {
+        Binding<Decimal>(
+            get: {
+                let stored = Money(amount: settings[keyPath: amount], currency: settings[keyPath: currency])
+                return stored.converted(to: displayCurrency, using: rates).amount
+            },
+            set: { newValue in
+                settings[keyPath: amount] = newValue
+                settings[keyPath: currency] = displayCurrency
+            }
+        )
     }
 }

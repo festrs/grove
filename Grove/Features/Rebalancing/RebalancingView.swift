@@ -1,11 +1,16 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
+import GroveServices
 
 struct RebalancingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @State private var viewModel = RebalancingViewModel()
     @State private var showingConfirmation = false
+    @FocusState private var amountFieldFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -16,7 +21,9 @@ struct RebalancingView: View {
                     compactRebalancingLayout
                 }
             }
-            .navigationTitle("Aportar")
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle("Invest")
+            .keyboardDoneBar()
         }
     }
 
@@ -61,11 +68,11 @@ struct RebalancingView: View {
     private var inputCard: some View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                Text("Quanto voce vai investir este mes?")
+                Text("How much will you invest this month?")
                     .font(.headline)
 
                 HStack {
-                    Text("R$")
+                    Text(displayCurrency.symbol)
                         .font(.title2)
                         .foregroundStyle(.secondary)
                     TextField("5.000", text: $viewModel.investmentAmountText)
@@ -73,30 +80,52 @@ struct RebalancingView: View {
                         .fontWeight(.bold)
                         #if os(iOS)
                         .keyboardType(.decimalPad)
+                        .focused($amountFieldFocused)
                         #endif
                 }
 
                 Button {
-                    viewModel.calculate(modelContext: modelContext)
+                    viewModel.calculate(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 } label: {
-                    Text("Calcular distribuicao")
+                    Text("Calculate Distribution")
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.tqAccentGreen)
-                .disabled(viewModel.investmentAmount <= 0)
+                .disabled(viewModel.investmentAmountDecimal <= 0)
             }
         }
     }
 
     private var noSuggestionsCard: some View {
         TQCard {
-            TQEmptyState(
-                icon: "slider.horizontal.3",
-                title: "Configure a alocacao",
-                message: "Defina a alocacao por classe no menu Editar Portfolio para receber sugestoes de aporte."
-            )
+            switch viewModel.emptyReason {
+            case .noAportarHoldings:
+                TQEmptyState(
+                    icon: "tray",
+                    title: "No assets to invest in",
+                    message: "Change the status of at least one asset to \"Invest\" on the portfolio screen."
+                )
+            case .noPortfolioValue:
+                TQEmptyState(
+                    icon: "chart.bar",
+                    title: "Portfolio has no value",
+                    message: "Register at least one purchase for rebalancing to work."
+                )
+            case .noAllocations:
+                TQEmptyState(
+                    icon: "slider.horizontal.3",
+                    title: "Set up allocation",
+                    message: "Define the allocation per class in Settings > Allocation to receive investment suggestions."
+                )
+            default:
+                TQEmptyState(
+                    icon: "exclamationmark.triangle",
+                    title: "No suggestions",
+                    message: "Could not generate suggestions. Check your assets and allocations in Settings."
+                )
+            }
         }
     }
 
@@ -104,10 +133,10 @@ struct RebalancingView: View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 HStack {
-                    Text("Sugestao de aporte")
+                    Text("Investment Suggestion")
                         .font(.headline)
                     Spacer()
-                    Text(viewModel.totalAllocated.formattedBRL())
+                    Text(viewModel.totalAllocated.formatted())
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -119,14 +148,14 @@ struct RebalancingView: View {
                     }
                 }
 
-                let remainder = viewModel.investmentAmount - viewModel.totalAllocated
+                let remainder = viewModel.investmentAmountDecimal - viewModel.totalAllocated.amount
                 if remainder > 0 {
                     HStack {
-                        Text("Sobra (fracionamento)")
+                        Text("Remainder (fractional)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(remainder.formattedBRL())
+                        Text(Money(amount: remainder, currency: displayCurrency).formatted())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -141,7 +170,7 @@ struct RebalancingView: View {
         } label: {
             HStack {
                 Image(systemName: "checkmark.circle.fill")
-                Text("Registrar aporte")
+                Text("Register Investment")
             }
             .fontWeight(.semibold)
             .frame(maxWidth: .infinity)
@@ -149,16 +178,16 @@ struct RebalancingView: View {
         .buttonStyle(.borderedProminent)
         .tint(.tqAccentGreen)
         .confirmationDialog(
-            "Confirmar aporte?",
+            "Confirm investment?",
             isPresented: $showingConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Registrar") {
+            Button("Register") {
                 viewModel.registerContributions(modelContext: modelContext)
             }
-            Button("Cancelar", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("As quantidades serao adicionadas ao seu portfolio. Lembre-se de executar as ordens na sua corretora.")
+            Text("The quantities will be added to your portfolio. Remember to execute the orders at your brokerage.")
         }
     }
 }

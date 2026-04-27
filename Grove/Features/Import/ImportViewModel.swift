@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import GroveDomain
 
 enum ImportInputMode {
     case file
@@ -37,7 +38,7 @@ final class ImportViewModel {
         case .success(let urls):
             guard let url = urls.first else { return }
             guard url.startAccessingSecurityScopedResource() else {
-                errorMessage = "Nao foi possivel acessar o arquivo."
+                errorMessage = "Could not access the file."
                 showingError = true
                 return
             }
@@ -46,11 +47,11 @@ final class ImportViewModel {
                 selectedFileData = try Data(contentsOf: url)
                 selectedFilename = url.lastPathComponent
             } catch {
-                errorMessage = "Erro ao ler o arquivo: \(error.localizedDescription)"
+                errorMessage = "Error reading file: \(error.localizedDescription)"
                 showingError = true
             }
         case .failure(let error):
-            errorMessage = "Erro ao selecionar arquivo: \(error.localizedDescription)"
+            errorMessage = "Error selecting file: \(error.localizedDescription)"
             showingError = true
         }
     }
@@ -69,17 +70,27 @@ final class ImportViewModel {
                 text: text
             )
             positions = result
-            selectedTickers = Set(result.map(\.ticker))
+            let tickers = result.map(\.ticker)
+            if let max = maxSelectable {
+                selectedTickers = Set(tickers.prefix(max))
+            } else {
+                selectedTickers = Set(tickers)
+            }
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
         }
     }
 
+    var maxSelectable: Int?
+
     func toggleSelection(_ ticker: String) {
         if selectedTickers.contains(ticker) {
             selectedTickers.remove(ticker)
         } else {
+            if let max = maxSelectable, selectedTickers.count >= max {
+                return
+            }
             selectedTickers.insert(ticker)
         }
     }

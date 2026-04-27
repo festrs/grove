@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -7,6 +8,7 @@ struct ContentView: View {
     @Environment(\.syncService) private var syncService
     @Query private var settings: [UserSettings]
     @Query private var holdings: [Holding]
+    @State private var rateStore = RateStore()
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -28,9 +30,19 @@ struct ContentView: View {
                 #endif
             }
         }
+        .environment(\.displayCurrency, settings.first?.preferredCurrency ?? .brl)
+        .environment(\.rates, rateStore)
+        .overlay {
+            #if DEBUG
+            DebugFloatingButton()
+            #endif
+        }
         .task {
             ensureSettingsExist()
+            await rateStore.refresh(using: backendService)
             guard settings.first?.hasCompletedOnboarding == true else { return }
+            // TODO: Enable when push notifications are ready
+            // await NotificationCoordinator.handleAppLaunch()
             await syncService.syncAll(
                 modelContext: modelContext,
                 backendService: backendService
@@ -71,10 +83,10 @@ enum AppNavigationItem: String, Hashable, CaseIterable, Identifiable {
         switch self {
         case .dashboard: "Dashboard"
         case .portfolio: "Portfolio"
-        case .rebalancing: "Aportar"
-        case .dividendCalendar: "Dividendos"
-        case .incomeHistory: "Renda Passiva"
-        case .settings: "Ajustes"
+        case .rebalancing: "Invest"
+        case .dividendCalendar: "Dividends"
+        case .incomeHistory: "Passive Income"
+        case .settings: "Settings"
         }
     }
 
@@ -101,10 +113,10 @@ struct AppTabNavigation: View {
             Tab("Portfolio", systemImage: "briefcase.fill") {
                 PortfolioView()
             }
-            Tab("Aportar", systemImage: "plus.circle.fill") {
+            Tab("Invest", systemImage: "plus.circle.fill") {
                 RebalancingView()
             }
-            Tab("Ajustes", systemImage: "gearshape.fill") {
+            Tab("Settings", systemImage: "gearshape.fill") {
                 SettingsView()
             }
         }
@@ -120,16 +132,16 @@ struct AppSidebarNavigation: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                Section("Visao Geral") {
+                Section("Overview") {
                     sidebarLink(.dashboard)
                     sidebarLink(.portfolio)
                 }
 
-                Section("Investimentos") {
+                Section("Investments") {
                     sidebarLink(.rebalancing)
                 }
 
-                Section("Renda") {
+                Section("Income") {
                     sidebarLink(.dividendCalendar)
                     sidebarLink(.incomeHistory)
                 }

@@ -1,5 +1,7 @@
 import Foundation
 import SwiftData
+import GroveDomain
+import GroveRepositories
 
 @Observable
 final class PortfolioViewModel {
@@ -10,22 +12,19 @@ final class PortfolioViewModel {
     var filteredHoldings: [Holding] = []
     var allocationByClass: [AssetClassAllocation] = []
     var summary: PortfolioSummary?
-    var totalValueBRL: Decimal = 0
+    var totalValue: Money = .zero(in: .brl)
     var isLoading = false
 
-    // Search result from AssetSearchView
     var selectedSearchResult: StockSearchResultDTO?
 
-    // Sheets
     var showingAddDetails = false
     var showingEditPortfolio = false
     var showingNewPortfolio = false
     var holdingToRemove: Holding?
 
-    func loadData(modelContext: ModelContext, exchangeRate: Decimal = 5.12) {
+    func loadData(modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
         let repo = PortfolioRepository(modelContext: modelContext)
         do {
-            // Load all portfolios
             let descriptor = FetchDescriptor<Portfolio>(sortBy: [SortDescriptor(\.createdAt)])
             portfolios = try modelContext.fetch(descriptor)
 
@@ -33,7 +32,6 @@ final class PortfolioViewModel {
                 selectedPortfolio = portfolios.first
             }
 
-            // Load holdings for selected portfolio
             if let portfolio = selectedPortfolio {
                 holdings = portfolio.holdings
             } else {
@@ -41,40 +39,45 @@ final class PortfolioViewModel {
             }
 
             let settings = try repo.fetchSettings()
-            let summaryResult = repo.computeSummary(holdings: holdings, classAllocations: settings.classAllocations, exchangeRate: exchangeRate)
+            let summaryResult = repo.computeSummary(
+                holdings: holdings,
+                classAllocations: settings.classAllocations,
+                displayCurrency: displayCurrency,
+                rates: rates
+            )
             summary = summaryResult
             allocationByClass = summaryResult.allocationByClass
-            totalValueBRL = summaryResult.totalValueBRL
-            applyFilter()
+            totalValue = summaryResult.totalValue
+            applyFilter(displayCurrency: displayCurrency, rates: rates)
         } catch {
             holdings = []
         }
     }
 
-    func applyFilter() {
+    func applyFilter(displayCurrency: Currency, rates: any ExchangeRates) {
         if let selected = selectedClass {
             filteredHoldings = holdings.filter { $0.assetClass == selected }
         } else {
             filteredHoldings = holdings
         }
         filteredHoldings.sort { h1, h2 in
-            let gap1 = h1.targetPercent - currentPercent(for: h1)
-            let gap2 = h2.targetPercent - currentPercent(for: h2)
+            let gap1 = h1.targetPercent - currentPercent(for: h1, displayCurrency: displayCurrency, rates: rates)
+            let gap2 = h2.targetPercent - currentPercent(for: h2, displayCurrency: displayCurrency, rates: rates)
             return gap1 > gap2
         }
     }
 
-    func selectClass(_ classType: AssetClassType?) {
+    func selectClass(_ classType: AssetClassType?, displayCurrency: Currency, rates: any ExchangeRates) {
         selectedClass = classType
-        applyFilter()
+        applyFilter(displayCurrency: displayCurrency, rates: rates)
     }
 
-    func selectPortfolio(_ portfolio: Portfolio, modelContext: ModelContext) {
+    func selectPortfolio(_ portfolio: Portfolio, modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
         selectedPortfolio = portfolio
-        loadData(modelContext: modelContext)
+        loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
     }
 
-    func deleteHolding(_ holding: Holding, modelContext: ModelContext) {
+    func deleteHolding(_ holding: Holding, modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
         if holding.hasPosition {
             let contribution = Contribution(
                 date: .now,
@@ -87,20 +90,20 @@ final class PortfolioViewModel {
         }
         modelContext.delete(holding)
         holdings.removeAll { $0.ticker == holding.ticker }
-        applyFilter()
+        applyFilter(displayCurrency: displayCurrency, rates: rates)
     }
 
-    func createPortfolio(name: String, modelContext: ModelContext) {
+    func createPortfolio(name: String, modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
         let portfolio = Portfolio(name: name)
         modelContext.insert(portfolio)
         portfolios.append(portfolio)
         selectedPortfolio = portfolio
-        loadData(modelContext: modelContext)
+        loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
     }
 
-    private func currentPercent(for holding: Holding) -> Decimal {
-        guard totalValueBRL > 0 else { return 0 }
-        let brlValue = holding.currency == .usd ? holding.currentValue * 5.12 : holding.currentValue
-        return (brlValue / totalValueBRL) * 100
+    private func currentPercent(for holding: Holding, displayCurrency: Currency, rates: any ExchangeRates) -> Decimal {
+        guard totalValue.amount > 0 else { return 0 }
+        let displayValue = holding.currentValueMoney.converted(to: displayCurrency, using: rates).amount
+        return (displayValue / totalValue.amount) * 100
     }
 }

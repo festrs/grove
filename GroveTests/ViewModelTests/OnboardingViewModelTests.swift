@@ -1,5 +1,7 @@
 import Testing
 import Foundation
+import SwiftData
+import GroveDomain
 @testable import Grove
 
 struct OnboardingViewModelTests {
@@ -287,5 +289,24 @@ struct OnboardingViewModelTests {
         // After completion, isSearching should be false
         #expect(vm.isSearching == false)
         #expect(!vm.searchResults.isEmpty)
+    }
+
+    // MARK: - completeOnboarding
+
+    @MainActor
+    @Test func completeOnboardingPreservesPendingStatus() throws {
+        let ctx = try makeTestContext()
+        let vm = OnboardingViewModel()
+        vm.addHolding(ticker: "ITUB3")
+        // User explicitly promotes the holding from .estudo to .aportar before finishing.
+        vm.pendingHoldings[0].status = .aportar
+        vm.targetAllocations = [.acoesBR: 100]
+
+        vm.completeOnboarding(modelContext: ctx)
+
+        let saved = try ctx.fetch(FetchDescriptor<Holding>())
+        #expect(saved.count == 1)
+        // Mutation "completeOnboarding ignores status" hard-codes .estudo here.
+        #expect(saved.first?.status == .aportar, "Onboarding must persist the user-picked status verbatim")
     }
 }

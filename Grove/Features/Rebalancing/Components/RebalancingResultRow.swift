@@ -1,4 +1,6 @@
 import SwiftUI
+import GroveDomain
+import GroveServices
 
 struct RebalancingResultRow: View {
     let suggestion: RebalancingSuggestion
@@ -18,10 +20,10 @@ struct RebalancingResultRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(suggestion.amount.formattedBRL())
+                Text(suggestion.amount.formatted())
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                Text("\(suggestion.sharesToBuy) cotas")
+                Text("\(suggestion.sharesToBuy) shares")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

@@ -1,8 +1,13 @@
 import SwiftUI
+import GroveDomain
+import GroveServices
+import GroveRepositories
 
 struct SummaryCardsRow: View {
     let summary: PortfolioSummary
     let projection: IncomeProjection?
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     var body: some View {
         LazyVGrid(
@@ -10,27 +15,27 @@ struct SummaryCardsRow: View {
             spacing: 12
         ) {
             summaryCard(
-                label: "Patrimonio",
-                value: summary.totalValueBRL.formattedCompact(),
-                prefix: "R$ "
+                label: "Assets",
+                value: summary.totalValue.amount.formattedCompact(),
+                prefix: "\(summary.totalValue.currency.symbol) "
             )
             summaryCard(
-                label: "Renda bruta",
-                value: summary.monthlyIncomeGross.formattedBRL(),
+                label: "Gross Income",
+                value: summary.monthlyIncomeGross.formatted(in: displayCurrency, using: rates),
                 hint: "/mes"
             )
             summaryCard(
-                label: "Renda liquida",
-                value: summary.monthlyIncomeNet.formattedBRL(),
-                hint: "Apos impostos",
+                label: "Net Income",
+                value: summary.monthlyIncomeNet.formatted(in: displayCurrency, using: rates),
+                hint: "After taxes",
                 accent: true
             )
             if let years = projection?.estimatedYearsToGoal {
                 let formatted = String(format: "%.1f", NSDecimalNumber(decimal: years).doubleValue)
                 summaryCard(
-                    label: "FI em",
-                    value: "\(formatted) anos",
-                    hint: "No ritmo atual"
+                    label: "FI in",
+                    value: "\(formatted) years",
+                    hint: "At current pace"
                 )
             }
         }

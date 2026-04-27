@@ -1,5 +1,6 @@
 import AsyncAlgorithms
 import Foundation
+import GroveDomain
 
 /// Debounces search queries using AsyncAlgorithms `AsyncChannel`.
 /// Each new query is sent into the channel; the consumer reads

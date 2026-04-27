@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import GroveDomain
 @testable import Grove
 
 /// Shared in-memory ModelContainer for all tests.

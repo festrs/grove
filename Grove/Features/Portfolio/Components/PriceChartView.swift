@@ -1,11 +1,12 @@
 import SwiftUI
 import Charts
+import GroveDomain
 
 struct PriceChartView: View {
     let ticker: String
     let currency: Currency
+    let backendService: any BackendServiceProtocol
 
-    @Environment(\.backendService) private var backendService
     @State private var points: [PriceChartPoint] = []
     @State private var isLoading = false
     @State private var selectedPeriod: ChartPeriod = .oneMonth
@@ -18,6 +19,7 @@ struct PriceChartView: View {
                 chartContent
             }
         }
+        .task { await loadData() }
     }
 
     // MARK: - Subviews
@@ -25,7 +27,7 @@ struct PriceChartView: View {
     private var headerSection: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Historico de precos")
+                Text("Price History")
                     .font(.headline)
                 if let last = points.last {
                     Text(last.price.formatted(as: currency))
@@ -51,14 +53,21 @@ struct PriceChartView: View {
     }
 
     private var periodPicker: some View {
-        Picker("Periodo", selection: $selectedPeriod) {
+        HStack(spacing: Theme.Spacing.xs) {
             ForEach(ChartPeriod.allCases) { period in
-                Text(period.label).tag(period)
+                Button(period.label) {
+                    selectedPeriod = period
+                    Task { await loadData() }
+                }
+                .font(.system(size: 13, weight: selectedPeriod == period ? .semibold : .regular))
+                .foregroundStyle(selectedPeriod == period ? .white : .secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    selectedPeriod == period ? Color.tqAccentGreen : Color.clear,
+                    in: Capsule()
+                )
             }
-        }
-        .pickerStyle(.segmented)
-        .onChange(of: selectedPeriod) {
-            Task { await loadData() }
         }
     }
 
@@ -68,7 +77,7 @@ struct PriceChartView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: 180)
         } else if points.isEmpty {
-            Text("Sem dados disponiveis")
+            Text("No data available")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: 180)
@@ -85,15 +94,15 @@ struct PriceChartView: View {
 
         return Chart(points) { point in
             LineMark(
-                x: .value("Data", point.date),
-                y: .value("Preco", NSDecimalNumber(decimal: point.price).doubleValue)
+                x: .value("Date", point.date),
+                y: .value("Price", NSDecimalNumber(decimal: point.price).doubleValue)
             )
             .foregroundStyle(lineColor)
             .interpolationMethod(.catmullRom)
 
             AreaMark(
-                x: .value("Data", point.date),
-                y: .value("Preco", NSDecimalNumber(decimal: point.price).doubleValue)
+                x: .value("Date", point.date),
+                y: .value("Price", NSDecimalNumber(decimal: point.price).doubleValue)
             )
             .foregroundStyle(
                 LinearGradient(
@@ -109,7 +118,7 @@ struct PriceChartView: View {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
                     .foregroundStyle(.secondary.opacity(0.3))
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                AxisValueLabel(format: xAxisFormat)
                     .foregroundStyle(.secondary)
             }
         }
@@ -125,6 +134,17 @@ struct PriceChartView: View {
     }
 
     // MARK: - Data
+
+    private var xAxisFormat: Date.FormatStyle {
+        switch selectedPeriod {
+        case .oneDay, .oneWeek, .oneMonth:
+            .dateTime.month(.abbreviated).day()
+        case .threeMonths, .sixMonths:
+            .dateTime.month(.abbreviated)
+        case .oneYear, .fiveYears, .max:
+            .dateTime.month(.abbreviated).year(.twoDigits)
+        }
+    }
 
     private var percentChange: Double {
         guard let first = points.first, let last = points.last else { return 0 }
@@ -171,33 +191,40 @@ private struct PriceChartPoint: Identifiable {
 }
 
 enum ChartPeriod: String, CaseIterable, Identifiable {
+    case oneDay
+    case oneWeek
     case oneMonth
     case threeMonths
+    case sixMonths
     case oneYear
+    case fiveYears
+    case max
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
+        case .oneDay: "1D"
+        case .oneWeek: "1W"
         case .oneMonth: "1M"
         case .threeMonths: "3M"
-        case .oneYear: "1A"
+        case .sixMonths: "6M"
+        case .oneYear: "1Y"
+        case .fiveYears: "5Y"
+        case .max: "Max"
         }
     }
 
     var apiValue: String {
         switch self {
+        case .oneDay: "1d"
+        case .oneWeek: "5d"
         case .oneMonth: "1mo"
         case .threeMonths: "3mo"
+        case .sixMonths: "6mo"
         case .oneYear: "1y"
+        case .fiveYears: "5y"
+        case .max: "max"
         }
-    }
-}
-
-// MARK: - Task Modifier
-
-extension PriceChartView {
-    func onAppearLoad() -> some View {
-        self.task { await loadData() }
     }
 }

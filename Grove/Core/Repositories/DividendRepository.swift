@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import GroveDomain
 
 struct MonthlyDividendSummary: Identifiable {
     var id: String { "\(year)-\(month)" }
@@ -9,6 +10,9 @@ struct MonthlyDividendSummary: Identifiable {
     let tax: Decimal
     let net: Decimal
     let payments: [DividendPayment]
+
+    var grossMoney: Money { Money(amount: gross, currency: .brl) }
+    var netMoney: Money { Money(amount: net, currency: .brl) }
 
     var monthLabel: String {
         let formatter = DateFormatter()

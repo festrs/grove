@@ -1,4 +1,5 @@
 import Foundation
+import GroveDomain
 
 /// Backend provides market data only. Portfolio lives in SwiftData.
 protocol BackendServiceProtocol: Sendable {

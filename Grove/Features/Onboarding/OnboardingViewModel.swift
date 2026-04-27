@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 // MARK: - PendingHolding
 
@@ -26,7 +27,7 @@ final class OnboardingViewModel {
 
     // MARK: - Portfolio
 
-    var portfolioName: String = "Meu Portfolio"
+    var portfolioName: String = "My Portfolio"
 
     // MARK: - Holdings
 
@@ -50,6 +51,20 @@ final class OnboardingViewModel {
 
     var monthlyIncomeGoal: Decimal = AppConstants.Defaults.monthlyIncomeGoal
     var monthlyCostOfLiving: Decimal = AppConstants.Defaults.monthlyCostOfLiving
+
+    /// Load existing allocations from UserSettings if redoing onboarding
+    func loadExistingAllocations(modelContext: ModelContext) {
+        var descriptor = FetchDescriptor<UserSettings>()
+        descriptor.fetchLimit = 1
+        guard let settings = try? modelContext.fetch(descriptor).first else { return }
+
+        let existing = settings.classAllocations
+        guard !existing.isEmpty else { return }
+
+        for (cls, value) in existing {
+            targetAllocations[cls] = Decimal(value)
+        }
+    }
 
     // MARK: - Errors
 
@@ -117,7 +132,7 @@ final class OnboardingViewModel {
             let results = try await service.searchStocks(query: trimmed)
             searchResults = results
         } catch {
-            errorMessage = "Erro ao buscar: \(error.localizedDescription)"
+            errorMessage = "Error searching: \(error.localizedDescription)"
             searchResults = []
         }
         isSearching = false
@@ -127,11 +142,11 @@ final class OnboardingViewModel {
 
     func addHolding(from result: StockSearchResultDTO) {
         guard canAddMoreHoldings else {
-            errorMessage = "Limite de \(AppConstants.freeTierMaxHoldings) ativos no plano gratuito."
+            errorMessage = Holding.freeTierLimitMessage
             return
         }
         guard !pendingHoldings.contains(where: { $0.ticker.uppercased() == result.symbol.uppercased() }) else {
-            errorMessage = "\(result.symbol) ja foi adicionado."
+            errorMessage = "\(result.symbol) has already been added."
             return
         }
 
@@ -151,13 +166,13 @@ final class OnboardingViewModel {
 
     func addHolding(ticker: String) {
         guard canAddMoreHoldings else {
-            errorMessage = "Limite de \(AppConstants.freeTierMaxHoldings) ativos no plano gratuito."
+            errorMessage = Holding.freeTierLimitMessage
             return
         }
         let upper = ticker.uppercased().trimmingCharacters(in: .whitespaces)
         guard !upper.isEmpty else { return }
         guard !pendingHoldings.contains(where: { $0.ticker == upper }) else {
-            errorMessage = "\(upper) ja foi adicionado."
+            errorMessage = "\(upper) has already been added."
             return
         }
 
@@ -254,15 +269,15 @@ final class OnboardingViewModel {
         if added > 0 {
             errorMessage = nil
         } else if tickers.isEmpty {
-            errorMessage = "Nenhum ticker encontrado. Cole um ticker por linha."
+            errorMessage = "No tickers found. Paste one ticker per line."
         }
     }
 
     // MARK: - Complete Onboarding
 
     private static let portfolioAdjectives = [
-        "Serenidade", "Horizonte", "Raizes", "Aurora", "Colheita",
-        "Travessia", "Resiliencia", "Safra", "Brisa", "Semente"
+        "Serenity", "Horizon", "Roots", "Dawn", "Harvest",
+        "Crossing", "Resilience", "Season", "Breeze", "Seed"
     ]
 
     func completeOnboarding(modelContext: ModelContext) {
@@ -281,19 +296,13 @@ final class OnboardingViewModel {
         modelContext.insert(portfolio)
 
         for pending in pendingHoldings {
-            let targetPct = targetAllocations[pending.assetClass] ?? 0
-            // Distribute target percent evenly among holdings of the same class
-            let classCount = Decimal(pendingHoldings.filter { $0.assetClass == pending.assetClass }.count)
-            let holdingTarget = classCount > 0 ? targetPct / classCount : 0
-
             let holding = Holding(
                 ticker: pending.ticker,
                 displayName: pending.displayName,
                 currentPrice: pending.currentPrice,
                 dividendYield: pending.dividendYield,
                 assetClass: pending.assetClass,
-                status: pending.quantity > 0 ? pending.status : .estudo,
-                targetPercent: holdingTarget
+                status: pending.status
             )
             holding.portfolio = portfolio
             modelContext.insert(holding)
@@ -317,9 +326,14 @@ final class OnboardingViewModel {
         descriptor.fetchLimit = 1
         let existingSettings = (try? modelContext.fetch(descriptor))?.first
 
-        // Convert Decimal allocations to Double for storage
+        // Persist only allocations for classes the user actually has holdings in.
+        // SetTargets validates the in-use total against 100, so writing the full
+        // dict (with untouched defaults for unused classes) was producing sums >100.
+        let usedClasses = Set(pendingHoldings.map(\.assetClass))
         let doubleAllocations = Dictionary(uniqueKeysWithValues:
-            targetAllocations.map { ($0.key, NSDecimalNumber(decimal: $0.value).doubleValue) }
+            targetAllocations
+                .filter { usedClasses.contains($0.key) }
+                .map { ($0.key, NSDecimalNumber(decimal: $0.value).doubleValue) }
         )
 
         if let settings = existingSettings {
@@ -340,7 +354,7 @@ final class OnboardingViewModel {
         do {
             try modelContext.save()
         } catch {
-            errorMessage = "Erro ao salvar: \(error.localizedDescription)"
+            errorMessage = "Error saving: \(error.localizedDescription)"
         }
     }
 }

@@ -1,23 +1,28 @@
 import SwiftUI
+import GroveDomain
+import GroveServices
+import GroveRepositories
 
 struct InspectorPanel: View {
     let dividends: [DividendPayment]
     let suggestions: [RebalancingSuggestion]
     let allocations: [AssetClassAllocation]
 
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @State private var selectedTab = InspectorTab.agenda
 
     enum InspectorTab: String, CaseIterable {
-        case agenda = "Agenda"
-        case aportar = "Aportar"
-        case alertas = "Alertas"
+        case agenda = "Schedule"
+        case aportar = "Invest"
+        case alertas = "Alerts"
     }
 
     var body: some View {
         VStack(spacing: 0) {
             // Header with tab picker
             VStack(alignment: .leading, spacing: 10) {
-                Text("PAINEL")
+                Text("PANEL")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .tracking(0.6)
@@ -61,17 +66,17 @@ struct InspectorPanel: View {
         // Monthly total card
         TQCard {
             VStack(alignment: .leading, spacing: 6) {
-                Text("ABRIL · ESPERADO")
+                Text("EXPECTED")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .tracking(0.6)
 
-                let total = dividends.reduce(Decimal.zero) { $0 + $1.totalAmount }
-                Text(total.formattedBRL())
+                let total = dividends.map { $0.totalAmountMoney }.sum(in: displayCurrency, using: rates)
+                Text(total.formatted())
                     .font(.system(size: 26, weight: .bold))
                     .monospacedDigit()
 
-                Text("\(dividends.count) pagamentos")
+                Text("\(dividends.count) payments")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -86,7 +91,7 @@ struct InspectorPanel: View {
             .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.card))
         )
 
-        Text("PROXIMOS PAGAMENTOS")
+        Text("UPCOMING PAYMENTS")
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
             .tracking(0.6)
@@ -117,14 +122,14 @@ struct InspectorPanel: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(dividend.holding?.displayTicker ?? "—")
                     .font(.system(size: 13, weight: .medium))
-                Text("1 pagamento")
+                Text("1 payment")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Text(dividend.totalAmount.formattedBRL())
+            Text(dividend.totalAmountMoney.formatted(in: displayCurrency, using: rates))
                 .font(.system(size: 13, weight: .semibold))
                 .monospacedDigit()
         }
@@ -135,7 +140,7 @@ struct InspectorPanel: View {
 
     @ViewBuilder
     private var aportarContent: some View {
-        Text("MAIORES GAPS · ACAO ESTE MES")
+        Text("LARGEST GAPS · ACTION THIS MONTH")
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
             .tracking(0.6)
@@ -163,7 +168,7 @@ struct InspectorPanel: View {
 
                     Spacer()
 
-                    Text(suggestion.amount.formattedBRL())
+                    Text(suggestion.amount.formatted())
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.tqAccentGreen)
                 }
@@ -177,7 +182,7 @@ struct InspectorPanel: View {
     private var alertasContent: some View {
         let alerts = alertsFromAllocations
 
-        Text("\(alerts.count) ALERTAS")
+        Text("\(alerts.count) ALERTS")
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
             .tracking(0.6)
@@ -217,13 +222,13 @@ struct InspectorPanel: View {
             if drift < -5 {
                 alerts.append(AlertItem(
                     title: alloc.assetClass.displayName,
-                    message: "Classe \(String(format: "%.0f", abs(drift)))% abaixo do alvo — priorizar aporte este mes.",
+                    message: "Class \(String(format: "%.0f", abs(drift)))% below target — prioritize investment this month.",
                     isWarning: false
                 ))
             } else if drift > 5 {
                 alerts.append(AlertItem(
                     title: alloc.assetClass.displayName,
-                    message: "Classe \(String(format: "%.0f", drift))% acima do alvo — considere rebalancear.",
+                    message: "Class \(String(format: "%.0f", drift))% above target — consider rebalancing.",
                     isWarning: true
                 ))
             }

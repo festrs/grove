@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import GroveDomain
 
 struct EditPortfolioView: View {
     @Environment(\.modelContext) private var modelContext
@@ -10,38 +11,38 @@ struct EditPortfolioView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Nome") {
-                    TextField("Nome do portfolio", text: $portfolio.name)
+                Section("Name") {
+                    TextField("Portfolio Name", text: $portfolio.name)
                 }
 
                 Section {
                     Button(role: .destructive) {
                         showDeleteAlert = true
                     } label: {
-                        HStack { Spacer(); Text("Excluir portfolio"); Spacer() }
+                        HStack { Spacer(); Text("Delete Portfolio"); Spacer() }
                     }
                 }
             }
-            .navigationTitle("Editar portfolio")
+            .navigationTitle("Edit Portfolio")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Salvar") { dismiss() }
+                    Button("Save") { dismiss() }
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
             }
-            .alert("Excluir portfolio", isPresented: $showDeleteAlert) {
-                Button("Cancelar", role: .cancel) {}
-                Button("Excluir", role: .destructive) {
+            .alert("Delete Portfolio", isPresented: $showDeleteAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
                     modelContext.delete(portfolio)
                     dismiss()
                 }
             } message: {
-                Text("Todos os ativos deste portfolio serao removidos.")
+                Text("All assets in this portfolio will be removed.")
             }
         }
         #if os(macOS)

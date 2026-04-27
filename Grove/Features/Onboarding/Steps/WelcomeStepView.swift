@@ -15,11 +15,11 @@ struct WelcomeStepView: View {
 
             // MARK: - Title
             VStack(spacing: Theme.Spacing.md) {
-                Text("Quanto falta para sua tranquilidade financeira?")
+                Text("How far are you from financial freedom?")
                     .font(.system(size: Theme.FontSize.title1, weight: .bold))
                     .multilineTextAlignment(.center)
 
-                Text("Descubra em 10 minutos. Adicione seus ativos e veja sua renda passiva real.")
+                Text("Discover in 10 minutes. Add your assets and see your real passive income.")
                     .font(.system(size: Theme.FontSize.body))
                     .foregroundStyle(Color.tqSecondaryText)
                     .multilineTextAlignment(.center)
@@ -32,7 +32,7 @@ struct WelcomeStepView: View {
             Button {
                 withAnimation { viewModel.advance() }
             } label: {
-                Text("Comecar")
+                Text("Start")
                     .font(.system(size: Theme.FontSize.body, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)

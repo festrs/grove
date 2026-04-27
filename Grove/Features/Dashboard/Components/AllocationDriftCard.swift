@@ -1,4 +1,6 @@
 import SwiftUI
+import GroveDomain
+import GroveRepositories
 
 struct AllocationDriftCard: View {
     let allocations: [AssetClassAllocation]
@@ -8,11 +10,11 @@ struct AllocationDriftCard: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("ALOCACAO VS ALVO")
+                        Text("ALLOCATION VS TARGET")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .tracking(0.6)
-                        Text("Drift por classe")
+                        Text("Class Drift")
                             .font(.system(size: 17, weight: .semibold))
                     }
                     Spacer()

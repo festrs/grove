@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import GroveDomain
 
 enum Route: Hashable {
     case holdingDetail(PersistentIdentifier)

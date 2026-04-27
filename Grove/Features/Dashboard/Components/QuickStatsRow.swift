@@ -1,8 +1,12 @@
 import SwiftUI
+import GroveDomain
+import GroveRepositories
 
 struct QuickStatsRow: View {
     let summary: PortfolioSummary
     let holdingCount: Int
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
 
     var body: some View {
         LazyVGrid(
@@ -10,25 +14,25 @@ struct QuickStatsRow: View {
             spacing: Theme.Spacing.sm
         ) {
             statCard(
-                label: "Patrimonio total",
-                value: summary.totalValueBRL.formattedCompact(),
-                prefix: "R$ "
+                label: "Total Assets",
+                value: summary.totalValue.amount.formattedCompact(),
+                prefix: "\(summary.totalValue.currency.symbol) "
             )
 
             statCard(
-                label: "Renda passiva liquida",
-                value: summary.monthlyIncomeNet.formattedBRL(),
-                suffix: "/mes"
+                label: "Net Passive Income",
+                value: summary.monthlyIncomeNet.formatted(in: displayCurrency, using: rates),
+                suffix: "/month"
             )
 
             statCard(
-                label: "Renda passiva bruta",
-                value: summary.monthlyIncomeGross.formattedBRL(),
-                suffix: "/mes"
+                label: "Gross Passive Income",
+                value: summary.monthlyIncomeGross.formatted(in: displayCurrency, using: rates),
+                suffix: "/month"
             )
 
             statCard(
-                label: "Holdings ativos",
+                label: "Active Holdings",
                 value: "\(summary.activeCount)",
                 suffix: "/ \(holdingCount)"
             )
@@ -76,10 +80,9 @@ struct QuickStatsRow: View {
 #Preview {
     QuickStatsRow(
         summary: PortfolioSummary(
-            totalValue: 245_000,
-            totalValueBRL: 245_000,
-            monthlyIncomeGross: 2_450,
-            monthlyIncomeNet: 2_100,
+            totalValue: Money(amount: 245_000, currency: .brl),
+            monthlyIncomeGross: Money(amount: 2_450, currency: .brl),
+            monthlyIncomeNet: Money(amount: 2_100, currency: .brl),
             allocationByClass: [],
             studyCount: 1,
             activeCount: 12,

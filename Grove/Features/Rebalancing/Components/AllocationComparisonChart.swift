@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import GroveServices
 
 struct AllocationComparisonChart: View {
     let suggestions: [RebalancingSuggestion]

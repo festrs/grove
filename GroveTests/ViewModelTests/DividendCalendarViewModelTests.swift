@@ -1,11 +1,12 @@
 import Testing
 import Foundation
+import GroveDomain
 @testable import Grove
 
 struct DividendCalendarViewModelTests {
 
     private func makeDividend(symbol: String, amount: Decimal, date: Date) -> CalendarDividend {
-        CalendarDividend(symbol: symbol, type: "Dividend", amount: amount, currency: "BRL", date: date)
+        CalendarDividend(symbol: symbol, type: "Dividend", amount: Money(amount: amount, currency: .brl), date: date)
     }
 
     private func date(year: Int, month: Int, day: Int) -> Date {
@@ -26,7 +27,7 @@ struct DividendCalendarViewModelTests {
         vm.filterForMonth()
 
         #expect(vm.dividendsForMonth.count == 2)
-        #expect(vm.monthlyTotal == 30) // 10 + 20
+        #expect(vm.monthlyTotal.amount == 30)
     }
 
     @Test func filterForMonthResetsSelection() {
@@ -51,7 +52,7 @@ struct DividendCalendarViewModelTests {
         vm.filterForMonth()
 
         #expect(vm.dividendsForMonth.isEmpty)
-        #expect(vm.monthlyTotal == 0)
+        #expect(vm.monthlyTotal.amount == 0)
     }
 
     // MARK: - Day Selection
