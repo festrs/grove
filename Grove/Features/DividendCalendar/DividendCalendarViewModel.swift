@@ -8,6 +8,23 @@ struct CalendarDividend: Identifiable {
     let type: String
     let amount: Money
     let date: Date
+
+    init(symbol: String, type: String, amount: Money, date: Date) {
+        self.symbol = symbol
+        self.type = type
+        self.amount = amount
+        self.date = date
+    }
+
+    /// Build a calendar entry from a stored payment. Returns nil when the payment
+    /// is detached from a holding (no ticker to display).
+    init?(from payment: DividendPayment) {
+        guard let ticker = payment.holding?.ticker else { return nil }
+        self.symbol = payment.holding?.displayTicker ?? ticker
+        self.type = payment.taxTreatment.displayName
+        self.amount = payment.netAmountMoney
+        self.date = payment.paymentDate
+    }
 }
 
 @Observable
@@ -34,15 +51,7 @@ final class DividendCalendarViewModel {
         )
         do {
             let allPayments = try modelContext.fetch(descriptor)
-            allDividends = allPayments.compactMap { payment in
-                guard let ticker = payment.holding?.ticker else { return nil }
-                return CalendarDividend(
-                    symbol: payment.holding?.displayTicker ?? ticker,
-                    type: payment.taxTreatment.displayName,
-                    amount: payment.netAmountMoney,
-                    date: payment.paymentDate
-                )
-            }
+            allDividends = allPayments.compactMap(CalendarDividend.init(from:))
             filterForMonth()
         } catch {
             allDividends = []

@@ -55,16 +55,12 @@ final class PortfolioViewModel {
     }
 
     func applyFilter(displayCurrency: Currency, rates: any ExchangeRates) {
-        if let selected = selectedClass {
-            filteredHoldings = holdings.filter { $0.assetClass == selected }
-        } else {
-            filteredHoldings = holdings
-        }
-        filteredHoldings.sort { h1, h2 in
-            let gap1 = h1.targetPercent - currentPercent(for: h1, displayCurrency: displayCurrency, rates: rates)
-            let gap2 = h2.targetPercent - currentPercent(for: h2, displayCurrency: displayCurrency, rates: rates)
-            return gap1 > gap2
-        }
+        let scoped = selectedClass.map { sel in holdings.filter { $0.assetClass == sel } } ?? holdings
+        filteredHoldings = scoped.sortedByAllocationGap(
+            totalValue: totalValue,
+            in: displayCurrency,
+            rates: rates
+        )
     }
 
     func selectClass(_ classType: AssetClassType?, displayCurrency: Currency, rates: any ExchangeRates) {
@@ -101,9 +97,4 @@ final class PortfolioViewModel {
         loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
     }
 
-    private func currentPercent(for holding: Holding, displayCurrency: Currency, rates: any ExchangeRates) -> Decimal {
-        guard totalValue.amount > 0 else { return 0 }
-        let displayValue = holding.currentValueMoney.converted(to: displayCurrency, using: rates).amount
-        return (displayValue / totalValue.amount) * 100
-    }
 }

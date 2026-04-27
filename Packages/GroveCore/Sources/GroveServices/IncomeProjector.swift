@@ -26,7 +26,37 @@ public struct IncomeProjection {
     }
 }
 
+public struct AnnualIncomeByClass: Sendable {
+    public let assetClass: AssetClassType
+    public let annual: Money
+
+    public init(assetClass: AssetClassType, annual: Money) {
+        self.assetClass = assetClass
+        self.annual = annual
+    }
+}
+
 public struct IncomeProjector {
+    /// Aggregate gross monthly income per asset class, scale to annual, then
+    /// rank classes by their displayCurrency-converted annual figure.
+    public static func annualIncomeByClass(
+        holdings: [Holding],
+        in displayCurrency: Currency,
+        rates: any ExchangeRates
+    ) -> [AnnualIncomeByClass] {
+        var grossByClass: [AssetClassType: Money] = [:]
+        for h in holdings {
+            let monthlyGross = h.estimatedMonthlyIncomeMoney
+            grossByClass[h.assetClass] = (grossByClass[h.assetClass] ?? .zero(in: h.currency)) + monthlyGross
+        }
+        return grossByClass
+            .map { AnnualIncomeByClass(assetClass: $0.key, annual: $0.value * 12) }
+            .sorted { a, b in
+                a.annual.converted(to: displayCurrency, using: rates).amount
+                    > b.annual.converted(to: displayCurrency, using: rates).amount
+            }
+    }
+
     /// Calculate current passive income and time to goal.
     /// Goal is provided as Money so its currency carries semantics.
     /// Aggregates and projections render in `displayCurrency`.

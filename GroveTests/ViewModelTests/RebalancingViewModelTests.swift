@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import SwiftData
 import GroveDomain
+import GroveServices
 @testable import Grove
 
 @Suite(.serialized)

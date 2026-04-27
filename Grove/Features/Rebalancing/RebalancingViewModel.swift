@@ -4,13 +4,6 @@ import GroveDomain
 import GroveServices
 import GroveRepositories
 
-enum RebalancingEmptyReason {
-    case noAportarHoldings
-    case noPortfolioValue
-    case noAllocations
-    case unknown
-}
-
 @Observable
 final class RebalancingViewModel {
     var investmentAmountText = ""
@@ -44,11 +37,7 @@ final class RebalancingViewModel {
             totalAllocated = allocated
             hasCalculated = true
 
-            if suggestions.isEmpty {
-                emptyReason = diagnoseEmpty(modelContext: modelContext)
-            } else {
-                emptyReason = nil
-            }
+            emptyReason = suggestions.isEmpty ? RebalancingEngine.diagnoseEmpty(modelContext: modelContext) : nil
         } catch {
             suggestions = []
             hasCalculated = true

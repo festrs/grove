@@ -1,6 +1,13 @@
 import Foundation
 import GroveDomain
 
+public enum RebalancingEmptyReason: Sendable {
+    case noAportarHoldings
+    case noPortfolioValue
+    case noAllocations
+    case unknown
+}
+
 public struct RebalancingSuggestion: Identifiable {
     public var id: String { ticker }
     public let ticker: String
@@ -67,6 +74,24 @@ public struct RebalancingEngine {
             newTotalValue: context.newTotalValue,
             rates: rates
         )
+    }
+
+    /// Explain why `calculate(...)` would return no suggestions for the given
+    /// portfolio state. Pure: takes inputs, no I/O.
+    public static func diagnoseEmpty(
+        holdings: [Holding],
+        classAllocations: [AssetClassType: Double]
+    ) -> RebalancingEmptyReason {
+        if classAllocations.isEmpty { return .noAllocations }
+
+        let aportarWithPrice = holdings.filter { $0.status == .aportar && $0.currentPrice > 0 }
+        if aportarWithPrice.isEmpty { return .noAportarHoldings }
+
+        let totalValue = holdings.filter { $0.status != .vender }
+            .reduce(Decimal.zero) { $0 + $1.currentValue }
+        if totalValue <= 0 { return .noPortfolioValue }
+
+        return .unknown
     }
 
     /// Simplified overload — derives equal class allocations from holdings.
