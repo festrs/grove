@@ -45,6 +45,35 @@ final class RebalancingViewModel {
         }
     }
 
+    private func diagnoseEmpty(modelContext: ModelContext) -> RebalancingEmptyReason {
+        let repo = PortfolioRepository(modelContext: modelContext)
+        let holdingRepo = HoldingRepository(modelContext: modelContext)
+
+        guard let settings = try? repo.fetchSettings(),
+              !settings.classAllocations.isEmpty else {
+            return .noAllocations
+        }
+
+        guard let holdings = try? holdingRepo.fetchAll() else {
+            return .unknown
+        }
+
+        let aportar = holdings.filter { $0.status == .aportar }
+        let aportarWithPrice = aportar.filter { $0.currentPrice > 0 }
+
+        if aportarWithPrice.isEmpty {
+            return .noAportarHoldings
+        }
+
+        let totalValue = holdings.filter { $0.status != .vender }
+            .reduce(Decimal.zero) { $0 + $1.currentValue }
+        if totalValue <= 0 {
+            return .noPortfolioValue
+        }
+
+        return .unknown
+    }
+
     func registerContributions(modelContext: ModelContext) {
         isRegistering = true
         defer { isRegistering = false }
