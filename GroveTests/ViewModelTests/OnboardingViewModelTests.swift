@@ -205,51 +205,6 @@ struct OnboardingViewModelTests {
         #expect(vm.pendingHoldings[0].assetClass == .fiis)
     }
 
-    // MARK: - Ticker Parsing
-
-    @Test func parseTickersFromLines() {
-        let vm = OnboardingViewModel()
-        let result = vm.parseTickers("ITUB3\nPETR4\nBTLG11")
-        #expect(result.count == 3)
-        #expect(result[0] == "ITUB3")
-        #expect(result[1] == "PETR4")
-        #expect(result[2] == "BTLG11")
-    }
-
-    @Test func parseTickersWithComma() {
-        let vm = OnboardingViewModel()
-        let result = vm.parseTickers("ITUB3, 100\nPETR4, 200")
-        #expect(result.count == 2)
-        #expect(result[0] == "ITUB3")
-        #expect(result[1] == "PETR4")
-    }
-
-    @Test func parseTickersWithSemicolon() {
-        let vm = OnboardingViewModel()
-        let result = vm.parseTickers("ITUB3;100")
-        #expect(result.count == 1)
-        #expect(result[0] == "ITUB3")
-    }
-
-    @Test func parseTickersWithTab() {
-        let vm = OnboardingViewModel()
-        let result = vm.parseTickers("ITUB3\t100")
-        #expect(result.count == 1)
-    }
-
-    @Test func parseTickersSkipsEmptyLines() {
-        let vm = OnboardingViewModel()
-        let result = vm.parseTickers("\n\nITUB3\n\n")
-        #expect(result.count == 1)
-    }
-
-    @Test func parseTickersSkipsNonTickers() {
-        let vm = OnboardingViewModel()
-        let result = vm.parseTickers("12345\nITUB3\n!!!")
-        #expect(result.count == 1)
-        #expect(result[0] == "ITUB3")
-    }
-
     @Test func importFromCSVAddsHoldings() {
         let vm = OnboardingViewModel()
         vm.csvText = "ITUB3\nPETR4\nBTLG11"

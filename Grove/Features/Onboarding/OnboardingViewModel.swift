@@ -1,19 +1,7 @@
 import SwiftUI
 import SwiftData
 import GroveDomain
-
-// MARK: - PendingHolding
-
-struct PendingHolding: Identifiable {
-    let id = UUID()
-    var ticker: String
-    var displayName: String
-    var quantity: Decimal
-    var assetClass: AssetClassType
-    var status: HoldingStatus
-    var currentPrice: Decimal
-    var dividendYield: Decimal
-}
+import GroveRepositories
 
 // MARK: - OnboardingViewModel
 
@@ -91,8 +79,9 @@ final class OnboardingViewModel {
     }
 
     var isTargetValid: Bool {
-        let total = totalTargetAllocation
-        return total >= 99 && total <= 101
+        AllocationValidator.isValid(
+            Dictionary(uniqueKeysWithValues: assetClassesInUse.map { ($0, targetAllocations[$0] ?? 0) })
+        )
     }
 
     // MARK: - Navigation Helpers
@@ -231,34 +220,8 @@ final class OnboardingViewModel {
         errorMessage = nil
     }
 
-    // MARK: - Ticker Parsing (used by tests)
-
-    func parseTickers(_ text: String) -> [String] {
-        var results: [String] = []
-        let lines = text.components(separatedBy: .newlines)
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { continue }
-
-            var ticker = trimmed
-            for sep in [",", ";", "\t"] {
-                let split = trimmed.components(separatedBy: sep)
-                if split.count >= 2 {
-                    ticker = split[0].trimmingCharacters(in: .whitespaces)
-                    break
-                }
-            }
-
-            let upper = ticker.uppercased()
-            guard !upper.isEmpty, upper.count <= 10 else { continue }
-            guard upper.contains(where: { $0.isLetter }) else { continue }
-            results.append(upper)
-        }
-        return results
-    }
-
     func importFromCSV() {
-        let tickers = parseTickers(csvText)
+        let tickers = TickerParser.parse(csvText)
         var added = 0
         for ticker in tickers {
             guard canAddMoreHoldings else { break }
@@ -281,78 +244,16 @@ final class OnboardingViewModel {
     ]
 
     func completeOnboarding(modelContext: ModelContext) {
-        // Generate unique portfolio name
-        let portfolioDescriptor = FetchDescriptor<Portfolio>()
-        let existing = (try? modelContext.fetch(portfolioDescriptor)) ?? []
-        let existingNames = Set(existing.map(\.name))
-
-        var finalName = portfolioName
-        if existingNames.contains(finalName) {
-            let shuffled = Self.portfolioAdjectives.shuffled()
-            finalName = shuffled.first { !existingNames.contains($0) } ?? "Portfolio \(existing.count + 1)"
-        }
-
-        let portfolio = Portfolio(name: finalName)
-        modelContext.insert(portfolio)
-
-        for pending in pendingHoldings {
-            let holding = Holding(
-                ticker: pending.ticker,
-                displayName: pending.displayName,
-                currentPrice: pending.currentPrice,
-                dividendYield: pending.dividendYield,
-                assetClass: pending.assetClass,
-                status: pending.status
-            )
-            holding.portfolio = portfolio
-            modelContext.insert(holding)
-
-            // Create initial buy contribution if the user has a position
-            if pending.quantity > 0 {
-                let contribution = Contribution(
-                    date: .now,
-                    amount: pending.quantity * pending.currentPrice,
-                    shares: pending.quantity,
-                    pricePerShare: pending.currentPrice
-                )
-                contribution.holding = holding
-                modelContext.insert(contribution)
-                holding.recalculateFromContributions()
-            }
-        }
-
-        // Update existing settings instead of creating a duplicate
-        var descriptor = FetchDescriptor<UserSettings>()
-        descriptor.fetchLimit = 1
-        let existingSettings = (try? modelContext.fetch(descriptor))?.first
-
-        // Persist only allocations for classes the user actually has holdings in.
-        // SetTargets validates the in-use total against 100, so writing the full
-        // dict (with untouched defaults for unused classes) was producing sums >100.
-        let usedClasses = Set(pendingHoldings.map(\.assetClass))
-        let doubleAllocations = Dictionary(uniqueKeysWithValues:
-            targetAllocations
-                .filter { usedClasses.contains($0.key) }
-                .map { ($0.key, NSDecimalNumber(decimal: $0.value).doubleValue) }
-        )
-
-        if let settings = existingSettings {
-            settings.monthlyIncomeGoal = monthlyIncomeGoal
-            settings.monthlyCostOfLiving = monthlyCostOfLiving
-            settings.classAllocations = doubleAllocations
-            settings.hasCompletedOnboarding = true
-        } else {
-            let settings = UserSettings(
-                monthlyIncomeGoal: monthlyIncomeGoal,
-                monthlyCostOfLiving: monthlyCostOfLiving,
-                hasCompletedOnboarding: true
-            )
-            settings.classAllocations = doubleAllocations
-            modelContext.insert(settings)
-        }
-
+        let repo = PortfolioRepository(modelContext: modelContext)
         do {
-            try modelContext.save()
+            _ = try repo.saveOnboardingPortfolio(
+                preferredName: portfolioName,
+                nameFallbacks: Self.portfolioAdjectives.shuffled(),
+                pendingHoldings: pendingHoldings,
+                targetAllocations: targetAllocations,
+                monthlyIncomeGoal: monthlyIncomeGoal,
+                monthlyCostOfLiving: monthlyCostOfLiving
+            )
         } catch {
             errorMessage = "Error saving: \(error.localizedDescription)"
         }

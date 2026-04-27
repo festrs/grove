@@ -7,6 +7,14 @@ import GroveRepositories
 // App-only glue: wraps the pure RebalancingEngine.calculate(...) with SwiftData
 // fetching so call sites can pass just a ModelContext.
 extension RebalancingEngine {
+    static func diagnoseEmpty(modelContext: ModelContext) -> RebalancingEmptyReason {
+        let repo = PortfolioRepository(modelContext: modelContext)
+        let holdingRepo = HoldingRepository(modelContext: modelContext)
+        guard let settings = try? repo.fetchSettings() else { return .unknown }
+        guard let holdings = try? holdingRepo.fetchAll() else { return .unknown }
+        return diagnoseEmpty(holdings: holdings, classAllocations: settings.classAllocations)
+    }
+
     static func suggestions(
         modelContext: ModelContext,
         investmentAmount: Money,

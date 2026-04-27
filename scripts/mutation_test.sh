@@ -78,7 +78,7 @@ add() {
 # --- RebalancingEngine: where to invest ---
 E="Packages/GroveCore/Sources/GroveServices/RebalancingEngine.swift"
 RE_TESTS="RebalancingEngineTests"
-add "$E" "eligible: aportar->quarentena"     'status == .aportar'                                    'status == .quarentena'                                                                  "$RE_TESTS"
+add "$E" "eligible: aportar->quarentena"     'let eligible = holdings.filter { $0.status == .aportar && $0.currentPrice > 0 }'  'let eligible = holdings.filter { $0.status == .quarentena && $0.currentPrice > 0 }' "$RE_TESTS"
 add "$E" "remove vender exclusion"           'guard h.status != .vender else { continue }'           '// mutated: vender not excluded'                                                        "$RE_TESTS"
 add "$E" "flip class gap sort"               'return a.classGap > b.classGap'                        'return a.classGap < b.classGap'                                                         "$RE_TESTS"
 add "$E" "break zero investment guard"       'guard investmentAmount.amount > 0 else { return [] }'  'guard investmentAmount.amount > 999999 else { return [] }'                              "$RE_TESTS"

@@ -4,13 +4,6 @@ import GroveDomain
 import GroveServices
 import GroveRepositories
 
-enum RebalancingEmptyReason {
-    case noAportarHoldings
-    case noPortfolioValue
-    case noAllocations
-    case unknown
-}
-
 @Observable
 final class RebalancingViewModel {
     var investmentAmountText = ""
@@ -44,45 +37,12 @@ final class RebalancingViewModel {
             totalAllocated = allocated
             hasCalculated = true
 
-            if suggestions.isEmpty {
-                emptyReason = diagnoseEmpty(modelContext: modelContext)
-            } else {
-                emptyReason = nil
-            }
+            emptyReason = suggestions.isEmpty ? RebalancingEngine.diagnoseEmpty(modelContext: modelContext) : nil
         } catch {
             suggestions = []
             hasCalculated = true
             emptyReason = .unknown
         }
-    }
-
-    private func diagnoseEmpty(modelContext: ModelContext) -> RebalancingEmptyReason {
-        let repo = PortfolioRepository(modelContext: modelContext)
-        let holdingRepo = HoldingRepository(modelContext: modelContext)
-
-        guard let settings = try? repo.fetchSettings(),
-              !settings.classAllocations.isEmpty else {
-            return .noAllocations
-        }
-
-        guard let holdings = try? holdingRepo.fetchAll() else {
-            return .unknown
-        }
-
-        let aportar = holdings.filter { $0.status == .aportar }
-        let aportarWithPrice = aportar.filter { $0.currentPrice > 0 }
-
-        if aportarWithPrice.isEmpty {
-            return .noAportarHoldings
-        }
-
-        let totalValue = holdings.filter { $0.status != .vender }
-            .reduce(Decimal.zero) { $0 + $1.currentValue }
-        if totalValue <= 0 {
-            return .noPortfolioValue
-        }
-
-        return .unknown
     }
 
     func registerContributions(modelContext: ModelContext) {

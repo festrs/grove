@@ -100,6 +100,28 @@ public final class Holding {
         return (gainLoss / totalCost) * 100
     }
 
+    /// Holding's share of `totalValue`, expressed as a percentage in
+    /// `displayCurrency`. Returns 0 when the portfolio is empty.
+    public func currentPercent(
+        of totalValue: Money,
+        in displayCurrency: Currency,
+        rates: any ExchangeRates
+    ) -> Decimal {
+        guard totalValue.amount > 0 else { return 0 }
+        let displayValue = currentValueMoney.converted(to: displayCurrency, using: rates).amount
+        return (displayValue / totalValue.amount) * 100
+    }
+
+    /// Distance from `targetPercent` (positive = under target / needs more buy).
+    /// Used to rank holdings when distributing a rebalancing budget.
+    public func allocationGap(
+        totalValue: Money,
+        in displayCurrency: Currency,
+        rates: any ExchangeRates
+    ) -> Decimal {
+        targetPercent - currentPercent(of: totalValue, in: displayCurrency, rates: rates)
+    }
+
     /// Estimated monthly dividend income (gross)
     public var estimatedMonthlyIncome: Decimal {
         guard dividendYield > 0 else { return 0 }

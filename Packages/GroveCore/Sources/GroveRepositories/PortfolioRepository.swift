@@ -150,6 +150,82 @@ public struct PortfolioRepository {
         )
     }
 
+    /// Persist the result of onboarding: portfolio (auto-renamed if a name
+    /// collides), holdings (with bootstrap contributions when the user already
+    /// has a position), and user settings (allocations limited to in-use classes
+    /// to avoid breaking the 100% sum invariant).
+    ///
+    /// `nameFallbacks` is a pool of alternative names tried in order when
+    /// `preferredName` already exists. The view layer owns the copywriting.
+    @discardableResult
+    public func saveOnboardingPortfolio(
+        preferredName: String,
+        nameFallbacks: [String],
+        pendingHoldings: [PendingHolding],
+        targetAllocations: [AssetClassType: Decimal],
+        monthlyIncomeGoal: Decimal,
+        monthlyCostOfLiving: Decimal
+    ) throws -> Portfolio {
+        let existing = (try? modelContext.fetch(FetchDescriptor<Portfolio>())) ?? []
+        let existingNames = Set(existing.map(\.name))
+
+        let resolvedName: String
+        if existingNames.contains(preferredName) {
+            resolvedName = nameFallbacks.first { !existingNames.contains($0) }
+                ?? "Portfolio \(existing.count + 1)"
+        } else {
+            resolvedName = preferredName
+        }
+
+        let portfolio = Portfolio(name: resolvedName)
+        modelContext.insert(portfolio)
+
+        for pending in pendingHoldings {
+            let holding = Holding(
+                ticker: pending.ticker,
+                displayName: pending.displayName,
+                currentPrice: pending.currentPrice,
+                dividendYield: pending.dividendYield,
+                assetClass: pending.assetClass,
+                status: pending.status
+            )
+            holding.portfolio = portfolio
+            modelContext.insert(holding)
+
+            // Bootstrap contribution when the user reports an existing position.
+            if pending.quantity > 0 {
+                let contribution = Contribution(
+                    date: .now,
+                    amount: pending.quantity * pending.currentPrice,
+                    shares: pending.quantity,
+                    pricePerShare: pending.currentPrice
+                )
+                contribution.holding = holding
+                modelContext.insert(contribution)
+                holding.recalculateFromContributions()
+            }
+        }
+
+        // Only persist allocations for classes the user actually has — writing
+        // the full dict (with defaults for unused classes) would push the sum
+        // past 100 and break the rebalancing invariant.
+        let usedClasses = Set(pendingHoldings.map(\.assetClass))
+        let allocationsToPersist = Dictionary(uniqueKeysWithValues:
+            targetAllocations
+                .filter { usedClasses.contains($0.key) }
+                .map { ($0.key, NSDecimalNumber(decimal: $0.value).doubleValue) }
+        )
+
+        let settings = try fetchSettings()
+        settings.monthlyIncomeGoal = monthlyIncomeGoal
+        settings.monthlyCostOfLiving = monthlyCostOfLiving
+        settings.classAllocations = allocationsToPersist
+        settings.hasCompletedOnboarding = true
+
+        try modelContext.save()
+        return portfolio
+    }
+
     public func fetchSettings() throws -> UserSettings {
         var descriptor = FetchDescriptor<UserSettings>()
         descriptor.fetchLimit = 1
