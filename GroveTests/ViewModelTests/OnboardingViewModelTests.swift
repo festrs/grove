@@ -257,7 +257,7 @@ struct OnboardingViewModelTests {
         vm.pendingHoldings[0].status = .aportar
         vm.targetAllocations = [.acoesBR: 100]
 
-        vm.completeOnboarding(modelContext: ctx)
+        vm.completeOnboarding(modelContext: ctx, backendService: MockBackendService())
 
         let saved = try ctx.fetch(FetchDescriptor<Holding>())
         #expect(saved.count == 1)

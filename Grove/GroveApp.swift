@@ -38,13 +38,15 @@ struct GroveApp: App {
 
     private let backendService = BackendService()
     @State private var syncService = SyncService()
+    @State private var rateStore = RateStore()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(rateStore: rateStore)
                 .preferredColorScheme(.dark)
                 .environment(\.backendService, backendService)
                 .environment(\.syncService, syncService)
+                .environment(\.rates, rateStore)
                 #if os(macOS)
                 .frame(minWidth: 900, minHeight: 600)
                 #endif
@@ -54,7 +56,12 @@ struct GroveApp: App {
         .defaultSize(width: 1100, height: 750)
         .commands {
             SidebarCommands()
-            CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .newItem) {
+                Button("New Holding") {
+                    NotificationCenter.default.post(name: .openAddHolding, object: nil)
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            }
             CommandGroup(after: .toolbar) {
                 Button("Sync") {
                     Task {
@@ -68,5 +75,23 @@ struct GroveApp: App {
             }
         }
         #endif
+
+        #if os(macOS)
+        Settings {
+            SettingsSceneRoot()
+                .preferredColorScheme(.dark)
+                .environment(\.backendService, backendService)
+                .environment(\.syncService, syncService)
+                .environment(\.rates, rateStore)
+                .modelContainer(sharedModelContainer)
+                .frame(minWidth: 520, idealWidth: 560, minHeight: 540, idealHeight: 620)
+        }
+        #endif
     }
 }
+
+#if os(macOS)
+extension Notification.Name {
+    static let openAddHolding = Notification.Name("grove.openAddHolding")
+}
+#endif

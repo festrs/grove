@@ -154,6 +154,7 @@ public struct RebalancingEngine {
     private struct ScoredHolding {
         let holding: Holding
         let classGap: Decimal
+        let holdingGap: Decimal
         let weight: Decimal
         let pricePerShareInBudgetCurrency: Decimal
         let classTarget: Decimal
@@ -180,8 +181,11 @@ public struct RebalancingEngine {
         }
 
         var weightByClass: [AssetClassType: Decimal] = [:]
+        var classValueInBudget: [AssetClassType: Decimal] = [:]
         for h in eligible {
             weightByClass[h.assetClass, default: 0] += h.targetPercent
+            let v = h.currentValueMoney.converted(to: budgetCurrency, using: rates).amount
+            classValueInBudget[h.assetClass, default: 0] += v
         }
 
         var scored: [ScoredHolding] = eligible.compactMap { h in
@@ -192,9 +196,20 @@ public struct RebalancingEngine {
             let classTotal = weightByClass[h.assetClass] ?? 1
             let holdingShare = classTotal > 0 ? h.targetPercent / classTotal : 1
 
+            // Per-holding gap = target share of class − actual share of class.
+            // Empty / under-positioned holdings have positive gap and rank
+            // above already-loaded ones inside the same class. A class with
+            // no current value falls back to the target share so newly-added
+            // holdings still get differentiated by their target weights.
+            let myValue = h.currentValueMoney.converted(to: budgetCurrency, using: rates).amount
+            let classVal = classValueInBudget[h.assetClass] ?? 0
+            let actualShare: Decimal = classVal > 0 ? myValue / classVal : 0
+            let holdingGap = holdingShare - actualShare
+
             return ScoredHolding(
                 holding: h,
                 classGap: gap,
+                holdingGap: holdingGap,
                 weight: h.targetPercent,
                 pricePerShareInBudgetCurrency: priceInBudget,
                 classTarget: Decimal(classAllocations[h.assetClass] ?? 0),
@@ -204,6 +219,7 @@ public struct RebalancingEngine {
 
         scored.sort { a, b in
             if a.classGap != b.classGap { return a.classGap > b.classGap }
+            if a.holdingGap != b.holdingGap { return a.holdingGap > b.holdingGap }
             return a.weight > b.weight
         }
 

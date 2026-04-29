@@ -6,6 +6,7 @@ struct EditPortfolioView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Bindable var portfolio: Portfolio
+    @State private var viewModel = EditPortfolioViewModel()
     @State private var showDeleteAlert = false
 
     var body: some View {
@@ -38,7 +39,7 @@ struct EditPortfolioView: View {
             .alert("Delete Portfolio", isPresented: $showDeleteAlert) {
                 Button("Cancel", role: .cancel) {}
                 Button("Delete", role: .destructive) {
-                    modelContext.delete(portfolio)
+                    viewModel.delete(portfolio: portfolio, modelContext: modelContext)
                     dismiss()
                 }
             } message: {

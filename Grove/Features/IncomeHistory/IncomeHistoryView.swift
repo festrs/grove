@@ -89,25 +89,33 @@ struct IncomeHistoryView: View {
     }
 
     private func assetClassCard(_ detail: MoneyTaxBreakdownDetail) -> some View {
-        TQCard {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                HStack {
-                    Circle().fill(detail.assetClass.color).frame(width: 10, height: 10)
-                    Text(detail.assetClass.displayName).font(.headline)
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(detail.gross.formatted())
-                            .font(.subheadline).fontWeight(.semibold)
-                        if detail.tax.amount > 0 {
-                            Text("-\(detail.tax.formatted()) IR")
-                                .font(.caption2).foregroundStyle(.red)
+        NavigationLink {
+            AssetClassDividendsView(assetClass: detail.assetClass)
+        } label: {
+            TQCard {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    HStack {
+                        Circle().fill(detail.assetClass.color).frame(width: 10, height: 10)
+                        Text(detail.assetClass.displayName).font(.headline)
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(detail.gross.formatted())
+                                .font(.subheadline).fontWeight(.semibold)
+                            if detail.tax.amount > 0 {
+                                Text("-\(detail.tax.formatted()) IR")
+                                    .font(.caption2).foregroundStyle(.red)
+                            }
+                            Text(detail.net.formatted())
+                                .font(.caption).foregroundStyle(Color.tqAccentGreen)
                         }
-                        Text(detail.net.formatted())
-                            .font(.caption).foregroundStyle(Color.tqAccentGreen)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 }
 

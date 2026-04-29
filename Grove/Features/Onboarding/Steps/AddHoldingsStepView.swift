@@ -49,8 +49,7 @@ struct AddHoldingsStepView: View {
                     }
                 }
                 .onAppear {
-                    let remaining = AppConstants.freeTierMaxHoldings - viewModel.pendingHoldings.count
-                    importViewModel.maxSelectable = max(remaining, 0)
+                    importViewModel.maxSelectable = Holding.remainingSlots(currentCount: viewModel.pendingHoldings.count)
                 }
             }
         }

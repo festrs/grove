@@ -214,7 +214,7 @@ struct ImportView: View {
                 isSelected: isSelected || alreadyAdded,
                 isDisabled: alreadyAdded,
                 showClassBadge: true,
-                trailingTitle: position.quantity > 0 ? "\(position.quantity) shares" : nil,
+                trailingTitle: position.quantity > 0 ? "\(position.displayQuantity) shares" : nil,
                 trailingSubtitle: position.quantity > 0 ? Money(amount: Decimal(position.totalValue), currency: .brl).formatted() : nil
             )
         }

@@ -47,10 +47,12 @@ struct DebugMenuView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var pendingCount = 0
     @State private var pendingDetails: [String] = []
+    @AppStorage(AppConstants.Debug.unlimitedHoldingsKey) private var unlimitedHoldings = false
 
     var body: some View {
         NavigationStack {
             List {
+                limitsSection
                 notificationsSection
                 dataSection
                 infoSection
@@ -64,6 +66,23 @@ struct DebugMenuView: View {
                     Button("Close") { dismiss() }
                 }
             }
+        }
+        #if os(macOS)
+        // SwiftUI sheets on macOS render at a tiny default size; without an
+        // explicit frame the List rows get clipped to nothing.
+        .frame(minWidth: 480, idealWidth: 540, minHeight: 580, idealHeight: 640)
+        #endif
+    }
+
+    // MARK: - Limits
+
+    private var limitsSection: some View {
+        Section {
+            Toggle("Unlimited Holdings", isOn: $unlimitedHoldings)
+        } header: {
+            Text("Free-tier limits")
+        } footer: {
+            Text("Bypasses the \(AppConstants.freeTierMaxHoldings)-asset cap. DEBUG builds only.")
         }
     }
 

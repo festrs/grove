@@ -31,6 +31,10 @@ actor MockBackendService: BackendServiceProtocol {
         [:]
     }
 
+    func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO {
+        DividendRefreshResultDTO(scraped: symbols.count, newRecords: 0, failed: [])
+    }
+
     func trackSymbol(symbol: String, assetClass: String) async throws {}
     func untrackSymbol(symbol: String) async throws {}
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {}

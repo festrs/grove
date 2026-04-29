@@ -108,7 +108,6 @@ final class SyncService {
                 exDate: exDate,
                 paymentDate: paymentDate,
                 amountPerShare: item.value.decimalAmount,
-                quantity: holding.quantity,
                 taxTreatment: holding.assetClass.defaultTaxTreatment
             )
             dividend.holding = holding

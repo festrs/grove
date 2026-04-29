@@ -55,7 +55,7 @@ struct InspectorPanel: View {
                 .padding(20)
             }
         }
-        .frame(width: 380)
+        .frame(width: 280)
         .background(Color.tqBackground)
     }
 

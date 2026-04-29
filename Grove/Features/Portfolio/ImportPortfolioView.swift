@@ -7,23 +7,29 @@ struct ImportPortfolioView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
-    @State private var viewModel = ImportViewModel()
+    @State private var importVM = ImportViewModel()
+    @State private var confirmVM = ImportPortfolioViewModel()
 
     let portfolio: Portfolio
 
     var body: some View {
         NavigationStack {
             ImportView(
-                viewModel: viewModel,
+                viewModel: importVM,
                 showFileOption: true,
                 existingTickers: existingTickers,
                 confirmLabel: "Import"
             ) { positions in
-                confirmImport(positions)
+                confirmVM.confirmImport(
+                    positions: positions,
+                    portfolio: portfolio,
+                    modelContext: modelContext,
+                    backendService: backendService
+                )
                 dismiss()
             }
             .onAppear {
-                viewModel.maxSelectable = Holding.remainingSlots(modelContext: modelContext)
+                importVM.maxSelectable = Holding.remainingSlots(modelContext: modelContext)
             }
             .padding(.vertical, Theme.Spacing.md)
             .background(Color.tqBackground)
@@ -44,38 +50,6 @@ struct ImportPortfolioView: View {
 
     private var existingTickers: Set<String> {
         Set((portfolio.holdings ?? []).map { $0.ticker.uppercased() })
-    }
-
-    private func confirmImport(_ positions: [ImportedPosition]) {
-        let service = backendService
-        for position in positions {
-            let assetClass = position.assetClassType
-            let holding = Holding(
-                ticker: position.ticker,
-                displayName: position.displayName,
-                currentPrice: Decimal(position.currentPrice),
-                assetClass: assetClass,
-                status: position.quantity > 0 ? .aportar : .estudo
-            )
-            holding.portfolio = portfolio
-            modelContext.insert(holding)
-
-            Task { try? await service.trackSymbol(symbol: position.ticker, assetClass: assetClass.rawValue) }
-
-            if position.quantity > 0 {
-                let pricePerShare = Decimal(position.currentPrice)
-                let shares = Decimal(position.quantity)
-                let contribution = Contribution(
-                    date: .now,
-                    amount: shares * pricePerShare,
-                    shares: shares,
-                    pricePerShare: pricePerShare
-                )
-                contribution.holding = holding
-                modelContext.insert(contribution)
-                holding.recalculateFromContributions()
-            }
-        }
     }
 }
 

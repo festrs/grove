@@ -6,15 +6,23 @@ public final class DividendPayment {
     public var exDate: Date
     public var paymentDate: Date
     public var amountPerShare: Decimal
-    public var totalAmount: Decimal
     public var taxTreatmentRaw: String
-    public var withholdingTax: Decimal
 
     public var holding: Holding?
 
     public var taxTreatment: TaxTreatment {
         get { TaxTreatment(rawValue: taxTreatmentRaw) ?? .exempt }
         set { taxTreatmentRaw = newValue.rawValue }
+    }
+
+    /// Live earnings derived from the holding's current share count.
+    /// Recomputes automatically as buys/sells change `holding.quantity`.
+    public var totalAmount: Decimal {
+        amountPerShare * (holding?.quantity ?? 0)
+    }
+
+    public var withholdingTax: Decimal {
+        totalAmount * (1 - taxTreatment.netMultiplier)
     }
 
     public var netAmount: Decimal {
@@ -41,25 +49,21 @@ public final class DividendPayment {
         Money(amount: withholdingTax, currency: resolvedCurrency)
     }
 
-    /// True when the payment is informational only — the holding has no shares
-    /// (typically status `.estudo`), so we show the per-share amount instead
-    /// of an earnings figure.
+    /// True when the linked holding has no shares (typically `.estudo`),
+    /// so the row should display the per-share amount instead of earnings.
     public var isInformational: Bool {
-        totalAmount == 0
+        (holding?.quantity ?? 0) == 0
     }
 
     public init(
         exDate: Date,
         paymentDate: Date,
         amountPerShare: Decimal,
-        quantity: Decimal,
         taxTreatment: TaxTreatment = .exempt
     ) {
         self.exDate = exDate
         self.paymentDate = paymentDate
         self.amountPerShare = amountPerShare
-        self.totalAmount = amountPerShare * quantity
         self.taxTreatmentRaw = taxTreatment.rawValue
-        self.withholdingTax = (amountPerShare * quantity) * (1 - taxTreatment.netMultiplier)
     }
 }
