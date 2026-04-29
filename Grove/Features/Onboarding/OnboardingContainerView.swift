@@ -4,6 +4,7 @@ import GroveDomain
 
 struct OnboardingContainerView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.backendService) private var backendService
     @State private var viewModel = OnboardingViewModel()
 
     var body: some View {
@@ -99,7 +100,7 @@ struct OnboardingContainerView: View {
                 .disabled(!viewModel.canAdvance)
             } else {
                 Button {
-                    viewModel.completeOnboarding(modelContext: modelContext)
+                    viewModel.completeOnboarding(modelContext: modelContext, backendService: backendService)
                 } label: {
                     HStack(spacing: Theme.Spacing.xs) {
                         Image(systemName: "checkmark.circle.fill")

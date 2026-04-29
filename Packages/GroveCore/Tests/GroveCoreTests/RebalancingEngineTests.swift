@@ -364,6 +364,48 @@ struct RebalancingEngineTests {
         #expect(suggestions.isEmpty)
     }
 
+    // MARK: - Within-class per-holding gap tiebreak
+
+    @Test func withinClassPrefersEmptyHoldingOverLoadedHolding() {
+        // Two FIIs, same class, same weight. One already has a position, the
+        // other was just added with quantity 0. Within the class the empty
+        // holding is most underweight relative to its share of class value, so
+        // it must win when only one suggestion fits.
+        let holdings = [
+            Holding(ticker: "OLD", quantity: 100, currentPrice: 10,
+                    assetClass: .fiis, status: .aportar, targetPercent: 5),
+            Holding(ticker: "NEW", quantity: 0, currentPrice: 10,
+                    assetClass: .fiis, status: .aportar, targetPercent: 5),
+        ]
+        let suggestions = RebalancingEngine.calculate(
+            holdings: holdings, investmentAmount: brl(100),
+            classAllocations: [.fiis: 100],
+            maxRecommendations: 1, rates: brlRates
+        )
+        #expect(suggestions.count == 1)
+        #expect(suggestions.first?.ticker == "NEW",
+                "Empty .aportar holding should win the within-class tiebreak over a loaded one")
+    }
+
+    @Test func withinClassEqualWeightTiebreaksByActualShareGap() {
+        // Same class, same targetPercent — but FAT already holds 10× more value
+        // than THIN. Both targets are 50% of class value; FAT is way over,
+        // THIN is way under. THIN must come first.
+        let holdings = [
+            Holding(ticker: "FAT", quantity: 100, currentPrice: 10,
+                    assetClass: .fiis, status: .aportar, targetPercent: 5),
+            Holding(ticker: "THIN", quantity: 10, currentPrice: 10,
+                    assetClass: .fiis, status: .aportar, targetPercent: 5),
+        ]
+        let suggestions = RebalancingEngine.calculate(
+            holdings: holdings, investmentAmount: brl(100),
+            classAllocations: [.fiis: 100],
+            maxRecommendations: 1, rates: brlRates
+        )
+        #expect(suggestions.first?.ticker == "THIN",
+                "When weights tie, prefer the holding furthest below its target share of class value")
+    }
+
     // MARK: - Portfolio class allocation storage
 
     @Test func portfolioClassAllocationsRoundTrip() {

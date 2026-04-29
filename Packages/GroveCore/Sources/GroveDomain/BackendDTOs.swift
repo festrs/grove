@@ -202,6 +202,24 @@ public nonisolated struct DividendSummaryDTO: Codable, Sendable {
     }
 }
 
+public nonisolated struct DividendRefreshResultDTO: Codable, Sendable {
+    public let scraped: Int
+    public let newRecords: Int
+    public let failed: [String]
+
+    public init(scraped: Int, newRecords: Int, failed: [String]) {
+        self.scraped = scraped
+        self.newRecords = newRecords
+        self.failed = failed
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case scraped
+        case newRecords = "new_records"
+        case failed
+    }
+}
+
 // MARK: - Price History
 
 public nonisolated struct PriceHistoryPointDTO: Codable, Sendable {
@@ -235,12 +253,16 @@ public nonisolated struct ImportedPosition: Codable, Sendable, Identifiable {
     public var id: String { ticker }
     public let ticker: String
     public let displayName: String
-    public let quantity: Int
+    /// Backend serializes quantity as a JSON number (Pydantic `float`), so
+    /// we decode it as Double — fractional quantities are valid (crypto,
+    /// fractional shares). Integer-quantity rows display without the
+    /// trailing `.0` via `displayQuantity`.
+    public let quantity: Double
     public let currentPrice: Double
     public let assetClass: String
     public let totalValue: Double
 
-    public init(ticker: String, displayName: String, quantity: Int, currentPrice: Double, assetClass: String, totalValue: Double) {
+    public init(ticker: String, displayName: String, quantity: Double, currentPrice: Double, assetClass: String, totalValue: Double) {
         self.ticker = ticker
         self.displayName = displayName
         self.quantity = quantity
@@ -264,5 +286,14 @@ public nonisolated struct ImportedPosition: Codable, Sendable, Identifiable {
 
     public var displayTicker: String {
         ticker.replacingOccurrences(of: ".SA", with: "")
+    }
+
+    /// Renders quantity without a trailing `.0` for whole-share rows, while
+    /// still showing fractional precision for crypto / fractional shares.
+    public var displayQuantity: String {
+        if quantity == quantity.rounded() {
+            return String(Int(quantity))
+        }
+        return String(format: "%g", quantity)
     }
 }

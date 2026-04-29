@@ -13,6 +13,7 @@ struct HoldingsTableView: View {
 
     @Environment(\.rates) private var rates
     @State private var sortOrder = [KeyPathComparator(\HoldingTableRow.ticker)]
+    @State private var selection = Set<HoldingTableRow.ID>()
 
     private var rows: [HoldingTableRow] {
         holdings.map { HoldingTableRow(holding: $0, totalValue: totalValue, rates: rates) }
@@ -23,7 +24,7 @@ struct HoldingsTableView: View {
     }
 
     var body: some View {
-        Table(sortedRows, sortOrder: $sortOrder) {
+        Table(sortedRows, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Ticker", value: \.ticker) { row in
                 HStack(spacing: 8) {
                     Circle()
@@ -91,9 +92,25 @@ struct HoldingsTableView: View {
             .width(min: 90, ideal: 110)
 
             TableColumn("Status") { row in
-                TQStatusBadge(status: row.holding.status)
+                Menu {
+                    ForEach(HoldingStatus.allCases) { status in
+                        Button {
+                            onChangeStatus(row.holding, status)
+                        } label: {
+                            Label(status.displayName, systemImage: status.icon)
+                        }
+                        .disabled(row.holding.status == status)
+                    }
+                } label: {
+                    TQStatusBadge(status: row.holding.status)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Change status")
             }
-            .width(min: 80, ideal: 90)
+            .width(min: 90, ideal: 110)
         }
         .contextMenu(forSelectionType: HoldingTableRow.ID.self) { ids in
             if let id = ids.first, let row = sortedRows.first(where: { $0.id == id }) {

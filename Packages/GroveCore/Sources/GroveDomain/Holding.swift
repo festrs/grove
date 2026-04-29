@@ -122,6 +122,18 @@ public final class Holding {
         targetPercent - currentPercent(of: totalValue, in: displayCurrency, rates: rates)
     }
 
+    /// Dividends with ex-date on or after the first contribution — i.e. the
+    /// ones the user was actually holding shares for. Sorted by payment date
+    /// descending. Returns empty until the first buy is recorded.
+    public var earnedDividends: [DividendPayment] {
+        guard let firstContributionDate = contributions.map(\.date).min() else {
+            return []
+        }
+        return dividends
+            .filter { $0.exDate >= firstContributionDate }
+            .sorted { $0.paymentDate > $1.paymentDate }
+    }
+
     /// Estimated monthly dividend income (gross)
     public var estimatedMonthlyIncome: Decimal {
         guard dividendYield > 0 else { return 0 }

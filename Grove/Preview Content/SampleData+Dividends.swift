@@ -34,7 +34,6 @@ enum SampleDividends {
                     exDate: exDate,
                     paymentDate: paymentDate,
                     amountPerShare: monthlyDividendPerShare * multiplier,
-                    quantity: holding.quantity,
                     taxTreatment: holding.assetClass.defaultTaxTreatment
                 )
                 dividend.holding = holding

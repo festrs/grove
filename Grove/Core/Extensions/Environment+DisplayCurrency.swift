@@ -6,7 +6,10 @@ private struct DisplayCurrencyKey: EnvironmentKey {
 }
 
 private struct ExchangeRatesKey: EnvironmentKey {
-    static let defaultValue: any ExchangeRates = IdentityRates()
+    /// Fallback for views that read `\.rates` before a real rate provider is
+    /// injected. Uses a recent USD/BRL approximation so cross-currency math
+    /// produces stale-but-reasonable numbers instead of crashing.
+    static let defaultValue: any ExchangeRates = StaticRates(brlPerUsd: 5.15)
 }
 
 extension EnvironmentValues {

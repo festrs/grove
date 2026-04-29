@@ -8,16 +8,15 @@ struct HoldingDetailView: View {
     @Environment(\.backendService) private var backendService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @State private var holding: Holding?
+
+    @State private var viewModel = HoldingDetailViewModel()
     @State private var showRemoveAlert = false
     @State private var showingBuy = false
     @State private var showingSell = false
-    @State private var fundamentals: FundamentalsDTO?
-    @State private var isFundamentalsLoading = false
 
     var body: some View {
         Group {
-            if let holding {
+            if let holding = viewModel.holding {
                 VStack(spacing: 0) {
                     ScrollView {
                         VStack(spacing: Theme.Spacing.md) {
@@ -29,8 +28,8 @@ struct HoldingDetailView: View {
 
                             HoldingStatsStrip(
                                 holding: holding,
-                                fundamentals: fundamentals,
-                                isFundamentalsLoading: isFundamentalsLoading
+                                fundamentals: viewModel.fundamentals,
+                                isFundamentalsLoading: viewModel.isFundamentalsLoading
                             )
 
                             CompanyInfoCard(holding: holding)
@@ -58,10 +57,32 @@ struct HoldingDetailView: View {
                         .frame(maxWidth: Theme.Layout.maxContentWidth)
                     }
 
+                    #if os(iOS)
                     actionBar(holding)
+                    #endif
                 }
                 .navigationTitle(holding.displayTicker)
                 .toolbar {
+                    #if os(macOS)
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button {
+                            showingBuy = true
+                        } label: {
+                            Label("Buy", systemImage: "plus.circle.fill")
+                        }
+                        .keyboardShortcut("b", modifiers: .command)
+                        .help("Buy (⌘B)")
+
+                        Button {
+                            showingSell = true
+                        } label: {
+                            Label("Sell", systemImage: "minus.circle.fill")
+                        }
+                        .keyboardShortcut("s", modifiers: .command)
+                        .disabled(!holding.hasPosition)
+                        .help("Sell (⌘S)")
+                    }
+                    #endif
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
                             Button(role: .destructive) {
@@ -74,51 +95,36 @@ struct HoldingDetailView: View {
                         }
                     }
                 }
-                .sheet(isPresented: $showingBuy, onDismiss: reloadHolding) {
+                .sheet(isPresented: $showingBuy, onDismiss: reload) {
                     NewTransactionView(transactionType: .buy, preselectedHolding: holding)
                 }
-                .sheet(isPresented: $showingSell, onDismiss: reloadHolding) {
+                .sheet(isPresented: $showingSell, onDismiss: reload) {
                     NewTransactionView(transactionType: .sell, preselectedHolding: holding)
                 }
                 .alert("Remove Asset", isPresented: $showRemoveAlert) {
                     Button("Cancel", role: .cancel) {}
                     Button("Remove", role: .destructive) {
-                        removeHolding()
+                        viewModel.removeHolding(modelContext: modelContext)
+                        dismiss()
                     }
                 } message: {
                     Text("Are you sure you want to remove \(holding.ticker) from your portfolio? This action cannot be undone.")
                 }
                 .refreshable {
-                    await refreshPrice()
+                    await viewModel.refreshAll(backendService: backendService)
                 }
             } else {
                 TQLoadingView()
             }
         }
         .task {
-            holding = modelContext.model(for: holdingID) as? Holding
-            await refreshPrice()
+            viewModel.loadHolding(id: holdingID, modelContext: modelContext)
+            await viewModel.refreshAll(backendService: backendService)
         }
     }
 
-    private func reloadHolding() {
-        holding = modelContext.model(for: holdingID) as? Holding
-    }
-
-    private func removeHolding() {
-        guard let holding else { return }
-        if holding.hasPosition {
-            let contribution = Contribution(
-                date: .now,
-                amount: -(holding.quantity * holding.currentPrice),
-                shares: -holding.quantity,
-                pricePerShare: holding.currentPrice
-            )
-            contribution.holding = holding
-            modelContext.insert(contribution)
-        }
-        modelContext.delete(holding)
-        dismiss()
+    private func reload() {
+        viewModel.loadHolding(id: holdingID, modelContext: modelContext)
     }
 
     private func actionBar(_ holding: Holding) -> some View {
@@ -147,34 +153,6 @@ struct HoldingDetailView: View {
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
         .background(.ultraThinMaterial)
-    }
-
-    private func refreshPrice() async {
-        guard let holding else { return }
-
-        // Fetch quote and fundamentals concurrently
-        async let quoteTask: Void = {
-            do {
-                let quote = try await backendService.fetchStockQuote(symbol: holding.ticker)
-                holding.currentPrice = quote.price.decimalAmount
-                holding.lastPriceUpdate = .now
-            } catch {
-                // Keep cached price
-            }
-        }()
-
-        async let fundamentalsTask: Void = {
-            guard holding.assetClass.hasFundamentals else { return }
-            isFundamentalsLoading = true
-            defer { isFundamentalsLoading = false }
-            do {
-                fundamentals = try await backendService.fetchFundamentals(symbol: holding.ticker)
-            } catch {
-                // Keep nil
-            }
-        }()
-
-        _ = await (quoteTask, fundamentalsTask)
     }
 
     private func headerCard(_ holding: Holding) -> some View {
@@ -317,7 +295,8 @@ struct HoldingDetailView: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Dividend History").font(.headline)
 
-                if holding.dividends.isEmpty {
+                let earned = holding.earnedDividends
+                if earned.isEmpty {
                     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                         Text("Estimated Monthly Income")
                             .font(.subheadline).foregroundStyle(.secondary)
@@ -326,7 +305,7 @@ struct HoldingDetailView: View {
                     }
                     .padding(.vertical, Theme.Spacing.sm)
                 } else {
-                    ForEach(holding.dividends.sorted(by: { $0.paymentDate > $1.paymentDate }).prefix(10), id: \.paymentDate) { div in
+                    ForEach(earned, id: \.paymentDate) { div in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(div.taxTreatment.displayName)

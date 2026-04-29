@@ -15,4 +15,10 @@ enum AppConstants {
         static let monthlyCostOfLiving: Decimal = 15_000
         static let emergencyReserveTarget: Decimal = 180_000
     }
+
+    enum Debug {
+        /// UserDefaults key — when true (DEBUG builds only) the free-tier
+        /// holdings cap is bypassed so we can pile assets in for testing.
+        static let unlimitedHoldingsKey = "debug_unlimitedHoldings"
+    }
 }

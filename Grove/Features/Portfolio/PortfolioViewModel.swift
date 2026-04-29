@@ -97,4 +97,55 @@ final class PortfolioViewModel {
         loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
     }
 
+    /// Add a search result directly to the portfolio as a `.estudo` (study)
+    /// holding — no transaction, no quantity. The user can buy into it later
+    /// via the Buy button on the holding detail.
+    @discardableResult
+    func addStudyHolding(
+        from result: StockSearchResultDTO,
+        modelContext: ModelContext,
+        backendService: any BackendServiceProtocol
+    ) -> Bool {
+        guard Holding.canAddMore(modelContext: modelContext) else { return false }
+
+        let assetClass = AssetClassType.detect(from: result.symbol, apiType: result.type) ?? .acoesBR
+        let price = result.priceDecimal ?? 0
+
+        let holding = Holding(
+            ticker: result.symbol,
+            displayName: result.name ?? result.symbol,
+            currentPrice: price,
+            assetClass: assetClass,
+            status: .estudo
+        )
+        holding.sector = result.sector
+        holding.logoURL = result.logo
+
+        if let portfolio = selectedPortfolio {
+            holding.portfolio = portfolio
+        } else {
+            var descriptor = FetchDescriptor<Portfolio>(sortBy: [SortDescriptor(\.createdAt)])
+            descriptor.fetchLimit = 1
+            if let p = try? modelContext.fetch(descriptor).first {
+                holding.portfolio = p
+            } else {
+                let p = Portfolio()
+                modelContext.insert(p)
+                holding.portfolio = p
+            }
+        }
+        modelContext.insert(holding)
+
+        let sym = holding.ticker
+        let cls = assetClass.rawValue
+        let bootstrap = TickerBootstrapService()
+        Task { @MainActor in
+            try? await backendService.trackSymbol(symbol: sym, assetClass: cls)
+            await bootstrap.bootstrap(holdings: [holding], backendService: backendService)
+            try? modelContext.save()
+        }
+
+        return true
+    }
+
 }

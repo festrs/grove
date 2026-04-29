@@ -71,7 +71,11 @@ struct DashboardView: View {
                     .padding(.bottom, Theme.Spacing.xl)
                 }
 
-                // Inspector panel on wide screens
+                // Inspector panel: macOS only — iPad/iPhone use the compact
+                // scroll layout where this content already lives inline (Next
+                // Dividend, Monthly Action, Quick Stats). On iPad the third
+                // column collapsed the middle into per-character wrapping.
+                #if os(macOS)
                 if sizeClass == .regular {
                     Divider()
                     InspectorPanel(
@@ -80,6 +84,7 @@ struct DashboardView: View {
                         allocations: viewModel.summary?.allocationByClass ?? []
                     )
                 }
+                #endif
             }
             .background(Color.tqBackground)
             .navigationTitle("Grove")
@@ -111,11 +116,18 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var dashboardContent: some View {
+        #if os(macOS)
         if sizeClass == .regular {
             wideDashboard
         } else {
             compactDashboard
         }
+        #else
+        // iPad uses the same scroll-stack as iPhone. The wide layout's
+        // side-by-side Allocation/History row is too tight inside a
+        // NavigationSplitView that already has a sidebar.
+        compactDashboard
+        #endif
     }
 
     @ViewBuilder

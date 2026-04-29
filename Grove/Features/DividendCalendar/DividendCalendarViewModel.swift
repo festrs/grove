@@ -36,7 +36,7 @@ final class DividendCalendarViewModel {
     var dividendsForDay: [CalendarDividend] = []
     var monthlyTotal: Money = .zero(in: .brl)
     private var displayCurrency: Currency = .brl
-    private var ratesProvider: any ExchangeRates = IdentityRates()
+    private var ratesProvider: any ExchangeRates = StaticRates(brlPerUsd: 5.15)
 
     var daysWithDividends: Set<Int> {
         Set(dividendsForMonth.map { Calendar.current.component(.day, from: $0.date) })

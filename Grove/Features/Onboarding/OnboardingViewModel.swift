@@ -65,7 +65,7 @@ final class OnboardingViewModel {
     // MARK: - Computed
 
     var holdingCount: Int { pendingHoldings.count }
-    var canAddMoreHoldings: Bool { pendingHoldings.count < AppConstants.freeTierMaxHoldings }
+    var canAddMoreHoldings: Bool { Holding.canAddMore(currentCount: pendingHoldings.count) }
 
     var assetClassesInUse: [AssetClassType] {
         let used = Set(pendingHoldings.map(\.assetClass))
@@ -147,7 +147,8 @@ final class OnboardingViewModel {
             assetClass: assetClass,
             status: .estudo,
             currentPrice: result.priceDecimal ?? 0,
-            dividendYield: 0
+            dividendYield: 0,
+            apiType: result.type
         )
         pendingHoldings.append(holding)
         errorMessage = nil
@@ -191,7 +192,13 @@ final class OnboardingViewModel {
 
     func autoClassifyAll() {
         for index in pendingHoldings.indices {
-            if let detected = AssetClassType.detect(from: pendingHoldings[index].ticker) {
+            // Pass the stored apiType so search-time hints (e.g. Finnhub
+            // "REIT" for ticker "O") survive a re-run; without it the
+            // ticker-only heuristic would clobber correct REIT/FII labels.
+            if let detected = AssetClassType.detect(
+                from: pendingHoldings[index].ticker,
+                apiType: pendingHoldings[index].apiType
+            ) {
                 pendingHoldings[index].assetClass = detected
             }
         }
@@ -243,10 +250,13 @@ final class OnboardingViewModel {
         "Crossing", "Resilience", "Season", "Breeze", "Seed"
     ]
 
-    func completeOnboarding(modelContext: ModelContext) {
+    func completeOnboarding(
+        modelContext: ModelContext,
+        backendService: any BackendServiceProtocol
+    ) {
         let repo = PortfolioRepository(modelContext: modelContext)
         do {
-            _ = try repo.saveOnboardingPortfolio(
+            let portfolio = try repo.saveOnboardingPortfolio(
                 preferredName: portfolioName,
                 nameFallbacks: Self.portfolioAdjectives.shuffled(),
                 pendingHoldings: pendingHoldings,
@@ -254,6 +264,22 @@ final class OnboardingViewModel {
                 monthlyIncomeGoal: monthlyIncomeGoal,
                 monthlyCostOfLiving: monthlyCostOfLiving
             )
+
+            // Bootstrap price + DY for every holding the user just created so
+            // the dashboard projection isn't stuck at R$0 until the next
+            // sync. Keep it best-effort — onboarding completes even if the
+            // network is flaky. Skip refreshDividendsAfterTransaction here:
+            // bootstrap contributions are dated `.now`, so a since-scoped
+            // scrape would be a no-op anyway. Users can backfill via the
+            // manual refresh button per asset class.
+            let snapshot = portfolio.holdings
+            let svc = backendService
+            let ctx = modelContext
+            let bootstrap = TickerBootstrapService()
+            Task { @MainActor in
+                await bootstrap.bootstrap(holdings: snapshot, backendService: svc)
+                try? ctx.save()
+            }
         } catch {
             errorMessage = "Error saving: \(error.localizedDescription)"
         }
