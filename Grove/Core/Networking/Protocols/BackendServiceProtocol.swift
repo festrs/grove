@@ -4,7 +4,7 @@ import GroveDomain
 /// Backend provides market data only. Portfolio lives in SwiftData.
 protocol BackendServiceProtocol: Sendable {
     // Stocks
-    func searchStocks(query: String) async throws -> [StockSearchResultDTO]
+    func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO]
     func fetchStockQuote(symbol: String) async throws -> StockQuoteDTO
 
     // Batch quotes (send local symbols, get prices back)
@@ -16,6 +16,14 @@ protocol BackendServiceProtocol: Sendable {
     // Dividends (send local symbols, get dividend data back)
     func fetchDividendsForSymbols(symbols: [String], year: Int?) async throws -> [MobileDividendDTO]
     func fetchDividendSummary(symbols: [String]) async throws -> [String: DividendSummaryDTO]
+
+    // On-demand dividend scrape: ask the backend to fetch fresh dividend
+    // history for these symbols inline (vs waiting for the next cron tick).
+    // Caller should refetch `fetchDividendsForSymbols` afterwards. Pass
+    // `since` (the holding's first-Contribution date) on the auto-bootstrap
+    // path so we don't pull payments from before the user owned the asset;
+    // omit it for the manual refresh button to allow full backfills.
+    func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO
 
     // Symbol tracking (tell backend which symbols to keep fresh)
     func trackSymbol(symbol: String, assetClass: String) async throws

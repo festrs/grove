@@ -37,7 +37,7 @@ final class AddHoldingViewModel {
             defer { isSearching = false }
 
             do {
-                searchResults = try await service.searchStocks(query: trimmed)
+                searchResults = try await service.searchStocks(query: trimmed, assetClass: nil)
             } catch {
                 searchResults = []
             }
@@ -101,7 +101,14 @@ final class AddHoldingViewModel {
 
         let sym = holding.ticker
         let cls = holding.assetClass.rawValue
-        Task { try? await backendService.trackSymbol(symbol: sym, assetClass: cls) }
+        let svc = backendService
+        let ctx = modelContext
+        let bootstrap = TickerBootstrapService()
+        Task { @MainActor in
+            try? await svc.trackSymbol(symbol: sym, assetClass: cls)
+            await bootstrap.bootstrap(holdings: [holding], backendService: svc)
+            try? ctx.save()
+        }
 
         return true
     }

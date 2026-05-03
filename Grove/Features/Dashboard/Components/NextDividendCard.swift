@@ -119,8 +119,7 @@ struct NextDividendCard: View {
     let div1 = DividendPayment(
         exDate: Calendar.current.date(byAdding: .day, value: 5, to: .now)!,
         paymentDate: Calendar.current.date(byAdding: .day, value: 12, to: .now)!,
-        amountPerShare: 0.95,
-        quantity: 50
+        amountPerShare: 0.95
     )
     div1.holding = holding1
     context.insert(div1)
@@ -139,8 +138,7 @@ struct NextDividendCard: View {
     let div2 = DividendPayment(
         exDate: Calendar.current.date(byAdding: .day, value: 10, to: .now)!,
         paymentDate: Calendar.current.date(byAdding: .day, value: 20, to: .now)!,
-        amountPerShare: 0.78,
-        quantity: 30
+        amountPerShare: 0.78
     )
     div2.holding = holding2
     context.insert(div2)

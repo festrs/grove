@@ -18,10 +18,12 @@ actor BackendService: BackendServiceProtocol {
 
     // MARK: - Stocks (existing public endpoints)
 
-    func searchStocks(query: String) async throws -> [StockSearchResultDTO] {
-        let url = try buildURL(path: "/stocks/search", queryItems: [
-            URLQueryItem(name: "q", value: query)
-        ])
+    func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO] {
+        var items = [URLQueryItem(name: "q", value: query)]
+        if let assetClass {
+            items.append(URLQueryItem(name: "asset_class", value: assetClass.rawValue))
+        }
+        let url = try buildURL(path: "/stocks/search", queryItems: items)
         return try await HTTPClient.fetch(url: url, headers: apiHeaders)
     }
 
@@ -67,6 +69,70 @@ actor BackendService: BackendServiceProtocol {
         ])
         return try await HTTPClient.fetch(url: url, headers: apiHeaders)
     }
+
+    func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO {
+        guard !symbols.isEmpty else {
+            return DividendRefreshResultDTO(scraped: 0, newRecords: 0, failed: [])
+        }
+        var queryItems = [
+            URLQueryItem(name: "symbols", value: symbols.joined(separator: ",")),
+            URLQueryItem(name: "asset_class", value: assetClass),
+        ]
+        if let since {
+            queryItems.append(URLQueryItem(name: "since", value: Self.dateFormatter.string(from: since)))
+        }
+        let url = try buildURL(path: "/mobile/dividends/refresh", queryItems: queryItems)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        // Backend serially hits upstream providers with a per-symbol delay,
+        // so a 20-symbol refresh can take 40s+. Bump the timeout accordingly.
+        request.timeoutInterval = 90
+        for (key, value) in apiHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let urlError as URLError {
+            throw APIError.networkError(urlError)
+        } catch {
+            throw APIError.unknown(error.localizedDescription)
+        }
+
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .prefix(200) ?? ""
+            let hint: String
+            switch status {
+            case 404, 405:
+                hint = "Endpoint missing — backend container probably needs rebuild (just backend)."
+            case 422:
+                hint = "Backend rejected the request payload."
+            case 429:
+                hint = "Rate-limited — wait a minute and try again."
+            case 500...599:
+                hint = "Backend error — provider scrape may have failed."
+            default:
+                hint = ""
+            }
+            let detail = hint.isEmpty ? "" : " \(hint)"
+            throw APIError.unknown("Refresh dividends HTTP \(status).\(detail) Body: \(body)")
+        }
+        return try JSONDecoder().decode(DividendRefreshResultDTO.self, from: data)
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .iso8601)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 
     // MARK: - Symbol Tracking
 

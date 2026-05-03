@@ -281,6 +281,25 @@ struct TransactionTests {
         #expect(holding.averagePrice == 15)
     }
 
+    @Test func recalculateClampsNegativeQuantityToZero() {
+        let holding = Holding(ticker: "TEST", assetClass: .acoesBR)
+        // Sells exceed buys (e.g., legacy data with mismatched corporate-action records).
+        // Quantity must clamp to 0, not go negative.
+        let buy = Contribution(date: Date(timeIntervalSince1970: 1000),
+                               amount: 100, shares: 10, pricePerShare: 10)
+        buy.holding = holding
+        let sell = Contribution(date: Date(timeIntervalSince1970: 2000),
+                                amount: -200, shares: -20, pricePerShare: 10)
+        sell.holding = holding
+        holding.contributions = [buy, sell]
+
+        holding.recalculateFromContributions()
+
+        #expect(holding.quantity == 0,
+                "Quantity must clamp at 0 — dropping max() would yield -10")
+        #expect(holding.averagePrice == 0)
+    }
+
     // MARK: - Status migration
 
     @Test func congelarMigratestoQuarentena() {

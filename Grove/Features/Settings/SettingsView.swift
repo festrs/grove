@@ -15,7 +15,8 @@ struct SettingsView: View {
                 if let settings = viewModel.settings {
                     portfolioInfoSection
                     displayCurrencySection(settings: settings)
-                    GoalSettingsSection(settings: settings)
+                    goalsSection(settings: settings)
+                    rebalancingSection(settings: settings)
                     // TODO: Enable when push notifications are ready
                     // NotificationSettingsSection()
                     PremiumSection()
@@ -23,12 +24,31 @@ struct SettingsView: View {
                     dangerSection
                 }
             }
-            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")
-            .keyboardDoneBar()
             .task {
                 viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
+        }
+    }
+
+    private func goalsSection(settings: UserSettings) -> some View {
+        Section {
+            NavigationLink {
+                GoalSettingsView(settings: settings)
+            } label: {
+                Label("Goals", systemImage: "target")
+            }
+        }
+    }
+
+    private func rebalancingSection(settings: UserSettings) -> some View {
+        @Bindable var settings = settings
+        return Section("Rebalancing") {
+            Stepper(
+                "Recommendations per investment: \(settings.recommendationCount)",
+                value: $settings.recommendationCount,
+                in: 1...10
+            )
         }
     }
 
@@ -85,6 +105,7 @@ struct SettingsView: View {
             }
         }
     }
+
 }
 
 #Preview {

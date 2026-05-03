@@ -8,7 +8,7 @@ struct AllocationBar: View {
     private let lineWidth: CGFloat = 22
 
     private var size: CGFloat {
-        Theme.Layout.chartSize(for: sizeClass)
+        Theme.Layout.chartSize(for: sizeClass) * 0.8
     }
 
     var body: some View {

@@ -21,9 +21,17 @@ struct RebalancingView: View {
                     compactRebalancingLayout
                 }
             }
-            .scrollDismissesKeyboard(.interactively)
+            .scrollDismissesKeyboard(.immediately)
             .navigationTitle("Invest")
-            .keyboardDoneBar()
+            #if os(iOS)
+            .toolbar {
+                if amountFieldFocused {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { amountFieldFocused = false }
+                    }
+                }
+            }
+            #endif
         }
     }
 
@@ -85,6 +93,7 @@ struct RebalancingView: View {
                 }
 
                 Button {
+                    amountFieldFocused = false
                     viewModel.calculate(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 } label: {
                     Text("Calculate Distribution")

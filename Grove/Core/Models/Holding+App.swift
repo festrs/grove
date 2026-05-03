@@ -10,14 +10,32 @@ extension Holding {
         gainLossPercent >= 0 ? .tqPositive : .tqNegative
     }
 
+    static var isFreeTierBypassed: Bool {
+        #if DEBUG
+        return UserDefaults.standard.bool(forKey: AppConstants.Debug.unlimitedHoldingsKey)
+        #else
+        return false
+        #endif
+    }
+
+    static func canAddMore(currentCount: Int) -> Bool {
+        if isFreeTierBypassed { return true }
+        return currentCount < AppConstants.freeTierMaxHoldings
+    }
+
+    static func remainingSlots(currentCount: Int) -> Int {
+        if isFreeTierBypassed { return .max }
+        return max(AppConstants.freeTierMaxHoldings - currentCount, 0)
+    }
+
     static func canAddMore(modelContext: ModelContext) -> Bool {
         let count = (try? modelContext.fetchCount(FetchDescriptor<Holding>())) ?? 0
-        return count < AppConstants.freeTierMaxHoldings
+        return canAddMore(currentCount: count)
     }
 
     static func remainingSlots(modelContext: ModelContext) -> Int {
         let count = (try? modelContext.fetchCount(FetchDescriptor<Holding>())) ?? 0
-        return max(AppConstants.freeTierMaxHoldings - count, 0)
+        return remainingSlots(currentCount: count)
     }
 
     static var freeTierLimitMessage: String {

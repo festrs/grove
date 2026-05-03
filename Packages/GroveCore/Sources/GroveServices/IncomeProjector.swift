@@ -1,7 +1,7 @@
 import Foundation
 import GroveDomain
 
-public struct IncomeProjection {
+public struct IncomeProjection: Sendable {
     public let currentMonthlyNet: Money
     public let currentMonthlyGross: Money
     public let goalMonthly: Money
@@ -26,83 +26,67 @@ public struct IncomeProjection {
     }
 }
 
-public struct AnnualIncomeByClass: Sendable {
-    public let assetClass: AssetClassType
-    public let annual: Money
-
-    public init(assetClass: AssetClassType, annual: Money) {
-        self.assetClass = assetClass
-        self.annual = annual
-    }
-}
-
 public struct IncomeProjector {
-    /// Aggregate gross monthly income per asset class, scale to annual, then
-    /// rank classes by their displayCurrency-converted annual figure.
-    public static func annualIncomeByClass(
-        holdings: [Holding],
-        in displayCurrency: Currency,
-        rates: any ExchangeRates
-    ) -> [AnnualIncomeByClass] {
-        var grossByClass: [AssetClassType: Money] = [:]
-        for h in holdings {
-            let monthlyGross = h.estimatedMonthlyIncomeMoney
-            grossByClass[h.assetClass] = (grossByClass[h.assetClass] ?? .zero(in: h.currency)) + monthlyGross
-        }
-        return grossByClass
-            .map { AnnualIncomeByClass(assetClass: $0.key, annual: $0.value * 12) }
-            .sorted { a, b in
-                a.annual.converted(to: displayCurrency, using: rates).amount
-                    > b.annual.converted(to: displayCurrency, using: rates).amount
-            }
-    }
-
-    /// Calculate current passive income and time to goal.
-    /// Goal is provided as Money so its currency carries semantics.
-    /// Aggregates and projections render in `displayCurrency`.
+    /// Calculate current passive income (from real `DividendPayment` records,
+    /// paid + projected for the current calendar month) and time to goal.
+    /// The goal-sim loop projects future contributions using a portfolio-
+    /// weighted DY% derived from `Holding.dividendYield` — that's the only
+    /// stable proxy for "what new shares will earn" since they have no
+    /// dividend records yet.
     public static func project(
         holdings: [Holding],
         incomeGoal: Money,
         monthlyContribution: Money,
         displayCurrency: Currency,
-        rates: any ExchangeRates
+        rates: any ExchangeRates,
+        asOf: Date = .now,
+        calendar: Calendar = .current
     ) -> IncomeProjection {
+        // Real-data current monthly (paid + projected, this calendar month).
+        let summary = IncomeAggregator.summary(
+            holdings: holdings, window: .month,
+            in: displayCurrency, rates: rates,
+            asOf: asOf, calendar: calendar
+        )
         var grossByClass: [AssetClassType: Money] = [:]
-        var grossValues: [Money] = []
-
-        for holding in holdings {
-            let monthlyGross = holding.estimatedMonthlyIncomeMoney
-            grossValues.append(monthlyGross)
-            grossByClass[holding.assetClass] = (grossByClass[holding.assetClass] ?? .zero(in: holding.currency)) + monthlyGross
+        for h in holdings {
+            let paid = h.paidIncome(in: .month, asOf: asOf, displayCurrency: displayCurrency,
+                                    rates: rates, calendar: calendar)
+            let proj = h.projectedIncome(in: .month, asOf: asOf, displayCurrency: displayCurrency,
+                                         rates: rates, calendar: calendar)
+            let g = paid + proj
+            grossByClass[h.assetClass] = (grossByClass[h.assetClass] ?? .zero(in: displayCurrency)) + g
         }
-
-        let totalGross = grossValues.sum(in: displayCurrency, using: rates)
         let breakdown = TaxCalculator.taxBreakdown(
             grossByClass: grossByClass,
             displayCurrency: displayCurrency,
             rates: rates
         )
+        let totalGross = summary.total
         let totalNet = breakdown.totalNet
         let goalDisplay = incomeGoal.converted(to: displayCurrency, using: rates)
-
         let progress: Decimal = goalDisplay.amount > 0 ? (totalNet.amount / goalDisplay.amount) * 100 : 0
 
         var estimatedMonths: Int?
         var estimatedYears: Decimal?
 
         let contributionDisplay = monthlyContribution.converted(to: displayCurrency, using: rates)
-        let totalValueDisplay = holdings.map { $0.currentValueMoney }.sum(in: displayCurrency, using: rates)
 
         if totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0 {
+            // Sim parameters: stable, portfolio-composition-based.
+            let totalValueDisplay = holdings.map { $0.currentValueMoney }
+                .sum(in: displayCurrency, using: rates)
+            let estAnnualGross = holdings.map { $0.estimatedMonthlyIncomeMoney * 12 }
+                .sum(in: displayCurrency, using: rates)
             let avgDY: Decimal
-            if totalValueDisplay.amount > 0 {
-                let annualIncome = totalGross.amount * 12
-                avgDY = (annualIncome / totalValueDisplay.amount) * 100
+            if totalValueDisplay.amount > 0 && estAnnualGross.amount > 0 {
+                avgDY = (estAnnualGross.amount / totalValueDisplay.amount) * 100
             } else {
                 avgDY = 6
             }
-
-            let avgNetMultiplier: Decimal = totalGross.amount > 0 ? totalNet.amount / totalGross.amount : 0.85
+            let avgNetMultiplier: Decimal = totalGross.amount > 0
+                ? totalNet.amount / totalGross.amount
+                : 0.85
             let monthlyYield = avgDY / 100 / 12
 
             var currentIncome = totalNet.amount
@@ -110,8 +94,7 @@ public struct IncomeProjector {
             let maxMonths = 600
 
             while currentIncome < goalDisplay.amount && months < maxMonths {
-                let newMonthlyIncome = contributionDisplay.amount * monthlyYield * avgNetMultiplier
-                currentIncome += newMonthlyIncome
+                currentIncome += contributionDisplay.amount * monthlyYield * avgNetMultiplier
                 months += 1
             }
 

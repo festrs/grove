@@ -11,6 +11,18 @@ struct PriceChartView: View {
     @State private var isLoading = false
     @State private var selectedPeriod: ChartPeriod = .oneMonth
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
+
+    private var isRegular: Bool {
+        #if os(macOS)
+        return true
+        #else
+        return sizeClass == .regular
+        #endif
+    }
+
     var body: some View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -55,20 +67,28 @@ struct PriceChartView: View {
     private var periodPicker: some View {
         HStack(spacing: Theme.Spacing.xs) {
             ForEach(ChartPeriod.allCases) { period in
-                Button(period.label) {
+                Button {
                     selectedPeriod = period
                     Task { await loadData() }
+                } label: {
+                    Text(period.label)
+                        .font(.system(
+                            size: isRegular ? 15 : 13,
+                            weight: selectedPeriod == period ? .semibold : .regular
+                        ))
+                        .foregroundStyle(selectedPeriod == period ? .white : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, isRegular ? 8 : 5)
+                        .background(
+                            selectedPeriod == period ? Color.tqAccentGreen : Color.clear,
+                            in: Capsule()
+                        )
+                        .contentShape(Capsule())
                 }
-                .font(.system(size: 13, weight: selectedPeriod == period ? .semibold : .regular))
-                .foregroundStyle(selectedPeriod == period ? .white : .secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    selectedPeriod == period ? Color.tqAccentGreen : Color.clear,
-                    in: Capsule()
-                )
+                .buttonStyle(.plain)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
