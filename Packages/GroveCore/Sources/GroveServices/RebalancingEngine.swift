@@ -218,7 +218,7 @@ public struct RebalancingEngine {
         }
 
         scored.sort { a, b in
-            if a.classGap != b.classGap { return a.classGap < b.classGap }
+            if a.classGap != b.classGap { return a.classGap > b.classGap }
             if a.holdingGap != b.holdingGap { return a.holdingGap > b.holdingGap }
             return a.weight > b.weight
         }
