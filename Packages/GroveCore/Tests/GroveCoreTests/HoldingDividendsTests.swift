@@ -164,6 +164,49 @@ struct HoldingDividendsTests {
         #expect(projectedTotal.amount == 30) // 3 × 10 shares
     }
 
+    // MARK: - ex-date == asOf boundary
+
+    @Test func paidDividendsIncludesExDateExactlyEqualToAsOf() throws {
+        let ctx = try Self.makeContext()
+        let h = Holding(ticker: "HGLG11", quantity: 10, currentPrice: 100, assetClass: .fiis, status: .aportar)
+        ctx.insert(h)
+        let asOf = Date(timeIntervalSince1970: 1_780_000_000)
+        // exDate == asOf must count as paid (inclusive boundary).
+        Self.attach(
+            DividendPayment(exDate: asOf, paymentDate: asOf, amountPerShare: 7),
+            to: h, in: ctx
+        )
+
+        #expect(h.paidDividends(asOf: asOf).count == 1,
+                "exDate <= asOf is inclusive — equality must surface as paid")
+        #expect(h.projectedDividends(asOf: asOf).isEmpty,
+                "exDate > asOf is strict — equality must NOT surface as projected")
+    }
+
+    // MARK: - DividendPayment tax math
+
+    @Test func withholdingTaxAppliesNetMultiplierCorrectly() throws {
+        let ctx = try Self.makeContext()
+        // 100 shares × 1 USD/share = 100 USD gross. NRA30 → multiplier 0.7,
+        // so withholding = 100 × (1 - 0.7) = 30, net = 100 - 30 = 70.
+        let h = Holding(ticker: "AAPL", quantity: 100, currentPrice: 100,
+                        assetClass: .usStocks, currency: .usd, status: .aportar)
+        ctx.insert(h)
+        let p = DividendPayment(
+            exDate: Date(timeIntervalSince1970: 1_780_000_000),
+            paymentDate: Date(timeIntervalSince1970: 1_780_086_400),
+            amountPerShare: 1,
+            taxTreatment: .nra30
+        )
+        Self.attach(p, to: h, in: ctx)
+
+        #expect(p.totalAmount == 100)
+        #expect(p.withholdingTax == 30,
+                "Sign flip on (1 - netMultiplier) would yield 170 instead of 30")
+        #expect(p.netAmount == 70,
+                "Sign flip on (totalAmount - withholdingTax) would yield 130 instead of 70")
+    }
+
     @Test func studyModeHoldingContributesZeroToTotals() throws {
         let ctx = try Self.makeContext()
         let h = Holding(ticker: "HGLG11", quantity: 0, currentPrice: 100, assetClass: .fiis, status: .estudo)

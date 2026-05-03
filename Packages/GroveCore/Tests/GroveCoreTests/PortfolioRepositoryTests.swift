@@ -16,6 +16,30 @@ struct PortfolioRepositoryTests {
         return ModelContext(container)
     }
 
+    // MARK: - Holding.currentPercent (allocation math used by views)
+
+    @Test func currentPercentReturnsHoldingShareOfTotal() {
+        let h = Holding(ticker: "ITUB3", quantity: 10, currentPrice: 100,
+                        assetClass: .acoesBR, status: .aportar)
+        // currentValue = 1000 BRL, totalValue = 4000 BRL → 25%.
+        // If the empty-guard is inverted, this returns 0 instead of 25.
+        let pct = h.currentPercent(
+            of: Money(amount: 4000, currency: .brl),
+            in: .brl, rates: Self.rates
+        )
+        #expect(pct == 25)
+    }
+
+    @Test func currentPercentReturnsZeroForEmptyPortfolio() {
+        let h = Holding(ticker: "ITUB3", quantity: 10, currentPrice: 100,
+                        assetClass: .acoesBR, status: .aportar)
+        let pct = h.currentPercent(
+            of: Money(amount: 0, currency: .brl),
+            in: .brl, rates: Self.rates
+        )
+        #expect(pct == 0)
+    }
+
     @Test func driftIsPositiveWhenOverweight() throws {
         let ctx = try Self.makeContext()
         let h = Holding(ticker: "ITUB3", quantity: 100, currentPrice: 30, assetClass: .acoesBR, status: .aportar, targetPercent: 5)

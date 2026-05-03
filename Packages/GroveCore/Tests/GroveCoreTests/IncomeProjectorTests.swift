@@ -199,6 +199,29 @@ struct IncomeProjectorTests {
         #expect(projection.currentMonthlyNet.amount == 350)
     }
 
+    @Test func goalSimAppliesAvgNetMultiplier() throws {
+        // Pure US-stocks portfolio so avgNetMultiplier ≠ 1.0 (NRA30 → 0.7).
+        // 100 shares × 100 USD → 10,000 USD = 50,000 BRL portfolio value.
+        // 100 shares × 1 USD/share dividend → 100 USD = 500 BRL gross,
+        // 350 BRL net. avgDY = 12% → monthlyYield = 0.01.
+        // Per iteration: 5000 BRL × 0.01 × 0.7 = 35 BRL.
+        // Need (1000 - 350) / 35 ≈ 18.57 → 19 months.
+        // Dropping the multiplier yields 50/iter → 13 months instead.
+        let ctx = try Self.makeContext()
+        let h = Self.makeHolding(in: ctx, ticker: "AAPL", qty: 100, price: 100, dy: 12,
+                                 assetClass: .usStocks, currency: .usd,
+                                 aprilDividendPerShare: 1)
+        let projection = IncomeProjector.project(
+            holdings: [h], incomeGoal: Self.brlGoal,
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            asOf: Self.asOf, calendar: Self.utcCal
+        )
+
+        #expect(projection.estimatedMonthsToGoal == 19,
+                "Sim must scale contribution growth by avgNetMultiplier — dropping it gives 13")
+    }
+
     // MARK: - Mixed Portfolio
 
     @Test func mixedPortfolioAggregatesCorrectly() throws {
