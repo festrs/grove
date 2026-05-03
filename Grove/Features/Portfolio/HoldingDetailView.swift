@@ -58,31 +58,33 @@ struct HoldingDetailView: View {
                     }
 
                     #if os(iOS)
-                    actionBar(holding)
+                    if sizeClass != .regular {
+                        actionBar(holding)
+                    }
                     #endif
                 }
                 .navigationTitle(holding.displayTicker)
                 .toolbar {
-                    #if os(macOS)
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        Button {
-                            showingBuy = true
-                        } label: {
-                            Label("Buy", systemImage: "plus.circle.fill")
-                        }
-                        .keyboardShortcut("b", modifiers: .command)
-                        .help("Buy (⌘B)")
+                    if sizeClass == .regular {
+                        ToolbarItemGroup(placement: .primaryAction) {
+                            Button {
+                                showingBuy = true
+                            } label: {
+                                Label("Buy", systemImage: "plus.circle.fill")
+                            }
+                            .keyboardShortcut("b", modifiers: .command)
+                            .help("Buy (⌘B)")
 
-                        Button {
-                            showingSell = true
-                        } label: {
-                            Label("Sell", systemImage: "minus.circle.fill")
+                            Button {
+                                showingSell = true
+                            } label: {
+                                Label("Sell", systemImage: "minus.circle.fill")
+                            }
+                            .keyboardShortcut("s", modifiers: .command)
+                            .disabled(!holding.hasPosition)
+                            .help("Sell (⌘S)")
                         }
-                        .keyboardShortcut("s", modifiers: .command)
-                        .disabled(!holding.hasPosition)
-                        .help("Sell (⌘S)")
                     }
-                    #endif
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
                             Button(role: .destructive) {
@@ -295,7 +297,7 @@ struct HoldingDetailView: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Dividend History").font(.headline)
 
-                let earned = holding.earnedDividends
+                let earned = holding.paidDividends
                 if earned.isEmpty {
                     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                         Text("Estimated Monthly Income")

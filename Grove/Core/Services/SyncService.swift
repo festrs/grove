@@ -29,7 +29,7 @@ final class SyncService {
     /// Tell backend which symbols the app cares about
     private func syncTrackedSymbols(modelContext: ModelContext, backendService: any BackendServiceProtocol) async throws {
         let descriptor = FetchDescriptor<Holding>()
-        let holdings = try modelContext.fetch(descriptor)
+        let holdings = try modelContext.fetch(descriptor).filter { !$0.isCustom }
         guard !holdings.isEmpty else { return }
 
         let pairs = holdings.map { (symbol: $0.ticker, assetClass: $0.assetClass.rawValue) }
@@ -39,7 +39,7 @@ final class SyncService {
     /// Fetch latest prices for all local holdings
     func syncPrices(modelContext: ModelContext, backendService: any BackendServiceProtocol) async throws {
         let descriptor = FetchDescriptor<Holding>()
-        let holdings = try modelContext.fetch(descriptor)
+        let holdings = try modelContext.fetch(descriptor).filter { !$0.isCustom }
         guard !holdings.isEmpty else { return }
 
         let symbols = holdings.map(\.ticker)
@@ -69,7 +69,7 @@ final class SyncService {
     /// Fetch dividend history for all local holdings
     func syncDividends(modelContext: ModelContext, backendService: any BackendServiceProtocol) async throws {
         let holdingDescriptor = FetchDescriptor<Holding>()
-        let holdings = try modelContext.fetch(holdingDescriptor)
+        let holdings = try modelContext.fetch(holdingDescriptor).filter { !$0.isCustom }
         guard !holdings.isEmpty else { return }
 
         let symbols = holdings.map(\.ticker)

@@ -37,7 +37,7 @@ final class AddHoldingViewModel {
             defer { isSearching = false }
 
             do {
-                searchResults = try await service.searchStocks(query: trimmed)
+                searchResults = try await service.searchStocks(query: trimmed, assetClass: nil)
             } catch {
                 searchResults = []
             }

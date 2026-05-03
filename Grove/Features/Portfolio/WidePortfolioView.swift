@@ -3,11 +3,21 @@ import SwiftData
 import GroveDomain
 import GroveRepositories
 
-/// iPad + macOS portfolio screen. Uses the system `.searchable` toolbar
-/// field for stock lookup and a vertical wide layout (header + ring + tabs
-/// on top, sortable holdings table on bottom). iPhone uses
-/// `CompactPortfolioView`.
+/// iPad + macOS portfolio screen — class-first hierarchy via
+/// `NavigationSplitView`. Sidebar shows the portfolio total + allocation
+/// bar + class table; the detail column hosts `AssetClassHoldingsView`
+/// for the selected class. Pushing into a holding stays inside the detail
+/// column's `NavigationStack`.
 struct WidePortfolioView: View {
+    /// When set, the view scopes itself to this portfolio on first appear.
+    /// Used by `PortfoliosOverviewView` to drill into a specific portfolio.
+    var initialPortfolioID: PersistentIdentifier? = nil
+
+    /// When set, a back button is shown in the sidebar that returns to the
+    /// portfolios overview. Nil = no back button (standalone or single-
+    /// portfolio mode).
+    var onBackToOverview: (() -> Void)? = nil
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
     @Environment(\.syncService) private var syncService
@@ -15,167 +25,149 @@ struct WidePortfolioView: View {
     @Environment(\.rates) private var rates
     @Query private var holdings: [Holding]
     @State private var viewModel = PortfolioViewModel()
-    @State private var searchText = ""
-    @State private var debouncer = SearchDebouncer()
-    @State private var recentlyAdded: [StockSearchResultDTO] = []
-    @State private var holdingToBuy: Holding?
-    @State private var holdingToSell: Holding?
+    @State private var selectedClass: AssetClassType?
     @State private var showingImport = false
-    @State private var navigationPath = NavigationPath()
-
-    private var showingSearchResults: Bool {
-        !searchText.isEmpty
-    }
-
-    private func isAlreadyAdded(_ symbol: String) -> Bool {
-        recentlyAdded.contains { $0.symbol == symbol }
-            || viewModel.holdings.contains { $0.ticker == symbol }
-    }
+    @State private var detailPath = NavigationPath()
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            VStack(spacing: 0) {
-                topBar
+        HStack(spacing: 0) {
+            sidebar
+                .frame(width: 360)
 
-                if showingSearchResults {
-                    ScrollView {
-                        PortfolioSearchResultsList(
-                            results: debouncer.results,
-                            isSearching: debouncer.isSearching,
-                            searchText: searchText,
-                            isAlreadyAdded: isAlreadyAdded,
-                            onAdd: handleAdd
+            Divider()
+
+            NavigationStack(path: $detailPath) {
+                Group {
+                    if let assetClass = selectedClass {
+                        AssetClassHoldingsView(
+                            assetClass: assetClass,
+                            portfolio: viewModel.selectedPortfolio,
+                            path: $detailPath
+                        )
+                        .id(assetClass)
+                    } else {
+                        TQEmptyState(
+                            icon: "rectangle.stack",
+                            title: "Pick an asset class",
+                            message: "Select a class on the left to see its holdings."
                         )
                     }
-                } else {
-                    wideLayout
+                }
+                .navigationDestination(for: PersistentIdentifier.self) { id in
+                    HoldingDetailView(holdingID: id)
                 }
             }
-            .background(Color.tqBackground)
-            .searchable(text: $searchText, placement: .toolbar, prompt: Text("Search stocks"))
-            .navigationDestination(for: PersistentIdentifier.self) { id in
-                HoldingDetailView(holdingID: id)
+            .frame(maxWidth: .infinity)
+        }
+        .modifier(PortfolioSheetsAndAlerts(
+            viewModel: viewModel,
+            showingImport: $showingImport,
+            holdings: holdings
+        ))
+        .refreshable {
+            await syncService.syncAll(modelContext: modelContext, backendService: backendService)
+            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
+        }
+        .task {
+            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
+            if let id = initialPortfolioID,
+               viewModel.selectedPortfolio?.persistentModelID != id,
+               let target = viewModel.portfolios.first(where: { $0.persistentModelID == id }) {
+                viewModel.selectPortfolio(target, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
-            .modifier(PortfolioSheetsAndAlerts(
-                viewModel: viewModel,
-                holdingToBuy: $holdingToBuy,
-                holdingToSell: $holdingToSell,
-                showingImport: $showingImport,
-                recentlyAdded: $recentlyAdded,
-                holdings: holdings
-            ))
-            .refreshable {
-                await syncService.syncAll(modelContext: modelContext, backendService: backendService)
-                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
+            if selectedClass == nil {
+                selectedClass = viewModel.allocationByClass.first?.assetClass
             }
-            .task {
-                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-                let service = backendService
-                debouncer.start { query in
-                    (try? await service.searchStocks(query: query)) ?? []
-                }
-            }
-            .onChange(of: syncService.isSyncing) { _, syncing in
-                if !syncing { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }
-            }
-            .onChange(of: holdings.count) {
-                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-            }
-            .onChange(of: searchText) { _, newValue in
-                debouncer.send(newValue)
-            }
+        }
+        .onChange(of: syncService.isSyncing) { _, syncing in
+            if !syncing { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }
+        }
+        .onChange(of: holdings.count) {
+            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
         }
     }
 
-    // MARK: - Top bar (portfolio selector + overflow menu)
+    // MARK: - Sidebar
+
+    private var sidebar: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                topBar
+                PortfolioTotalHeader(
+                    totalValue: viewModel.totalValue,
+                    monthlyIncomeNet: viewModel.summary?.monthlyIncomeNet
+                )
+                if !viewModel.allocationByClass.isEmpty {
+                    AllocationBar(allocations: viewModel.allocationByClass)
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .padding(.bottom, Theme.Spacing.md)
+                }
+
+                if viewModel.allocationByClass.isEmpty {
+                    TQEmptyState(
+                        icon: "briefcase",
+                        title: "No Assets",
+                        message: "Tap a class to add tickers, or open Settings → Allocation to set targets."
+                    )
+                    .padding(.top, 40)
+                } else {
+                    PortfolioClassTable(
+                        allocations: viewModel.allocationByClass,
+                        holdings: viewModel.holdings,
+                        onSelect: { classType in
+                            // Detail column re-renders fresh when class
+                            // changes (see `.id(assetClass)`).
+                            detailPath = NavigationPath()
+                            selectedClass = classType
+                        }
+                    )
+                    .background(Color.tqCardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium))
+                    .padding(.horizontal, Theme.Spacing.md)
+                }
+
+                Color.clear.frame(height: Theme.Spacing.lg)
+            }
+        }
+        .background(Color.tqBackground)
+        #if os(iOS)
+        .navigationBarHidden(true)
+        #endif
+    }
 
     private var topBar: some View {
-        HStack {
-            PortfolioSelectorMenu(
-                portfolios: viewModel.portfolios,
-                selected: viewModel.selectedPortfolio,
-                onSelect: { viewModel.selectPortfolio($0, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }
-            )
+        HStack(spacing: Theme.Spacing.sm) {
+            if let onBack = onBackToOverview {
+                Button {
+                    onBack()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Portfolios")
+                            .font(.subheadline)
+                    }
+                    .foregroundStyle(Color.tqAccentGreen)
+                }
+                .buttonStyle(.plain)
+            }
+            if let name = viewModel.selectedPortfolio?.name {
+                Text(name)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
             Spacer()
             PortfolioOverflowMenu(
                 onEdit: { viewModel.showingEditPortfolio = true },
-                onNew: { viewModel.showingNewPortfolio = true },
+                onNew: onBackToOverview == nil
+                    ? { viewModel.showingNewPortfolio = true }
+                    : nil,
                 onImport: { showingImport = true }
             )
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
-    }
-
-    // MARK: - Wide layout (header + ring + tabs / sortable table)
-
-    private var wideLayout: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                PortfolioTotalHeader(
-                    totalValue: viewModel.totalValue,
-                    monthlyIncomeNet: viewModel.summary?.monthlyIncomeNet
-                )
-                allocationSection
-                AssetClassTabsRow(
-                    holdings: viewModel.holdings,
-                    selected: viewModel.selectedClass,
-                    isWide: true,
-                    onSelect: { viewModel.selectClass($0, displayCurrency: displayCurrency, rates: rates) }
-                )
-            }
-            .frame(maxWidth: .infinity)
-
-            Divider()
-
-            HoldingsTableView(
-                holdings: viewModel.filteredHoldings,
-                totalValue: viewModel.totalValue,
-                onSelect: { id in
-                    navigationPath.append(id)
-                },
-                onChangeStatus: { holding, status in
-                    holding.status = status
-                },
-                onBuy: { holding in
-                    holdingToBuy = holding
-                },
-                onSell: { holding in
-                    holdingToSell = holding
-                },
-                onRemove: { holding in
-                    viewModel.holdingToRemove = holding
-                }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    private var allocationSection: some View {
-        Group {
-            if !viewModel.allocationByClass.isEmpty {
-                HStack {
-                    Spacer()
-                    AllocationBar(allocations: viewModel.allocationByClass)
-                        .frame(maxWidth: 520)
-                    Spacer()
-                }
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.bottom, Theme.Spacing.md)
-            }
-        }
-    }
-
-    private func handleAdd(_ result: StockSearchResultDTO) {
-        let ok = viewModel.addStudyHolding(
-            from: result,
-            modelContext: modelContext,
-            backendService: backendService
-        )
-        if ok, !recentlyAdded.contains(where: { $0.symbol == result.symbol }) {
-            withAnimation { recentlyAdded.insert(result, at: 0) }
-        }
-        viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
     }
 }
 

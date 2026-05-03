@@ -118,7 +118,7 @@ private actor RecordingBackend: BackendServiceProtocol {
     }
     var refreshCalls: [RefreshCall] = []
 
-    func searchStocks(query: String) async throws -> [StockSearchResultDTO] { [] }
+    func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO] { [] }
     func fetchStockQuote(symbol: String) async throws -> StockQuoteDTO {
         StockQuoteDTO(symbol: symbol, name: symbol, price: MoneyDTO(amount: "0", currency: "BRL"), currency: "BRL")
     }
@@ -155,7 +155,7 @@ private actor FailingBackend: BackendServiceProtocol {
         var errorDescription: String? { "refresh failed" }
     }
 
-    func searchStocks(query: String) async throws -> [StockSearchResultDTO] { [] }
+    func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO] { [] }
     func fetchStockQuote(symbol: String) async throws -> StockQuoteDTO {
         StockQuoteDTO(symbol: symbol, name: symbol, price: MoneyDTO(amount: "0", currency: "BRL"), currency: "BRL")
     }

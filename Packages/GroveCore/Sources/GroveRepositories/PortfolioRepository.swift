@@ -123,12 +123,11 @@ public struct PortfolioRepository {
             rates: rates
         )
 
-        let allocations = AssetClassType.allCases.compactMap { classType -> AssetClassAllocation? in
+        let allocations = AssetClassType.allCases.map { classType -> AssetClassAllocation in
             let nativeValue = valueByClass[classType] ?? .zero(in: displayCurrency)
             let displayValue = nativeValue.converted(to: displayCurrency, using: rates)
             let currentPct: Decimal = totalValue.amount > 0 ? (displayValue.amount / totalValue.amount) * 100 : 0
             let targetPct = Decimal(classAllocations[classType] ?? 0)
-            guard displayValue.amount > 0 || targetPct > 0 else { return nil }
             return AssetClassAllocation(
                 assetClass: classType,
                 currentValue: displayValue,
@@ -194,11 +193,13 @@ public struct PortfolioRepository {
 
             // Bootstrap contribution when the user reports an existing position.
             if pending.quantity > 0 {
+                let buyPrice = pending.averagePrice ?? pending.currentPrice
+                let date = pending.purchaseDate ?? .now
                 let contribution = Contribution(
-                    date: .now,
-                    amount: pending.quantity * pending.currentPrice,
+                    date: date,
+                    amount: pending.quantity * buyPrice,
                     shares: pending.quantity,
-                    pricePerShare: pending.currentPrice
+                    pricePerShare: buyPrice
                 )
                 contribution.holding = holding
                 modelContext.insert(contribution)
@@ -206,14 +207,12 @@ public struct PortfolioRepository {
             }
         }
 
-        // Only persist allocations for classes the user actually has — writing
-        // the full dict (with defaults for unused classes) would push the sum
-        // past 100 and break the rebalancing invariant.
-        let usedClasses = Set(pendingHoldings.map(\.assetClass))
+        // Persist the full per-class dict the user set in the allocation step.
+        // Onboarding now collects weights for all 6 classes (sum 100 ± 0.5), so
+        // we don't need to filter by `pendingHoldings` anymore — Settings will
+        // see the same complete allocation later.
         let allocationsToPersist = Dictionary(uniqueKeysWithValues:
-            targetAllocations
-                .filter { usedClasses.contains($0.key) }
-                .map { ($0.key, NSDecimalNumber(decimal: $0.value).doubleValue) }
+            targetAllocations.map { ($0.key, NSDecimalNumber(decimal: $0.value).doubleValue) }
         )
 
         let settings = try fetchSettings()

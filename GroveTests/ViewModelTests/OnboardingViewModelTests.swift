@@ -102,6 +102,7 @@ struct OnboardingViewModelTests {
     }
 
     @Test func addHoldingRespectsFreeTierLimit() {
+        UserDefaults.standard.set(false, forKey: AppConstants.Debug.unlimitedHoldingsKey)
         let vm = OnboardingViewModel()
         for i in 0..<AppConstants.freeTierMaxHoldings {
             vm.addHolding(ticker: "T\(i)")
@@ -115,6 +116,7 @@ struct OnboardingViewModelTests {
     }
 
     @Test func addHoldingFromSearchRespectsFreeTierLimit() {
+        UserDefaults.standard.set(false, forKey: AppConstants.Debug.unlimitedHoldingsKey)
         let vm = OnboardingViewModel()
         for i in 0..<AppConstants.freeTierMaxHoldings {
             vm.addHolding(ticker: "T\(i)")
@@ -173,11 +175,12 @@ struct OnboardingViewModelTests {
         #expect(!classes.contains(.usStocks))
     }
 
-    @Test func totalTargetAllocationOnlyCountsUsedClasses() {
+    @Test func totalTargetAllocationCoversAllSixClasses() {
         let vm = OnboardingViewModel()
         vm.addHolding(ticker: "ITUB3") // acoesBR
-        // Default targetAllocations[.acoesBR] = 30
-        #expect(vm.totalTargetAllocation == 30)
+        // Defaults sum to 100 across the full universe, regardless of which
+        // classes the user has pending holdings in.
+        #expect(vm.totalTargetAllocation == 100)
     }
 
     @Test func isTargetValidWhenSumIs100() {

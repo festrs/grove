@@ -18,6 +18,12 @@ public final class Holding {
     public var targetPercent: Decimal
     public var lastPriceUpdate: Date?
 
+    /// Custom (user-created) holdings are local-only — the backend has no
+    /// quote, dividends, or symbol for them. Sync, ticker bootstrap, and the
+    /// dividend scrape must skip these so they never trigger best-effort
+    /// failures or stomp the user's manually entered price.
+    public var isCustom: Bool = false
+
     // Optional enrichment data
     public var sector: String?
     public var logoURL: String?
@@ -122,16 +128,100 @@ public final class Holding {
         targetPercent - currentPercent(of: totalValue, in: displayCurrency, rates: rates)
     }
 
-    /// Dividends with ex-date on or after the first contribution — i.e. the
-    /// ones the user was actually holding shares for. Sorted by payment date
-    /// descending. Returns empty until the first buy is recorded.
-    public var earnedDividends: [DividendPayment] {
-        guard let firstContributionDate = contributions.map(\.date).min() else {
-            return []
-        }
-        return dividends
-            .filter { $0.exDate >= firstContributionDate }
+    /// Past dividends — every record with `exDate <= asOf`. No
+    /// contribution-date gating: Passive Income shows all recorded
+    /// dividends, totals scale by current `quantity` (study-mode
+    /// holdings naturally contribute zero).
+    public func paidDividends(asOf: Date) -> [DividendPayment] {
+        dividends
+            .filter { $0.exDate <= asOf }
             .sorted { $0.paymentDate > $1.paymentDate }
+    }
+
+    public var paidDividends: [DividendPayment] { paidDividends(asOf: .now) }
+
+    /// Future dividends — every record with `exDate > asOf`. Sorted by
+    /// payment date ascending so the next payment surfaces first.
+    public func projectedDividends(asOf: Date) -> [DividendPayment] {
+        dividends
+            .filter { $0.exDate > asOf }
+            .sorted { $0.paymentDate < $1.paymentDate }
+    }
+
+    public var projectedDividends: [DividendPayment] { projectedDividends(asOf: .now) }
+
+    /// Every dividend on this holding, sorted by payment date descending
+    /// and tagged paid / projected relative to `asOf`. Drives the per-class
+    /// income drilldown — see `DividendKind`.
+    public func classifiedDividends(asOf: Date) -> [ClassifiedDividend] {
+        dividends
+            .sorted { $0.paymentDate > $1.paymentDate }
+            .map { payment in
+                let kind: DividendKind = payment.exDate <= asOf ? .paid : .projected
+                return ClassifiedDividend(payment: payment, kind: kind)
+            }
+    }
+
+    public var classifiedDividends: [ClassifiedDividend] { classifiedDividends(asOf: .now) }
+
+    /// Sum of `paidDividends` totals, converted to `displayCurrency`. Excludes
+    /// projected and informational rows so the figure matches what the user
+    /// actually received.
+    public func paidDividendsTotal(
+        in displayCurrency: Currency,
+        rates: any ExchangeRates,
+        asOf: Date = .now
+    ) -> Money {
+        paidDividends(asOf: asOf).map(\.totalAmountMoney).sum(in: displayCurrency, using: rates)
+    }
+
+    /// Sum of `projectedDividends` totals, converted to `displayCurrency`.
+    /// What the user is expected to receive going forward at the current
+    /// share count.
+    public func projectedDividendsTotal(
+        in displayCurrency: Currency,
+        rates: any ExchangeRates,
+        asOf: Date = .now
+    ) -> Money {
+        projectedDividends(asOf: asOf).map(\.totalAmountMoney).sum(in: displayCurrency, using: rates)
+    }
+
+    // MARK: - Windowed income (paid + projected over day/week/month/year)
+    // NOTE: `DividendPayment.totalAmount` uses current `quantity`. For
+    // projected this is correct (best proxy for future shares). For paid it
+    // is slightly revisionist if the share count has changed since the
+    // payment. Tracking historical share count at ex-date is a follow-up.
+
+    /// Sum of dividends with `paymentDate` inside `window` AND classified as
+    /// paid (ex-date past `asOf` and on/after first contribution).
+    public func paidIncome(
+        in window: IncomeWindow,
+        asOf: Date = .now,
+        displayCurrency: Currency,
+        rates: any ExchangeRates,
+        calendar: Calendar = .current
+    ) -> Money {
+        let range = window.dateRange(asOf: asOf, calendar: calendar)
+        return paidDividends(asOf: asOf)
+            .filter { range.contains($0.paymentDate) }
+            .map(\.totalAmountMoney)
+            .sum(in: displayCurrency, using: rates)
+    }
+
+    /// Sum of dividends with `paymentDate` inside `window` AND classified as
+    /// projected (ex-date in the future).
+    public func projectedIncome(
+        in window: IncomeWindow,
+        asOf: Date = .now,
+        displayCurrency: Currency,
+        rates: any ExchangeRates,
+        calendar: Calendar = .current
+    ) -> Money {
+        let range = window.dateRange(asOf: asOf, calendar: calendar)
+        return projectedDividends(asOf: asOf)
+            .filter { range.contains($0.paymentDate) }
+            .map(\.totalAmountMoney)
+            .sum(in: displayCurrency, using: rates)
     }
 
     /// Estimated monthly dividend income (gross)
@@ -155,7 +245,8 @@ public final class Holding {
         assetClass: AssetClassType,
         currency: Currency? = nil,
         status: HoldingStatus = .estudo,
-        targetPercent: Decimal = 5
+        targetPercent: Decimal = 5,
+        isCustom: Bool = false
     ) {
         self.ticker = ticker
         self.displayName = displayName.isEmpty ? ticker : displayName
@@ -167,6 +258,7 @@ public final class Holding {
         self.currencyRaw = (currency ?? assetClass.defaultCurrency).rawValue
         self.statusRaw = status.rawValue
         self.targetPercent = targetPercent
+        self.isCustom = isCustom
         self.dividends = []
         self.contributions = []
     }

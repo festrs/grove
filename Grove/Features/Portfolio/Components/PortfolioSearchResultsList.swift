@@ -2,14 +2,16 @@ import SwiftUI
 import GroveDomain
 
 /// Stocks-search results pane shared by Compact (iPhone) and Wide
-/// (iPad + macOS) portfolio views. Tap a row to add it as `.estudo` —
-/// the caller wires the actual add via `onAdd`.
+/// (iPad + macOS) portfolio views. Tapping a row toggles the asset:
+/// `onAdd` when the result isn't in the portfolio yet, `onRemove` when it
+/// already is.
 struct PortfolioSearchResultsList: View {
     let results: [StockSearchResultDTO]
     let isSearching: Bool
     let searchText: String
     let isAlreadyAdded: (String) -> Bool
     let onAdd: (StockSearchResultDTO) -> Void
+    let onRemove: (StockSearchResultDTO) -> Void
 
     var body: some View {
         Group {
@@ -26,13 +28,11 @@ struct PortfolioSearchResultsList: View {
                     ForEach(results, id: \.id) { result in
                         let added = isAlreadyAdded(result.symbol)
                         Button {
-                            guard !added else { return }
-                            onAdd(result)
+                            if added { onRemove(result) } else { onAdd(result) }
                         } label: {
                             row(result: result, added: added)
                         }
                         .buttonStyle(.plain)
-                        .disabled(added)
                         .padding(.horizontal, Theme.Spacing.md)
                         .padding(.vertical, 8)
                     }
@@ -53,7 +53,7 @@ struct PortfolioSearchResultsList: View {
     @ViewBuilder
     private func row(result: StockSearchResultDTO, added: Bool) -> some View {
         HStack(spacing: 12) {
-            leadingIcon(for: result, added: added)
+            leadingIcon(added: added)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(result.displaySymbol)
@@ -72,22 +72,19 @@ struct PortfolioSearchResultsList: View {
             Spacer()
 
             if added {
-                Text("Added")
+                Text("Tap to remove")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
         }
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
-    private func leadingIcon(for result: StockSearchResultDTO, added: Bool) -> some View {
+    private func leadingIcon(added: Bool) -> some View {
         if added {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Color.tqAccentGreen)
-                .font(.title3)
-        } else if result.isCrypto {
-            Image(systemName: "bitcoinsign.circle.fill")
-                .foregroundStyle(AssetClassType.crypto.color)
+            Image(systemName: "minus.circle.fill")
+                .foregroundStyle(Color.tqNegative)
                 .font(.title3)
         } else {
             Image(systemName: "plus.circle.fill")

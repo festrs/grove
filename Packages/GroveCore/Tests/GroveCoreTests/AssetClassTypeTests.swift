@@ -36,6 +36,47 @@ struct AssetClassTypeTests {
         #expect(AssetClassType.detect(from: "btc") == .crypto)
     }
 
+    // MARK: - apiType-driven detection (yfinance/backend search)
+
+    // The unified search endpoint emits the strings below in the `type`
+    // field; iOS must keep mapping them to the right asset class so search
+    // results render with the correct badge/destination class screen.
+
+    @Test func detectsFromApiTypeStock() {
+        #expect(AssetClassType.detect(from: "PETR4.SA", apiType: "stock") == .acoesBR)
+    }
+
+    @Test func detectsFromApiTypeFund() {
+        #expect(AssetClassType.detect(from: "BTLG11.SA", apiType: "fund") == .fiis)
+    }
+
+    @Test func detectsFromApiTypeBdr() {
+        #expect(AssetClassType.detect(from: "AAPL34.SA", apiType: "bdr") == .usStocks)
+    }
+
+    @Test func detectsFromApiTypeReit() {
+        #expect(AssetClassType.detect(from: "O", apiType: "reit") == .reits)
+    }
+
+    @Test func detectsFromApiTypeCommonStock() {
+        // Backend emits "common stock" verbatim for US equities; the
+        // case-insensitive match in detect() also handles "Common Stock".
+        #expect(AssetClassType.detect(from: "AAPL", apiType: "common stock") == .usStocks)
+        #expect(AssetClassType.detect(from: "AAPL", apiType: "Common Stock") == .usStocks)
+    }
+
+    @Test func detectsFromApiTypeCrypto() {
+        #expect(AssetClassType.detect(from: "DOGE", apiType: "crypto") == .crypto)
+    }
+
+    @Test func apiTypeOverridesTickerHeuristic() {
+        // BTLG11 ends in "11" → ticker heuristic says FII; but if the
+        // backend (somehow) tagged it "stock", the apiType wins. This
+        // protects against future backend mapping changes leaking into
+        // misclassification on the client.
+        #expect(AssetClassType.detect(from: "BTLG11.SA", apiType: "stock") == .acoesBR)
+    }
+
     // MARK: - Default Currency
 
     @Test func brAssetsDefaultToBRL() {

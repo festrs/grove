@@ -101,7 +101,7 @@ cd backend && .venv312/bin/python -m pytest tests/ -v
 - `NSDecimalNumber(decimal:).doubleValue` for converting Decimal to Double (never use `.intValue` — it returns 0 for values < 1).
 - Feature-based folder structure: `Features/Dashboard/`, `Features/Portfolio/`, etc.
 - Previews should use `Holding.itub3`, `.btlg11`, etc. (static factory properties on `Holding` in `SampleData+Holdings.swift`).
-- Brazilian Portuguese for UI strings (no localization framework yet — strings are inline).
+- UI strings are localized via `Grove/Localizable.xcstrings` (sourceLanguage `en`, with `pt-BR` and `es` translations). Author new `Text(...)` literals in **English** so SwiftUI's `LocalizedStringKey` picks them up; for `String`-typed parameters use `String(localized: "Key")`. Use `Text(verbatim:)` for user-supplied data (portfolio names, ticker symbols, formatted money) so it isn't passed through the localizer. Add the new key to `Localizable.xcstrings` with translations when shipping.
 
 ## Git & PR Conventions
 

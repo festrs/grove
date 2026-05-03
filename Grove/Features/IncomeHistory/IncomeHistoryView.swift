@@ -11,19 +11,10 @@ struct IncomeHistoryView: View {
     @Environment(\.rates) private var rates
     @State private var viewModel = IncomeHistoryViewModel()
 
-    @Environment(\.horizontalSizeClass) private var sizeClass
-
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.md) {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 280), spacing: Theme.Spacing.md)],
-                    spacing: Theme.Spacing.md
-                ) {
-                    annualSummaryCard
-                    monthlySummaryCard
-                }
-
+                windowGrid
                 if let breakdown = viewModel.taxBreakdown {
                     LazyVGrid(
                         columns: [GridItem(.adaptive(minimum: 280), spacing: Theme.Spacing.md)],
@@ -39,9 +30,13 @@ struct IncomeHistoryView: View {
             .frame(maxWidth: Theme.Layout.maxContentWidth)
         }
         .navigationTitle("Passive Income")
-        .refreshable {
-            await syncService.syncAll(modelContext: modelContext, backendService: backendService)
-            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
+        .refreshable { await refresh() }
+        .toolbar {
+            #if os(macOS)
+            ToolbarItem(placement: .primaryAction) { refreshToolbarButton }
+            #else
+            ToolbarItem(placement: .topBarTrailing) { refreshToolbarButton }
+            #endif
         }
         .task {
             viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
@@ -51,40 +46,82 @@ struct IncomeHistoryView: View {
         }
     }
 
-    private var annualSummaryCard: some View {
-        TQCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Estimated Annual Income")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(viewModel.totalAnnual.formatted())
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.tqAccentGreen)
-                }
-                Spacer()
-                Image(systemName: "chart.bar.fill")
-                    .font(.title)
-                    .foregroundStyle(Color.tqAccentGreen.opacity(0.5))
+    @ViewBuilder
+    private var refreshToolbarButton: some View {
+        Button {
+            Task { await refresh() }
+        } label: {
+            if syncService.isSyncing {
+                ProgressView().controlSize(.small)
+            } else {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+        }
+        .disabled(syncService.isSyncing)
+        .help("Sync dividends from backend for all holdings")
+    }
+
+    private func refresh() async {
+        await syncService.syncAll(modelContext: modelContext, backendService: backendService)
+        viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
+    }
+
+    /// Day / Week / Month / Year cards. Tapping selects the window for the
+    /// per-class breakdown below.
+    private var windowGrid: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 160), spacing: Theme.Spacing.sm)],
+            spacing: Theme.Spacing.sm
+        ) {
+            ForEach(viewModel.summaries, id: \.window) { summary in
+                windowCard(summary)
             }
         }
     }
 
-    private var monthlySummaryCard: some View {
-        TQCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Estimated Monthly Income")
+    private func windowCard(_ summary: IncomeWindowSummary) -> some View {
+        let isSelected = summary.window == viewModel.selectedWindow
+        return Button {
+            viewModel.selectWindow(summary.window, modelContext: modelContext,
+                                   displayCurrency: displayCurrency, rates: rates)
+        } label: {
+            TQCard {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Text(label(for: summary.window))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(viewModel.monthlyIncome.formatted())
+                    Text(summary.total.formatted())
                         .font(.title3)
                         .fontWeight(.bold)
+                        .foregroundStyle(Color.tqAccentGreen)
+                    HStack(spacing: 4) {
+                        Text("Paid \(summary.paid.formatted())")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        if summary.projected.amount > 0 {
+                            Text("· Proj \(summary.projected.formatted())")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary.opacity(0.8))
+                        }
+                    }
                 }
-                Spacer()
-                Text("/month").font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.card)
+                    .stroke(isSelected ? Color.tqAccentGreen : .clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func label(for window: IncomeWindow) -> String {
+        switch window {
+        case .day: return "Today"
+        case .week: return "This Week"
+        case .month: return "This Month"
+        case .year: return "This Year"
+        case .custom: return "Custom"
         }
     }
 

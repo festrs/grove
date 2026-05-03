@@ -25,8 +25,8 @@ struct AssetClassDividendsView: View {
         )
     }
 
-    private var earningHoldings: [Holding] {
-        holdings.filter { !$0.earnedDividends.isEmpty }
+    private var holdingsWithPayments: [Holding] {
+        holdings.filter { !$0.dividends.isEmpty }
     }
 
     var body: some View {
@@ -35,14 +35,14 @@ struct AssetClassDividendsView: View {
                 if let error = viewModel.errorMessage {
                     errorBanner(error)
                 }
-                if earningHoldings.isEmpty {
+                if holdingsWithPayments.isEmpty {
                     TQEmptyState(
                         icon: "tray",
                         title: "No dividends yet",
-                        message: "Dividends for \(assetClass.displayName) will appear here once payments are recorded."
+                        message: "Pull to refresh and we'll fetch payment history for these tickers from the backend."
                     )
                 } else {
-                    ForEach(earningHoldings, id: \.persistentModelID) { holding in
+                    ForEach(holdingsWithPayments, id: \.persistentModelID) { holding in
                         holdingCard(holding)
                     }
                 }
@@ -100,8 +100,11 @@ struct AssetClassDividendsView: View {
     }
 
     private func holdingCard(_ holding: Holding) -> some View {
-        let dividends = holding.earnedDividends
-        let total = dividends.map(\.totalAmountMoney).sum(in: displayCurrency, using: rates)
+        let rows = holding.classifiedDividends
+        let paidTotal = holding.paidDividendsTotal(in: displayCurrency, rates: rates)
+        let projectedTotal = holding.projectedDividendsTotal(in: displayCurrency, rates: rates)
+        let paidCount = holding.paidDividends.count
+        let projectedCount = holding.projectedDividends.count
 
         return TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -116,28 +119,64 @@ struct AssetClassDividendsView: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(total.formatted())
+                        Text(paidTotal.formatted())
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.tqAccentGreen)
-                        Text("\(dividends.count) payment\(dividends.count == 1 ? "" : "s")")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        if projectedTotal.amount > 0 {
+                            Text("+ \(projectedTotal.formatted()) projected")
+                                .font(.caption2)
+                                .foregroundStyle(Color.tqAccentGreen.opacity(0.8))
+                        }
+                        cardSubtitle(paidCount: paidCount, projectedCount: projectedCount)
                     }
                 }
                 Divider()
-                ForEach(dividends, id: \.persistentModelID) { d in
-                    dividendRow(d)
+                ForEach(rows) { row in
+                    dividendRow(row)
                 }
             }
         }
     }
 
-    private func dividendRow(_ d: DividendPayment) -> some View {
-        HStack {
+    private func cardSubtitle(paidCount: Int, projectedCount: Int) -> some View {
+        let parts: [String] = {
+            var p: [String] = []
+            if paidCount > 0 { p.append("\(paidCount) paid") }
+            if projectedCount > 0 { p.append("\(projectedCount) projected") }
+            if p.isEmpty { p.append("0 payments") }
+            return p
+        }()
+        return Text(parts.joined(separator: " · "))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+    }
+
+    private func dividendRow(_ row: ClassifiedDividend) -> some View {
+        let kind = row.kind
+        let d = row.payment
+        let badge: (label: String, opacity: Double)? = {
+            switch kind {
+            case .paid: return nil
+            case .projected: return ("projected", 0.85)
+            }
+        }()
+        let amountColor: Color = kind == .paid ? Color.tqAccentGreen : Color.secondary
+        return HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(d.paymentDate.formatted(.dateTime.day().month().year()))
-                    .font(.subheadline)
+                HStack(spacing: Theme.Spacing.xs) {
+                    Text(d.paymentDate.formatted(.dateTime.day().month().year()))
+                        .font(.subheadline)
+                    if let badge {
+                        Text(badge.label)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
                 Text("\(d.amountPerShareMoney.formatted()) / share")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -146,7 +185,7 @@ struct AssetClassDividendsView: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(d.totalAmountMoney.formatted())
                     .font(.subheadline)
-                    .foregroundStyle(Color.tqAccentGreen)
+                    .foregroundStyle(amountColor)
                 if d.withholdingTax > 0 {
                     Text("net \(d.netAmountMoney.formatted())")
                         .font(.caption2)
@@ -154,6 +193,7 @@ struct AssetClassDividendsView: View {
                 }
             }
         }
+        .opacity(badge?.opacity ?? 1)
     }
 }
 

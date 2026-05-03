@@ -88,17 +88,47 @@ add "$E" "percent helper: divide by total"   'guard total > 0 else { return 0 }'
 # --- TaxTreatment / TaxCalculator: after-tax income ---
 TT="Packages/GroveCore/Sources/GroveDomain/TaxTreatment.swift"
 add "$TT" "nra30 multiplier 0.70 -> 1.0"     'case .nra30: 0.70'                                     'case .nra30: 1.0'                                                                       "TaxCalculatorTests"
+add "$TT" "crypto15 multiplier 0.85 -> 0.70" 'case .crypto15: 0.85'                                  'case .crypto15: 0.70'                                                                   "TaxCalculatorTests"
+add "$TT" "irRegressivo 0.80 -> 1.0"         'case .irRegressivo: 0.80'                              'case .irRegressivo: 1.0'                                                                "TaxCalculatorTests"
+add "$TT" "exempt multiplier 1.0 -> 0.7"     'case .exempt: 1.0'                                     'case .exempt: 0.7'                                                                      "TaxCalculatorTests"
 
 T="Packages/GroveCore/Sources/GroveServices/TaxCalculator.swift"
 add "$T" "flip withholding sign"             'gross * (1 - netMultiplier(for: assetClass))'          'gross * (1 + netMultiplier(for: assetClass))'                                           "TaxCalculatorTests"
+add "$T" "netIncome: gross*net -> gross*tax" 'gross * netMultiplier(for: assetClass)'                'gross * (1 - netMultiplier(for: assetClass))'                                           "TaxCalculatorTests"
+add "$T" "money breakdown: net <-> tax"      'gross.amount * multiplier'                             'gross.amount * (1 - multiplier)'                                                        "TaxCalculatorTests"
 
 # --- IncomeProjector: FIRE projection ---
 I="Packages/GroveCore/Sources/GroveServices/IncomeProjector.swift"
 add "$I" "skip projection loop"              'totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0'  'totalNet.amount > goalDisplay.amount && contributionDisplay.amount > 0' "IncomeProjectorTests"
+add "$I" "monthlyYield: drop /12"            'monthlyYield = avgDY / 100 / 12'                       'monthlyYield = avgDY / 100'                                                             "IncomeProjectorTests"
+add "$I" "FIRE sim: drop tax multiplier"     'currentIncome += contributionDisplay.amount * monthlyYield * avgNetMultiplier'  'currentIncome += contributionDisplay.amount * monthlyYield'    "IncomeProjectorTests"
 
-# --- Holding: per-position P&L ---
+# --- IncomeAggregator: passive-income drilldown ---
+IA="Packages/GroveCore/Sources/GroveServices/IncomeAggregator.swift"
+add "$IA" "byClass filter: nonzero -> negative" '$0.total.amount > 0'                                '$0.total.amount < 0'                                                                    "IncomeAggregatorTests"
+add "$IA" "byClass sort: descending -> ascending" '$0.total.amount > $1.total.amount'                '$0.total.amount < $1.total.amount'                                                      "IncomeAggregatorTests"
+
+# --- Holding: per-position P&L + cost basis + dividend windows ---
 H="Packages/GroveCore/Sources/GroveDomain/Holding.swift"
 add "$H" "flip gainLoss sign"                'currentValue - totalCost'                              'totalCost - currentValue'                                                               "TransactionTests"
+add "$H" "gainLossPercent: invert guard"     'guard totalCost > 0 else { return 0 }'                 'guard totalCost < 0 else { return 0 }'                                                  "TransactionTests"
+add "$H" "currentPercent: invert empty guard" 'guard totalValue.amount > 0 else { return 0 }'        'guard totalValue.amount < 0 else { return 0 }'                                          "PortfolioRepositoryTests,RebalancingEngineTests"
+add "$H" "recalc: buy/sell branch flip"      'if c.shares > 0 {'                                     'if c.shares < 0 {'                                                                      "TransactionTests"
+add "$H" "recalc: drop max-zero clamp"       'quantity = max(totalShares, 0)'                        'quantity = totalShares'                                                                 "TransactionTests"
+add "$H" "paidDividends ex-date: <= -> <"    '$0.exDate <= asOf'                                     '$0.exDate < asOf'                                                                       "HoldingDividendsTests,HoldingIncomeWindowTests"
+add "$H" "projectedDividends: > -> >="       '$0.exDate > asOf'                                      '$0.exDate >= asOf'                                                                      "HoldingDividendsTests,HoldingIncomeWindowTests"
+
+# --- DividendPayment: per-payment tax + earnings ---
+D="Packages/GroveCore/Sources/GroveDomain/DividendPayment.swift"
+add "$D" "totalAmount: multiply -> add"      'amountPerShare * (holding?.quantity ?? 0)'             'amountPerShare + (holding?.quantity ?? 0)'                                              "HoldingDividendsTests"
+add "$D" "withholdingTax: flip sign"         'totalAmount * (1 - taxTreatment.netMultiplier)'        'totalAmount * (1 + taxTreatment.netMultiplier)'                                         "HoldingDividendsTests"
+add "$D" "netAmount: flip sign"              'totalAmount - withholdingTax'                          'totalAmount + withholdingTax'                                                           "HoldingDividendsTests"
+
+# --- Money: arithmetic + FX conversion ---
+M="Packages/GroveCore/Sources/GroveDomain/Money.swift"
+add "$M" "Money +: flip to subtraction"      'lhs.amount + rhs.amount'                               'lhs.amount - rhs.amount'                                                                "MoneyTests"
+add "$M" "converted: short-circuit inverted" 'if currency == target { return self }'                 'if currency != target { return self }'                                                  "MoneyTests"
+add "$M" "sum reducer: add -> subtract"      'acc + money.converted(to: target, using: rates)'       'acc - money.converted(to: target, using: rates)'                                        "MoneyTests"
 
 # --- PortfolioRepository: allocation drift ---
 R="Packages/GroveCore/Sources/GroveRepositories/PortfolioRepository.swift"
@@ -109,6 +139,9 @@ A="Packages/GroveCore/Sources/GroveDomain/AssetClassType.swift"
 add "$A" "detect FII -> acoesBR"             'if apiType == "fund" { return .fiis }'                 'if apiType == "fund" { return .acoesBR }'                                               "BackendDTOTests"
 add "$A" "BR currency -> USD"                'case .acoesBR, .fiis, .rendaFixa: .brl'                'case .acoesBR, .fiis, .rendaFixa: .usd'                                                 "AssetClassTypeTests,TaxCalculatorTests"
 add "$A" "detect crypto -> nil"              'if apiType == "crypto" { return .crypto }'             'if apiType == "crypto" { return nil }'                                                  "BackendDTOTests"
+add "$A" "acoesBR tax: exempt -> nra30"      'case .acoesBR: .exempt'                                'case .acoesBR: .nra30'                                                                  "TaxCalculatorTests"
+add "$A" "crypto tax: crypto15 -> exempt"    'case .crypto: .crypto15'                               'case .crypto: .exempt'                                                                  "TaxCalculatorTests"
+add "$A" "detect BDR -> acoesBR"             'if apiType == "bdr" { return .usStocks }'              'if apiType == "bdr" { return .acoesBR }'                                                "BackendDTOTests"
 
 # ────────────────────────────────────────────────
 #  Batched runner

@@ -9,37 +9,16 @@ struct AllocationSettingsView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(AssetClassType.allCases) { cls in
-                    HStack {
-                        Circle()
-                            .fill(cls.color)
-                            .frame(width: 10, height: 10)
-                        Text(cls.displayName)
-                            .font(.subheadline)
-
-                        Spacer()
-
-                        Text("\(Int(viewModel.weights[cls] ?? 0))%")
-                            .font(.subheadline.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(viewModel.weights[cls] ?? 0 > 0 ? .primary : .secondary)
-                            .frame(width: 44, alignment: .trailing)
-
-                        Stepper("", value: Binding(
-                            get: { viewModel.weights[cls] ?? 0 },
-                            set: { viewModel.setWeight($0, for: cls) }
-                        ), in: 0...100, step: 1)
-                        .labelsHidden()
-                    }
-                }
-
-                HStack {
-                    Text("Total")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Text("\(Int(viewModel.total))%")
-                        .font(.subheadline.monospacedDigit().weight(.bold))
-                        .foregroundStyle(viewModel.isValid ? Color.tqAccentGreen : Color.tqNegative)
-                }
+                TQAssetClassWeightsEditor(
+                    weights: Binding(
+                        get: { viewModel.weights },
+                        set: { newValue in
+                            for (cls, value) in newValue where viewModel.weights[cls] != value {
+                                viewModel.setWeight(value, for: cls)
+                            }
+                        }
+                    )
+                )
             } header: {
                 Text("Allocation by Class")
             } footer: {

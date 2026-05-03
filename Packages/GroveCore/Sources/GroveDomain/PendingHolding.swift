@@ -15,6 +15,11 @@ public struct PendingHolding: Identifiable, Sendable {
     /// "Common Stock"). Preserved across auto-classify so we don't lose the
     /// stronger signal in favor of ticker-only heuristics.
     public var apiType: String?
+    /// User-entered buy price for the bootstrap contribution. When nil, the
+    /// repository falls back to `currentPrice` at completion time.
+    public var averagePrice: Decimal?
+    /// User-entered purchase date. When nil, the repository uses `.now`.
+    public var purchaseDate: Date?
 
     public init(
         id: UUID = UUID(),
@@ -25,7 +30,9 @@ public struct PendingHolding: Identifiable, Sendable {
         status: HoldingStatus,
         currentPrice: Decimal,
         dividendYield: Decimal,
-        apiType: String? = nil
+        apiType: String? = nil,
+        averagePrice: Decimal? = nil,
+        purchaseDate: Date? = nil
     ) {
         self.id = id
         self.ticker = ticker
@@ -36,5 +43,7 @@ public struct PendingHolding: Identifiable, Sendable {
         self.currentPrice = currentPrice
         self.dividendYield = dividendYield
         self.apiType = apiType
+        self.averagePrice = averagePrice
+        self.purchaseDate = purchaseDate
     }
 }

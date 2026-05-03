@@ -4,7 +4,7 @@ import GroveDomain
 /// Backend provides market data only. Portfolio lives in SwiftData.
 protocol BackendServiceProtocol: Sendable {
     // Stocks
-    func searchStocks(query: String) async throws -> [StockSearchResultDTO]
+    func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO]
     func fetchStockQuote(symbol: String) async throws -> StockQuoteDTO
 
     // Batch quotes (send local symbols, get prices back)

@@ -2,10 +2,9 @@ import Foundation
 import SwiftData
 import GroveDomain
 
-/// Owns the refresh-from-backend flow for `AssetClassDividendsView`. Keeps
-/// the view as pure layout: state transitions (`isRefreshing`, error
-/// surfacing) and the two-step refresh (on-demand scrape + local sync) live
-/// here so they're testable without SwiftUI in the loop.
+/// Backs `AssetClassDividendsView`. Owns the manual refresh flow only —
+/// per-holding dividend classification (earned vs informational) and totals
+/// live on `Holding` itself in GroveDomain.
 @Observable
 @MainActor
 final class AssetClassDividendsViewModel {

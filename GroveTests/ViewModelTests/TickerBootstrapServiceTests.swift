@@ -159,7 +159,7 @@ private actor StubBackend: BackendServiceProtocol {
         self.dpsBySymbol = dpsBySymbol
     }
 
-    func searchStocks(query: String) async throws -> [StockSearchResultDTO] { [] }
+    func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO] { [] }
     func fetchStockQuote(symbol: String) async throws -> StockQuoteDTO {
         calls.append("quote:\(symbol)")
         return StockQuoteDTO(symbol: symbol, name: symbol,
@@ -214,7 +214,7 @@ private actor StubBackend: BackendServiceProtocol {
 
 private actor ThrowingBackend: BackendServiceProtocol {
     enum E: Error { case nope }
-    func searchStocks(query: String) async throws -> [StockSearchResultDTO] { throw E.nope }
+    func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO] { throw E.nope }
     func fetchStockQuote(symbol: String) async throws -> StockQuoteDTO { throw E.nope }
     func fetchBatchQuotes(symbols: [String]) async throws -> [BatchQuoteDTO] { throw E.nope }
     func fetchExchangeRate(pair: String) async throws -> BackendExchangeRateDTO { throw E.nope }

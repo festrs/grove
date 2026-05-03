@@ -18,10 +18,12 @@ actor BackendService: BackendServiceProtocol {
 
     // MARK: - Stocks (existing public endpoints)
 
-    func searchStocks(query: String) async throws -> [StockSearchResultDTO] {
-        let url = try buildURL(path: "/stocks/search", queryItems: [
-            URLQueryItem(name: "q", value: query)
-        ])
+    func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO] {
+        var items = [URLQueryItem(name: "q", value: query)]
+        if let assetClass {
+            items.append(URLQueryItem(name: "asset_class", value: assetClass.rawValue))
+        }
+        let url = try buildURL(path: "/stocks/search", queryItems: items)
         return try await HTTPClient.fetch(url: url, headers: apiHeaders)
     }
 

@@ -3,12 +3,15 @@ import GroveDomain
 
 actor MockBackendService: BackendServiceProtocol {
 
-    func searchStocks(query: String) async throws -> [StockSearchResultDTO] {
-        [
+    func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO] {
+        let all = [
             StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "ITAU UNIBANCO HOLDING S.A.", type: "stock", price: "46.37", currency: "BRL", change: "-0.92", sector: "Finance", logo: nil),
             StockSearchResultDTO(id: "PETR4.SA", symbol: "PETR4.SA", name: "PETROLEO BRASILEIRO S.A. PETROBRAS", type: "stock", price: "36.80", currency: "BRL", change: "1.5", sector: "Energy Minerals", logo: nil),
             StockSearchResultDTO(id: "AAPL", symbol: "AAPL", name: "Apple Inc", type: "Common Stock", price: "189.50", currency: "USD", change: "0.3", sector: nil, logo: nil),
-        ].filter { $0.symbol.lowercased().contains(query.lowercased()) || ($0.name ?? "").lowercased().contains(query.lowercased()) }
+        ]
+        let matched = all.filter { $0.symbol.lowercased().contains(query.lowercased()) || ($0.name ?? "").lowercased().contains(query.lowercased()) }
+        guard let assetClass else { return matched }
+        return matched.filter { $0.inferredAssetClass == assetClass }
     }
 
     func fetchStockQuote(symbol: String) async throws -> StockQuoteDTO {

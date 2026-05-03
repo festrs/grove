@@ -2,16 +2,13 @@ import SwiftUI
 import SwiftData
 import GroveDomain
 
-/// Shared sheet + alert wiring for the portfolio screens. Both
-/// `CompactPortfolioView` and `WidePortfolioView` attach this so the buy/sell
-/// transaction sheets, the import sheet, the edit/new portfolio sheets, and
-/// the remove-asset confirmation all behave identically across platforms.
+/// Shared sheet + alert wiring for the portfolio root screens. Hosts the
+/// edit/new portfolio sheets, the import sheet, and the remove-asset
+/// confirmation. Per-class buy/sell sheets and the add flow live inside
+/// `AssetClassHoldingsView` now.
 struct PortfolioSheetsAndAlerts: ViewModifier {
     @Bindable var viewModel: PortfolioViewModel
-    @Binding var holdingToBuy: Holding?
-    @Binding var holdingToSell: Holding?
     @Binding var showingImport: Bool
-    @Binding var recentlyAdded: [StockSearchResultDTO]
     let holdings: [Holding]
 
     @Environment(\.modelContext) private var modelContext
@@ -20,19 +17,6 @@ struct PortfolioSheetsAndAlerts: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $viewModel.showingAddDetails, onDismiss: {
-                if let result = viewModel.selectedSearchResult {
-                    let wasAdded = holdings.contains { $0.ticker == result.symbol }
-                    if wasAdded && !recentlyAdded.contains(where: { $0.symbol == result.symbol }) {
-                        withAnimation { recentlyAdded.insert(result, at: 0) }
-                    }
-                    viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-                }
-            }) {
-                if let result = viewModel.selectedSearchResult {
-                    AddAssetDetailSheet(searchResult: result)
-                }
-            }
             .sheet(isPresented: $viewModel.showingEditPortfolio) {
                 if let portfolio = viewModel.selectedPortfolio {
                     EditPortfolioView(portfolio: portfolio)
@@ -42,12 +26,6 @@ struct PortfolioSheetsAndAlerts: ViewModifier {
                 NewPortfolioSheet { name in
                     viewModel.createPortfolio(name: name, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
                 }
-            }
-            .sheet(item: $holdingToBuy, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) { holding in
-                NewTransactionView(transactionType: .buy, preselectedHolding: holding)
-            }
-            .sheet(item: $holdingToSell, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) { holding in
-                NewTransactionView(transactionType: .sell, preselectedHolding: holding)
             }
             .sheet(isPresented: $showingImport, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) {
                 if let portfolio = viewModel.selectedPortfolio {

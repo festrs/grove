@@ -73,15 +73,13 @@ final class OnboardingViewModel {
     }
 
     var totalTargetAllocation: Decimal {
-        assetClassesInUse.reduce(Decimal.zero) { sum, cls in
+        AssetClassType.allCases.reduce(Decimal.zero) { sum, cls in
             sum + (targetAllocations[cls] ?? 0)
         }
     }
 
     var isTargetValid: Bool {
-        AllocationValidator.isValid(
-            Dictionary(uniqueKeysWithValues: assetClassesInUse.map { ($0, targetAllocations[$0] ?? 0) })
-        )
+        AllocationValidator.isValid(targetAllocations)
     }
 
     // MARK: - Navigation Helpers
@@ -118,7 +116,7 @@ final class OnboardingViewModel {
         isSearching = true
         errorMessage = nil
         do {
-            let results = try await service.searchStocks(query: trimmed)
+            let results = try await service.searchStocks(query: trimmed, assetClass: nil)
             searchResults = results
         } catch {
             errorMessage = "Error searching: \(error.localizedDescription)"
@@ -177,6 +175,22 @@ final class OnboardingViewModel {
             dividendYield: 0
         )
         pendingHoldings.append(holding)
+        errorMessage = nil
+    }
+
+    /// Append a pre-populated draft (from `AddAssetDetailSheet` in
+    /// `.onboarding` mode) with the same dedupe/limit guards as
+    /// `addHolding(from:)`.
+    func appendPending(_ pending: PendingHolding) {
+        guard canAddMoreHoldings else {
+            errorMessage = Holding.freeTierLimitMessage
+            return
+        }
+        guard !pendingHoldings.contains(where: { $0.ticker.uppercased() == pending.ticker.uppercased() }) else {
+            errorMessage = "\(pending.ticker) has already been added."
+            return
+        }
+        pendingHoldings.append(pending)
         errorMessage = nil
     }
 

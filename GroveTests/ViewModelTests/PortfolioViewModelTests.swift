@@ -14,9 +14,7 @@ struct PortfolioViewModelTests {
 
     @Test func initialState() {
         let vm = PortfolioViewModel()
-        #expect(vm.selectedClass == nil)
         #expect(vm.holdings.isEmpty)
-        #expect(vm.filteredHoldings.isEmpty)
         #expect(vm.summary == nil)
         #expect(vm.totalValue.amount == 0)
     }
@@ -32,53 +30,10 @@ struct PortfolioViewModelTests {
         vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
 
         #expect(!vm.holdings.isEmpty)
-        #expect(!vm.filteredHoldings.isEmpty)
         #expect(vm.summary != nil)
         #expect(vm.totalValue.amount > 0)
         #expect(!vm.portfolios.isEmpty)
         #expect(vm.selectedPortfolio != nil)
-    }
-
-    // MARK: - selectClass / applyFilter
-
-    @MainActor
-    @Test func selectClassFiltersHoldings() throws {
-        let ctx = try makeTestContext()
-        let (_, _) = seedTestData(ctx)
-
-        let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
-
-        vm.selectClass(.acoesBR, displayCurrency: .brl, rates: Self.rates)
-        #expect(vm.selectedClass == .acoesBR)
-        #expect(vm.filteredHoldings.allSatisfy { $0.assetClass == .acoesBR })
-    }
-
-    @MainActor
-    @Test func selectClassNilShowsAll() throws {
-        let ctx = try makeTestContext()
-        let (_, _) = seedTestData(ctx)
-
-        let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
-
-        vm.selectClass(.acoesBR, displayCurrency: .brl, rates: Self.rates)
-        let filteredCount = vm.filteredHoldings.count
-
-        vm.selectClass(nil, displayCurrency: .brl, rates: Self.rates)
-        #expect(vm.filteredHoldings.count > filteredCount)
-    }
-
-    @MainActor
-    @Test func selectClassWithNoMatchReturnsEmpty() throws {
-        let ctx = try makeTestContext()
-        let (_, _) = seedTestData(ctx)
-
-        let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
-
-        vm.selectClass(.crypto, displayCurrency: .brl, rates: Self.rates)
-        #expect(vm.filteredHoldings.isEmpty)
     }
 
     // MARK: - deleteHolding

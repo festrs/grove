@@ -35,10 +35,14 @@ struct PortfolioSelectorMenu: View {
     }
 }
 
-/// Edit / New / Import portfolio overflow menu.
+/// Edit / New / Import portfolio overflow menu. `onNew` is optional —
+/// callers in the multi-portfolio flow (where `PortfoliosOverviewView`
+/// owns portfolio creation via its toolbar `+`) pass `nil` to hide the
+/// entry. Standalone single-portfolio mode still passes a closure so the
+/// user has a path to create their second portfolio.
 struct PortfolioOverflowMenu: View {
     let onEdit: () -> Void
-    let onNew: () -> Void
+    let onNew: (() -> Void)?
     let onImport: () -> Void
 
     var body: some View {
@@ -48,10 +52,12 @@ struct PortfolioOverflowMenu: View {
             } label: {
                 Label("Edit Portfolio", systemImage: "pencil")
             }
-            Button {
-                onNew()
-            } label: {
-                Label("New Portfolio", systemImage: "folder.badge.plus")
+            if let onNew {
+                Button {
+                    onNew()
+                } label: {
+                    Label("New Portfolio", systemImage: "folder.badge.plus")
+                }
             }
             Divider()
             Button {

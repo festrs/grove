@@ -142,7 +142,7 @@ struct NewTransactionView: View {
             .onAppear {
                 let svc = backendService
                 debouncer.start { query in
-                    (try? await svc.searchStocks(query: query)) ?? []
+                    (try? await svc.searchStocks(query: query, assetClass: nil)) ?? []
                 }
             }
             .onDisappear { debouncer.stop() }

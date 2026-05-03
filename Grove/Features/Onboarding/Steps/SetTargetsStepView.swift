@@ -22,15 +22,18 @@ struct SetTargetsStepView: View {
             distributionBar
                 .padding(.horizontal, Theme.Spacing.lg)
 
-            // MARK: - Total Indicator
-            totalIndicator
-                .padding(.horizontal, Theme.Spacing.lg)
-
-            // MARK: - Sliders
+            // MARK: - Editor (all 6 classes via shared component)
             ScrollView {
-                LazyVStack(spacing: Theme.Spacing.sm) {
-                    ForEach(viewModel.assetClassesInUse) { assetClass in
-                        allocationSlider(for: assetClass)
+                TQCard {
+                    VStack(spacing: Theme.Spacing.sm) {
+                        TQAssetClassWeightsEditor(
+                            weights: doubleWeightsBinding,
+                            caption: { cls in
+                                let count = viewModel.pendingHoldings.filter { $0.assetClass == cls }.count
+                                if count == 0 { return String(localized: "No assets yet") }
+                                return count == 1 ? "1 asset" : "\(count) assets"
+                            }
+                        )
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
@@ -40,104 +43,45 @@ struct SetTargetsStepView: View {
         }
     }
 
+    // MARK: - Decimal ↔ Double bridge for the shared editor
+
+    private var doubleWeightsBinding: Binding<[AssetClassType: Double]> {
+        Binding(
+            get: {
+                Dictionary(uniqueKeysWithValues: AssetClassType.allCases.map { cls in
+                    (cls, NSDecimalNumber(decimal: viewModel.targetAllocations[cls] ?? 0).doubleValue)
+                })
+            },
+            set: { newValue in
+                for (cls, value) in newValue {
+                    viewModel.targetAllocations[cls] = Decimal(value)
+                }
+            }
+        )
+    }
+
     // MARK: - Distribution Bar
 
     private var distributionBar: some View {
         GeometryReader { geo in
             HStack(spacing: 2) {
-                ForEach(viewModel.assetClassesInUse) { assetClass in
+                ForEach(AssetClassType.allCases) { assetClass in
                     let pct = viewModel.targetAllocations[assetClass] ?? 0
                     let width = max(
-                        4,
+                        0,
                         geo.size.width * CGFloat(truncating: pct as NSDecimalNumber) / 100
                     )
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(assetClass.color)
-                        .frame(width: width)
+                    if width > 0 {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(assetClass.color)
+                            .frame(width: width)
+                    }
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: viewModel.targetAllocations.values.map { $0 })
         }
         .frame(height: 28)
         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
-    }
-
-    // MARK: - Total Indicator
-
-    private var totalIndicator: some View {
-        let total = viewModel.totalTargetAllocation
-        let isValid = viewModel.isTargetValid
-        let totalDouble = NSDecimalNumber(decimal: total).doubleValue
-
-        return HStack {
-            Text("Total:")
-                .font(.system(size: Theme.FontSize.body, weight: .medium))
-
-            Text("\(totalDouble, specifier: "%.0f")%")
-                .font(.system(size: Theme.FontSize.body, weight: .bold))
-                .foregroundStyle(isValid ? Color.tqAccentGreen : .red)
-
-            Spacer()
-
-            if !isValid {
-                HStack(spacing: Theme.Spacing.xs) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                    Text(total > 100 ? "Above 100%" : "Below 100%")
-                }
-                .font(.system(size: Theme.FontSize.caption))
-                .foregroundStyle(Color.tqWarning)
-            } else {
-                HStack(spacing: Theme.Spacing.xs) {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("Valid allocation")
-                }
-                .font(.system(size: Theme.FontSize.caption))
-                .foregroundStyle(Color.tqAccentGreen)
-            }
-        }
-    }
-
-    // MARK: - Allocation Slider
-
-    private func allocationSlider(for assetClass: AssetClassType) -> some View {
-        let binding = Binding<Double>(
-            get: {
-                NSDecimalNumber(decimal: viewModel.targetAllocations[assetClass] ?? 0).doubleValue
-            },
-            set: {
-                viewModel.targetAllocations[assetClass] = Decimal($0)
-            }
-        )
-
-        let holdingCount = viewModel.pendingHoldings.filter { $0.assetClass == assetClass }.count
-        let pctValue = NSDecimalNumber(decimal: viewModel.targetAllocations[assetClass] ?? 0).doubleValue
-
-        return TQCard {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                HStack {
-                    Image(systemName: assetClass.icon)
-                        .foregroundStyle(assetClass.color)
-                        .frame(width: 24)
-
-                    Text(assetClass.displayName)
-                        .font(.system(size: Theme.FontSize.body, weight: .medium))
-
-                    Spacer()
-
-                    Text("\(pctValue, specifier: "%.0f")%")
-                        .font(.system(size: Theme.FontSize.body, weight: .bold))
-                        .foregroundStyle(assetClass.color)
-                        .frame(width: 50, alignment: .trailing)
-                }
-
-                Slider(value: binding, in: 0...100, step: 1)
-                    .tint(assetClass.color)
-
-                Text("\(holdingCount) asset\(holdingCount == 1 ? "" : "s")")
-                    .font(.system(size: Theme.FontSize.caption))
-                    .foregroundStyle(Color.tqSecondaryText)
-            }
-        }
     }
 }
 
@@ -154,4 +98,5 @@ struct SetTargetsStepView: View {
                        assetClass: .usStocks, status: .estudo, currentPrice: 175.00, dividendYield: 0.5),
     ]
     return SetTargetsStepView(viewModel: vm)
+        .preferredColorScheme(.dark)
 }

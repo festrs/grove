@@ -67,3 +67,27 @@ public final class DividendPayment {
         self.taxTreatmentRaw = taxTreatment.rawValue
     }
 }
+
+/// Classification of a dividend relative to the current date.
+/// `paid` = ex-date is in the past; `projected` = ex-date is in the future.
+/// Totals derive from the holding's current `quantity`, so a study-mode
+/// holding (qty=0) contributes zero — it stays visible in drilldowns
+/// but doesn't inflate the per-class total.
+public enum DividendKind: String, Sendable {
+    case paid
+    case projected
+}
+
+/// One dividend paired with how it relates to the holding's purchase
+/// timeline. Built by `Holding.classifiedDividends` so the view layer can
+/// `ForEach` without re-doing the classification.
+public struct ClassifiedDividend: Identifiable {
+    public let payment: DividendPayment
+    public let kind: DividendKind
+    public var id: PersistentIdentifier { payment.persistentModelID }
+
+    public init(payment: DividendPayment, kind: DividendKind) {
+        self.payment = payment
+        self.kind = kind
+    }
+}

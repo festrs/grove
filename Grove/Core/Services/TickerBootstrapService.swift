@@ -33,6 +33,7 @@ struct TickerBootstrapService {
         holdings: [Holding],
         backendService: any BackendServiceProtocol
     ) async {
+        let holdings = holdings.filter { !$0.isCustom }
         guard !holdings.isEmpty else { return }
         let symbols = holdings.map(\.ticker)
 
@@ -66,6 +67,7 @@ struct TickerBootstrapService {
         modelContext: ModelContext,
         backendService: any BackendServiceProtocol
     ) async {
+        guard !holding.isCustom else { return }
         guard let firstDate = holding.contributions.map(\.date).min() else { return }
         let symbol = holding.ticker
         let assetClassRaw = holding.assetClass.rawValue

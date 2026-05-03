@@ -67,21 +67,25 @@ struct PriceChartView: View {
     private var periodPicker: some View {
         HStack(spacing: Theme.Spacing.xs) {
             ForEach(ChartPeriod.allCases) { period in
-                Button(period.label) {
+                Button {
                     selectedPeriod = period
                     Task { await loadData() }
+                } label: {
+                    Text(period.label)
+                        .font(.system(
+                            size: isRegular ? 15 : 13,
+                            weight: selectedPeriod == period ? .semibold : .regular
+                        ))
+                        .foregroundStyle(selectedPeriod == period ? .white : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, isRegular ? 8 : 5)
+                        .background(
+                            selectedPeriod == period ? Color.tqAccentGreen : Color.clear,
+                            in: Capsule()
+                        )
+                        .contentShape(Capsule())
                 }
-                .font(.system(
-                    size: isRegular ? 15 : 13,
-                    weight: selectedPeriod == period ? .semibold : .regular
-                ))
-                .foregroundStyle(selectedPeriod == period ? .white : .secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, isRegular ? 8 : 5)
-                .background(
-                    selectedPeriod == period ? Color.tqAccentGreen : Color.clear,
-                    in: Capsule()
-                )
+                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity)

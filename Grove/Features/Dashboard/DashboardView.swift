@@ -18,9 +18,11 @@ struct DashboardView: View {
     @Environment(\.rates) private var rates
 
     @Query(sort: \Holding.ticker) private var holdings: [Holding]
+    @Query private var portfolios: [Portfolio]
     @Query private var settingsList: [UserSettings]
 
     @State private var viewModel = DashboardViewModel()
+    @State private var isLandscape: Bool = false
 
     private static let fxTimeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -71,12 +73,11 @@ struct DashboardView: View {
                     .padding(.bottom, Theme.Spacing.xl)
                 }
 
-                // Inspector panel: macOS only — iPad/iPhone use the compact
-                // scroll layout where this content already lives inline (Next
-                // Dividend, Monthly Action, Quick Stats). On iPad the third
-                // column collapsed the middle into per-character wrapping.
-                #if os(macOS)
-                if sizeClass == .regular {
+                // Inspector panel at regular width in landscape only (iPad
+                // landscape and Mac). iPad portrait reports regular too, so we
+                // also gate on orientation; portrait falls back to the inline
+                // cards in compactDashboard.
+                if sizeClass == .regular && isLandscape {
                     Divider()
                     InspectorPanel(
                         dividends: viewModel.nextDividends,
@@ -84,7 +85,11 @@ struct DashboardView: View {
                         allocations: viewModel.summary?.allocationByClass ?? []
                     )
                 }
-                #endif
+            }
+            .onGeometryChange(for: Bool.self) { proxy in
+                proxy.size.width > proxy.size.height
+            } action: { newValue in
+                isLandscape = newValue
             }
             .background(Color.tqBackground)
             .navigationTitle("Grove")
@@ -116,18 +121,11 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var dashboardContent: some View {
-        #if os(macOS)
         if sizeClass == .regular {
             wideDashboard
         } else {
             compactDashboard
         }
-        #else
-        // iPad uses the same scroll-stack as iPhone. The wide layout's
-        // side-by-side Allocation/History row is too tight inside a
-        // NavigationSplitView that already has a sidebar.
-        compactDashboard
-        #endif
     }
 
     @ViewBuilder
@@ -142,7 +140,7 @@ struct DashboardView: View {
         MonthlyActionCard(suggestions: viewModel.topSuggestions)
 
         if let summary = viewModel.summary {
-            QuickStatsRow(summary: summary, holdingCount: holdings.count)
+            QuickStatsRow(summary: summary, holdingCount: holdings.count, portfolioCount: portfolios.count)
         }
 
         NavigationLink(value: DashboardDestination.dividendCalendar) {
@@ -153,35 +151,29 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var wideDashboard: some View {
-        // Row 1: Summary cards (4 across)
+        // Row 1: KPI summary cards.
         if let summary = viewModel.summary {
-            SummaryCardsRow(summary: summary, projection: viewModel.projection)
+            SummaryCardsRow(summary: summary, projection: viewModel.projection, portfolioCount: portfolios.count)
         }
 
-        // Row 2: Hero card (gauge + action + suggestions)
+        // Row 2: Hero card (gauge + action + suggestions).
         if let projection = viewModel.projection {
             HeroCard(projection: projection, suggestions: viewModel.topSuggestions)
         }
 
-        // Row 3: Allocation drift + History bars (side-by-side)
+        // Row 3: Adaptive grid — allocation drift + upcoming dividends.
+        // LazyVGrid reflows: 1 column on narrow regular widths (iPad
+        // portrait), 2 columns on wider widths (iPad landscape, Mac).
         if let summary = viewModel.summary {
-            HStack(alignment: .top, spacing: Theme.Spacing.md) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 360), spacing: Theme.Spacing.md)],
+                spacing: Theme.Spacing.md
+            ) {
                 AllocationDriftCard(allocations: summary.allocationByClass)
-                    .frame(minWidth: 0, maxWidth: .infinity)
-
-                HistoryBarChart(
-                    monthlyData: [
-                        ("Jan", .zero(in: displayCurrency)), ("Fev", .zero(in: displayCurrency)),
-                        ("Mar", .zero(in: displayCurrency)), ("Abr", .zero(in: displayCurrency)),
-                        ("Mai", .zero(in: displayCurrency)), ("Jun", .zero(in: displayCurrency)),
-                        ("Jul", .zero(in: displayCurrency)), ("Ago", .zero(in: displayCurrency)),
-                        ("Set", .zero(in: displayCurrency)), ("Out", .zero(in: displayCurrency)),
-                        ("Nov", .zero(in: displayCurrency)),
-                        ("Dez", summary.monthlyIncomeNet),
-                    ],
-                    goal: viewModel.projection?.goalMonthly ?? Money(amount: 10000, currency: displayCurrency)
-                )
-                .frame(minWidth: 0, maxWidth: .infinity)
+                NavigationLink(value: DashboardDestination.dividendCalendar) {
+                    NextDividendCard(dividends: viewModel.nextDividends)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
