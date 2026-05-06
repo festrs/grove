@@ -2,22 +2,36 @@ import SwiftUI
 import SwiftData
 import GroveDomain
 
-/// Class-scoped add sheet. Two paths:
-/// 1. Search → tap a real result → caller presents `AddAssetDetailSheet`
-///    with the screen's class fixed (we dismiss this sheet and hand the
-///    selected DTO back via `onSelectResult`).
-/// 2. No-results / custom path → "Add custom ticker" row creates a local
-///    `Holding` directly via `AssetClassHoldingsViewModel.addCustomTicker`,
-///    no detail screen.
-struct AddToClassSheet: View {
+/// Global add-ticker sheet. Single entry point for adding holdings to the
+/// portfolio — search hits the backend unfiltered (the asset class is
+/// derived from the result via `AssetClassType.detect`), and a "custom
+/// ticker" row at the bottom routes through the same `AddAssetDetailSheet`
+/// for symbols the backend doesn't know about.
+///
+/// The parent presents the detail sheet after this one dismisses (we hand
+/// the selection back via `onSelect`); SwiftUI doesn't like stacking two
+/// fullscreen sheets directly.
+enum AddTickerSelection: Identifiable {
+    case found(StockSearchResultDTO)
+    case custom(symbol: String)
+
+    var id: String {
+        switch self {
+        case .found(let dto): return "found:\(dto.id)"
+        case .custom(let symbol): return "custom:\(symbol)"
+        }
+    }
+}
+
+struct AddTickerSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
     @Environment(\.dismiss) private var dismiss
 
-    @Bindable var viewModel: AssetClassHoldingsViewModel
-    let onSelectResult: (StockSearchResultDTO) -> Void
-
+    @State private var viewModel = AddTickerSheetViewModel()
     @FocusState private var fieldFocused: Bool
+
+    let onSelect: (AddTickerSelection) -> Void
 
     var body: some View {
         NavigationStack {
@@ -40,6 +54,8 @@ struct AddToClassSheet: View {
                             )
 
                             customTickerRow
+                        } else {
+                            hint
                         }
 
                         if let error = viewModel.errorMessage {
@@ -52,7 +68,7 @@ struct AddToClassSheet: View {
                 }
             }
             .background(Color.tqBackground)
-            .navigationTitle("Add to \(viewModel.assetClass.displayName)")
+            .navigationTitle("Add Ticker")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -62,11 +78,9 @@ struct AddToClassSheet: View {
                 }
             }
             .task {
+                viewModel.loadExistingTickers(modelContext: modelContext)
                 let service = backendService
                 viewModel.debouncer.start { query in
-                    // Search shows results from every asset class so users can
-                    // discover assets that don't fit the current screen and
-                    // also reach the "Add custom ticker" path below.
                     (try? await service.searchStocks(query: query, assetClass: nil)) ?? []
                 }
                 fieldFocused = true
@@ -110,20 +124,34 @@ struct AddToClassSheet: View {
         .background(Color.tqCardBackground, in: RoundedRectangle(cornerRadius: 12))
     }
 
+    private var hint: some View {
+        VStack(spacing: Theme.Spacing.xs) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+            Text("Search for a ticker or company")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Text("Or type a symbol and add it as a custom ticker.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 60)
+        .padding(.horizontal, Theme.Spacing.md)
+    }
+
     @ViewBuilder
     private var customTickerRow: some View {
         let trimmed = viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty,
-           !viewModel.debouncer.isSearching,
-           !viewModel.isAlreadyAdded(trimmed) {
+        if viewModel.canAddAsCustom(trimmed: trimmed, isSearching: viewModel.debouncer.isSearching) {
             Button {
-                if viewModel.addCustomTicker(symbol: trimmed, modelContext: modelContext) {
-                    dismiss()
-                }
+                handleCustomTapped(symbol: trimmed)
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "plus.circle.dashed")
-                        .foregroundStyle(viewModel.assetClass.color)
+                        .foregroundStyle(Color.tqAccentGreen)
                         .font(.title3)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Add \"\(trimmed.uppercased())\" as custom ticker")
@@ -147,12 +175,18 @@ struct AddToClassSheet: View {
     }
 
     private func handleResultTapped(_ result: StockSearchResultDTO) {
-        // Hand the selected DTO back to the parent so it can present
-        // AddAssetDetailSheet with the class fixed. We dismiss first to
-        // avoid stacking two sheets.
+        // Dismiss before invoking the parent so it can stack the detail
+        // sheet without SwiftUI complaining about competing presentations.
         dismiss()
         DispatchQueue.main.async {
-            onSelectResult(result)
+            onSelect(.found(result))
+        }
+    }
+
+    private func handleCustomTapped(symbol: String) {
+        dismiss()
+        DispatchQueue.main.async {
+            onSelect(.custom(symbol: symbol))
         }
     }
 }

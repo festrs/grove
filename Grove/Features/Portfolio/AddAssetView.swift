@@ -28,6 +28,13 @@ struct AddAssetDetailSheet: View {
         self.mode = mode
     }
 
+    /// Custom-ticker entry point — user typed a symbol that didn't match any
+    /// search result. Saves with `Holding.isCustom = true`.
+    init(customSymbol: String, mode: Mode = .portfolio) {
+        _viewModel = State(initialValue: AddAssetViewModel.custom(symbol: customSymbol))
+        self.mode = mode
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -99,7 +106,11 @@ struct AddAssetDetailSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.searchResult.displaySymbol)
                     .font(.title3).fontWeight(.bold)
-                if let name = viewModel.searchResult.name {
+                if viewModel.isCustom {
+                    Text("Custom ticker — local only")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else if let name = viewModel.searchResult.name {
                     Text(name)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)

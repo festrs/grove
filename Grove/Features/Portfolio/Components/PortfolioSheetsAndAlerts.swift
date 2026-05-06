@@ -3,12 +3,14 @@ import SwiftData
 import GroveDomain
 
 /// Shared sheet + alert wiring for the portfolio root screens. Hosts the
-/// edit/new portfolio sheets, the import sheet, and the remove-asset
-/// confirmation. Per-class buy/sell sheets and the add flow live inside
-/// `AssetClassHoldingsView` now.
+/// edit-portfolio sheet, the import sheet, the global add-ticker flow, and
+/// the remove-asset confirmation. Per-class buy/sell sheets still live
+/// inside `AssetClassHoldingsView`.
 struct PortfolioSheetsAndAlerts: ViewModifier {
     @Bindable var viewModel: PortfolioViewModel
     @Binding var showingImport: Bool
+    @Binding var showingAddTicker: Bool
+    @Binding var pendingAdd: AddTickerSelection?
     let holdings: [Holding]
 
     @Environment(\.modelContext) private var modelContext
@@ -18,18 +20,28 @@ struct PortfolioSheetsAndAlerts: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $viewModel.showingEditPortfolio) {
-                if let portfolio = viewModel.selectedPortfolio {
+                if let portfolio = viewModel.portfolio {
                     EditPortfolioView(portfolio: portfolio)
                 }
             }
-            .sheet(isPresented: $viewModel.showingNewPortfolio) {
-                NewPortfolioSheet { name in
-                    viewModel.createPortfolio(name: name, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
+            .sheet(isPresented: $showingImport, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) {
+                if let portfolio = viewModel.portfolio {
+                    ImportPortfolioView(portfolio: portfolio)
                 }
             }
-            .sheet(isPresented: $showingImport, onDismiss: { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }) {
-                if let portfolio = viewModel.selectedPortfolio {
-                    ImportPortfolioView(portfolio: portfolio)
+            .sheet(isPresented: $showingAddTicker) {
+                AddTickerSheet { selection in
+                    pendingAdd = selection
+                }
+            }
+            .sheet(item: $pendingAdd, onDismiss: {
+                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
+            }) { selection in
+                switch selection {
+                case .found(let result):
+                    AddAssetDetailSheet(searchResult: result, assetClass: nil)
+                case .custom(let symbol):
+                    AddAssetDetailSheet(customSymbol: symbol)
                 }
             }
             .alert(

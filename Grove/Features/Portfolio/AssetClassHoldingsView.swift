@@ -5,8 +5,11 @@ import GroveRepositories
 
 /// Class-scoped holdings screen. Pushed from the portfolio root when the
 /// user taps an asset-class row. Hosts the sortable holdings table for
-/// this class plus the "Add to <Class>" entry point — the only place new
-/// holdings can be added in the new hierarchy.
+/// this class plus a `+` toolbar shortcut that opens the global add-ticker
+/// flow (`AddTickerSheet` → `AddAssetDetailSheet`). Adds aren't scoped to
+/// the screen's class — the resulting class is derived from the search
+/// result via `AssetClassType.detect` (or chosen by the user for custom
+/// tickers), so the screen context never lies about routing.
 struct AssetClassHoldingsView: View {
     let assetClass: AssetClassType
     let portfolio: Portfolio?
@@ -23,7 +26,8 @@ struct AssetClassHoldingsView: View {
     @Query private var holdings: [Holding]
 
     @State private var viewModel: AssetClassHoldingsViewModel
-    @State private var showingAddSheet = false
+    @State private var showingAddTicker = false
+    @State private var pendingAdd: AddTickerSelection?
     @State private var sortOrder: [KeyPathComparator<HoldingTableRow>] = [KeyPathComparator(\HoldingTableRow.ticker)]
 
     init(
@@ -47,9 +51,9 @@ struct AssetClassHoldingsView: View {
                         TQEmptyState(
                             icon: assetClass.icon,
                             title: "No \(assetClass.displayName) yet",
-                            message: "Tap Add to search for a ticker or create a custom one.",
-                            actionTitle: "Add to \(assetClass.displayName)",
-                            action: { showingAddSheet = true }
+                            message: "Tap + above to search for a ticker or add a custom one.",
+                            actionTitle: "Add Ticker",
+                            action: { showingAddTicker = true }
                         )
                         .padding(.top, 60)
                     } else if useCardLayout {
@@ -87,38 +91,38 @@ struct AssetClassHoldingsView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            addButton
-        }
         .background(Color.tqBackground)
         .navigationTitle(assetClass.displayName)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .sheet(isPresented: $showingAddSheet) {
-            AddToClassSheet(
-                viewModel: viewModel,
-                onSelectResult: { result in
-                    viewModel.selectedSearchResult = result
-                    viewModel.showingAddDetails = true
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingAddTicker = true
+                } label: {
+                    Label("Add Ticker", systemImage: "plus")
                 }
-            )
+            }
         }
-        .sheet(isPresented: $viewModel.showingAddDetails, onDismiss: {
+        .sheet(isPresented: $showingAddTicker) {
+            AddTickerSheet { selection in
+                pendingAdd = selection
+            }
+        }
+        .sheet(item: $pendingAdd, onDismiss: {
             viewModel.loadData(
                 portfolio: portfolio,
                 modelContext: modelContext,
                 displayCurrency: displayCurrency,
                 rates: rates
             )
-        }) {
-            if let result = viewModel.selectedSearchResult {
-                // Pass nil so AddAssetDetailSheet auto-detects the class
-                // from the result. Search returns assets from every class
-                // (so custom-add and cross-class discovery still work),
-                // and forcing the screen's class here would mis-file e.g.
-                // AAPL as Ações BR when picked from the BR screen.
+        }) { selection in
+            switch selection {
+            case .found(let result):
                 AddAssetDetailSheet(searchResult: result, assetClass: nil)
+            case .custom(let symbol):
+                AddAssetDetailSheet(customSymbol: symbol)
             }
         }
         .sheet(item: $viewModel.holdingToBuy, onDismiss: {
@@ -247,23 +251,4 @@ struct AssetClassHoldingsView: View {
         }
     }
 
-    private var addButton: some View {
-        Button {
-            showingAddSheet = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "plus")
-                    .fontWeight(.bold)
-                Text("Add to \(assetClass.displayName)")
-                    .fontWeight(.semibold)
-            }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, 14)
-            .background(assetClass.color, in: Capsule())
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
-        }
-        .buttonStyle(.plain)
-        .padding(.bottom, Theme.Spacing.md)
-    }
 }

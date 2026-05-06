@@ -16,6 +16,7 @@ import GroveDomain
 final class AddAssetViewModel {
     let searchResult: StockSearchResultDTO
     let hasFixedClass: Bool
+    let isCustom: Bool
 
     // Form state
     var detectedClass: AssetClassType
@@ -34,12 +35,21 @@ final class AddAssetViewModel {
     /// `assetClass` pins the holding's class — the new class-scoped Add flow
     /// always passes the screen's class so the user never picks one. Pass
     /// `nil` only for legacy entry points (e.g. onboarding) that still
-    /// auto-detect from the search result.
-    init(searchResult: StockSearchResultDTO, assetClass: AssetClassType? = nil) {
+    /// auto-detect from the search result. Set `isCustom = true` to persist
+    /// a local-only Holding (no backend quote, no bootstrap).
+    init(
+        searchResult: StockSearchResultDTO,
+        assetClass: AssetClassType? = nil,
+        isCustom: Bool = false
+    ) {
         self.searchResult = searchResult
+        self.isCustom = isCustom
         if let assetClass {
             self.detectedClass = assetClass
             self.hasFixedClass = true
+        } else if isCustom {
+            self.detectedClass = .acoesBR
+            self.hasFixedClass = false
         } else {
             self.detectedClass = AssetClassType.detect(
                 from: searchResult.symbol,
@@ -47,6 +57,17 @@ final class AddAssetViewModel {
             ) ?? .acoesBR
             self.hasFixedClass = false
         }
+    }
+
+    /// Build a VM for a manually-typed ticker. Synthesizes a minimal DTO so
+    /// the rest of the form (header card, position section) keeps working
+    /// without branching on `isCustom` everywhere.
+    static func custom(symbol: String) -> AddAssetViewModel {
+        let trimmed = symbol
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+        let dto = StockSearchResultDTO(id: trimmed, symbol: trimmed, name: trimmed)
+        return AddAssetViewModel(searchResult: dto, assetClass: nil, isCustom: true)
     }
 
     // MARK: - Computed
@@ -86,8 +107,10 @@ final class AddAssetViewModel {
     // MARK: - Actions
 
     /// Pre-fill the price field from the search result, falling back to a
-    /// fresh quote if needed. View calls this from `.task`.
+    /// fresh quote if needed. View calls this from `.task`. Custom tickers
+    /// have no backend record, so we don't query.
     func fetchPrice(backendService: any BackendServiceProtocol) async {
+        if isCustom { return }
         if let p = searchResult.priceDecimal, p > 0 {
             priceText = "\(p)"
             return
@@ -125,10 +148,13 @@ final class AddAssetViewModel {
             displayName: searchResult.name ?? searchResult.symbol,
             currentPrice: livePrice,
             assetClass: detectedClass,
-            status: selectedStatus
+            status: selectedStatus,
+            isCustom: isCustom
         )
-        holding.sector = searchResult.sector
-        holding.logoURL = searchResult.logo
+        if !isCustom {
+            holding.sector = searchResult.sector
+            holding.logoURL = searchResult.logo
+        }
 
         var descriptor = FetchDescriptor<Portfolio>(sortBy: [SortDescriptor(\.createdAt)])
         descriptor.fetchLimit = 1
@@ -164,19 +190,23 @@ final class AddAssetViewModel {
             return false
         }
 
-        let symbol = searchResult.symbol
-        let assetClass = detectedClass
-        let bootstrap = TickerBootstrapService()
-        let owns = ownsPosition
-        Task { @MainActor in
-            try? await backendService.trackSymbol(symbol: symbol, assetClass: assetClass.rawValue)
-            await bootstrap.bootstrap(holdings: [holding], backendService: backendService)
-            if owns {
-                await bootstrap.refreshDividendsAfterTransaction(
-                    holding: holding,
-                    modelContext: modelContext,
-                    backendService: backendService
-                )
+        // Custom tickers are local-only — the backend has no record so
+        // tracking + bootstrap would just produce best-effort failures.
+        if !isCustom {
+            let symbol = searchResult.symbol
+            let assetClass = detectedClass
+            let bootstrap = TickerBootstrapService()
+            let owns = ownsPosition
+            Task { @MainActor in
+                try? await backendService.trackSymbol(symbol: symbol, assetClass: assetClass.rawValue)
+                await bootstrap.bootstrap(holdings: [holding], backendService: backendService)
+                if owns {
+                    await bootstrap.refreshDividendsAfterTransaction(
+                        holding: holding,
+                        modelContext: modelContext,
+                        backendService: backendService
+                    )
+                }
             }
         }
 

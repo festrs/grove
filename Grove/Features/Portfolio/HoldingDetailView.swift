@@ -22,18 +22,25 @@ struct HoldingDetailView: View {
                         VStack(spacing: Theme.Spacing.md) {
                             headerCard(holding)
 
-                            if holding.assetClass.hasPriceHistory {
+                            // Custom (user-created) holdings have no backend
+                            // record — chart, fundamentals, company info, and
+                            // dividend history are all backend-sourced and
+                            // would be empty/incorrect, so we skip them.
+                            if !holding.isCustom, holding.assetClass.hasPriceHistory {
                                 PriceChartView(ticker: holding.ticker, currency: holding.currency, backendService: backendService)
                             }
 
-                            HoldingStatsStrip(
-                                holding: holding,
-                                fundamentals: viewModel.fundamentals,
-                                isFundamentalsLoading: viewModel.isFundamentalsLoading
-                            )
+                            if !holding.isCustom {
+                                HoldingStatsStrip(
+                                    holding: holding,
+                                    fundamentals: viewModel.fundamentals,
+                                    isFundamentalsLoading: viewModel.isFundamentalsLoading
+                                )
 
-                            CompanyInfoCard(holding: holding)
+                                CompanyInfoCard(holding: holding)
+                            }
 
+                            let showDividends = !holding.isCustom && holding.assetClass.hasDividends
                             if sizeClass == .regular {
                                 LazyVGrid(
                                     columns: [GridItem(.adaptive(minimum: Theme.Layout.regularCardMin), spacing: Theme.Spacing.md)],
@@ -41,14 +48,14 @@ struct HoldingDetailView: View {
                                 ) {
                                     targetSection(holding)
                                     transactionHistorySection(holding)
-                                    if holding.assetClass.hasDividends {
+                                    if showDividends {
                                         dividendHistorySection(holding)
                                     }
                                 }
                             } else {
                                 targetSection(holding)
                                 transactionHistorySection(holding)
-                                if holding.assetClass.hasDividends {
+                                if showDividends {
                                     dividendHistorySection(holding)
                                 }
                             }
@@ -86,15 +93,12 @@ struct HoldingDetailView: View {
                         }
                     }
                     ToolbarItem(placement: .primaryAction) {
-                        Menu {
-                            Button(role: .destructive) {
-                                showRemoveAlert = true
-                            } label: {
-                                Label("Remove Asset", systemImage: "trash")
-                            }
+                        Button(role: .destructive) {
+                            showRemoveAlert = true
                         } label: {
-                            Image(systemName: "ellipsis.circle")
+                            Label("Remove Asset", systemImage: "trash")
                         }
+                        .help("Remove Asset")
                     }
                 }
                 .sheet(isPresented: $showingBuy, onDismiss: reload) {
@@ -113,7 +117,9 @@ struct HoldingDetailView: View {
                     Text("Are you sure you want to remove \(holding.ticker) from your portfolio? This action cannot be undone.")
                 }
                 .refreshable {
-                    await viewModel.refreshAll(backendService: backendService)
+                    if !holding.isCustom {
+                        await viewModel.refreshAll(backendService: backendService)
+                    }
                 }
             } else {
                 TQLoadingView()
@@ -121,7 +127,9 @@ struct HoldingDetailView: View {
         }
         .task {
             viewModel.loadHolding(id: holdingID, modelContext: modelContext)
-            await viewModel.refreshAll(backendService: backendService)
+            if let holding = viewModel.holding, !holding.isCustom {
+                await viewModel.refreshAll(backendService: backendService)
+            }
         }
     }
 

@@ -9,15 +9,6 @@ import GroveRepositories
 /// for the selected class. Pushing into a holding stays inside the detail
 /// column's `NavigationStack`.
 struct WidePortfolioView: View {
-    /// When set, the view scopes itself to this portfolio on first appear.
-    /// Used by `PortfoliosOverviewView` to drill into a specific portfolio.
-    var initialPortfolioID: PersistentIdentifier? = nil
-
-    /// When set, a back button is shown in the sidebar that returns to the
-    /// portfolios overview. Nil = no back button (standalone or single-
-    /// portfolio mode).
-    var onBackToOverview: (() -> Void)? = nil
-
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
     @Environment(\.syncService) private var syncService
@@ -27,6 +18,8 @@ struct WidePortfolioView: View {
     @State private var viewModel = PortfolioViewModel()
     @State private var selectedClass: AssetClassType?
     @State private var showingImport = false
+    @State private var showingAddTicker = false
+    @State private var pendingAdd: AddTickerSelection?
     @State private var detailPath = NavigationPath()
 
     var body: some View {
@@ -41,7 +34,7 @@ struct WidePortfolioView: View {
                     if let assetClass = selectedClass {
                         AssetClassHoldingsView(
                             assetClass: assetClass,
-                            portfolio: viewModel.selectedPortfolio,
+                            portfolio: viewModel.portfolio,
                             path: $detailPath
                         )
                         .id(assetClass)
@@ -62,6 +55,8 @@ struct WidePortfolioView: View {
         .modifier(PortfolioSheetsAndAlerts(
             viewModel: viewModel,
             showingImport: $showingImport,
+            showingAddTicker: $showingAddTicker,
+            pendingAdd: $pendingAdd,
             holdings: holdings
         ))
         .refreshable {
@@ -70,11 +65,6 @@ struct WidePortfolioView: View {
         }
         .task {
             viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-            if let id = initialPortfolioID,
-               viewModel.selectedPortfolio?.persistentModelID != id,
-               let target = viewModel.portfolios.first(where: { $0.persistentModelID == id }) {
-                viewModel.selectPortfolio(target, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-            }
             if selectedClass == nil {
                 selectedClass = viewModel.allocationByClass.first?.assetClass
             }
@@ -95,15 +85,14 @@ struct WidePortfolioView: View {
                 topBar
                 PortfolioTotalHeader(
                     totalValue: viewModel.totalValue,
-                    monthlyIncomeNet: viewModel.summary?.monthlyIncomeNet
+                    monthlyIncomeNet: viewModel.summary?.monthlyIncomeNet,
+                    isLoading: viewModel.isLoading && viewModel.summary == nil
                 )
-                if !viewModel.allocationByClass.isEmpty {
-                    AllocationBar(allocations: viewModel.allocationByClass)
-                        .padding(.horizontal, Theme.Spacing.md)
-                        .padding(.bottom, Theme.Spacing.md)
-                }
 
-                if viewModel.allocationByClass.isEmpty {
+                if viewModel.isLoading && viewModel.summary == nil {
+                    ProgressView()
+                        .padding(.top, 40)
+                } else if viewModel.allocationByClass.isEmpty {
                     TQEmptyState(
                         icon: "briefcase",
                         title: "No Assets",
@@ -111,6 +100,10 @@ struct WidePortfolioView: View {
                     )
                     .padding(.top, 40)
                 } else {
+                    AllocationBar(allocations: viewModel.allocationByClass)
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .padding(.bottom, Theme.Spacing.md)
+
                     PortfolioClassTable(
                         allocations: viewModel.allocationByClass,
                         holdings: viewModel.holdings,
@@ -137,32 +130,16 @@ struct WidePortfolioView: View {
 
     private var topBar: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            if let onBack = onBackToOverview {
-                Button {
-                    onBack()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Portfolios")
-                            .font(.subheadline)
-                    }
-                    .foregroundStyle(Color.tqAccentGreen)
-                }
-                .buttonStyle(.plain)
-            }
-            if let name = viewModel.selectedPortfolio?.name {
-                Text(name)
+            if let name = viewModel.portfolio?.name {
+                Text(verbatim: name)
                     .font(.headline.weight(.bold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
             }
             Spacer()
-            PortfolioOverflowMenu(
+            PortfolioActionButtons(
                 onEdit: { viewModel.showingEditPortfolio = true },
-                onNew: onBackToOverview == nil
-                    ? { viewModel.showingNewPortfolio = true }
-                    : nil,
+                onAdd: { showingAddTicker = true },
                 onImport: { showingImport = true }
             )
         }

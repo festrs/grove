@@ -70,7 +70,7 @@ struct AddAssetViewModelTests {
         #expect(vm.errorMessage == nil)
         let holdings = try ctx.fetch(FetchDescriptor<Holding>())
         #expect(holdings.count == 1)
-        #expect(holdings.first?.ticker == "HGLG11.SA")
+        #expect(holdings.first?.ticker == "HGLG11")
         #expect(holdings.first?.status == .aportar)
         let contributions = try ctx.fetch(FetchDescriptor<Contribution>())
         #expect(contributions.count == 1)
@@ -159,6 +159,57 @@ struct AddAssetViewModelTests {
         let vm = AddAssetViewModel(searchResult: Self.sampleSearch)
         #expect(vm.detectedClass == .fiis)
         #expect(vm.hasFixedClass == false)
+    }
+
+    // MARK: - Custom ticker
+
+    @MainActor
+    @Test func customFactoryDefaultsToAcoesBRWithPickerEnabled() {
+        let vm = AddAssetViewModel.custom(symbol: " mycoin ")
+        #expect(vm.isCustom == true)
+        #expect(vm.searchResult.symbol == "MYCOIN")
+        #expect(vm.detectedClass == .acoesBR, "Custom add starts on a sane default; user can repick")
+        #expect(vm.hasFixedClass == false, "Custom always exposes the class picker")
+        #expect(vm.priceText.isEmpty, "Custom never pre-fills price — there's no backend quote")
+    }
+
+    @MainActor
+    @Test func customAddPersistsHoldingWithIsCustomTrue() async throws {
+        let ctx = try makeTestContext()
+        let backend = MockBackendService()
+        let vm = AddAssetViewModel.custom(symbol: "myCoin")
+        vm.detectedClass = .crypto
+
+        let added = vm.addAsset(modelContext: ctx, backendService: backend)
+
+        #expect(added == true)
+        let holdings = try ctx.fetch(FetchDescriptor<Holding>())
+        let custom = try #require(holdings.first { $0.ticker == "MYCOIN" })
+        #expect(custom.isCustom == true)
+        #expect(custom.assetClass == .crypto)
+        #expect(custom.status == .estudo, "Track-only custom defaults to .estudo")
+        #expect(custom.currentPrice == 0, "Custom track-only enters with zero price; user fills from detail screen")
+    }
+
+    @MainActor
+    @Test func customAddWithPositionRecordsContribution() async throws {
+        let ctx = try makeTestContext()
+        let backend = MockBackendService()
+        let vm = AddAssetViewModel.custom(symbol: "MYCOIN")
+        vm.detectedClass = .crypto
+        vm.ownsPosition = true
+        vm.quantityText = "2"
+        vm.priceText = "150"
+
+        let added = vm.addAsset(modelContext: ctx, backendService: backend)
+
+        #expect(added == true)
+        let holding = try #require(try ctx.fetch(FetchDescriptor<Holding>()).first)
+        #expect(holding.isCustom == true)
+        #expect(holding.status == .aportar)
+        let contributions = try ctx.fetch(FetchDescriptor<Contribution>())
+        #expect(contributions.count == 1)
+        #expect(contributions.first?.shares == 2)
     }
 
     @MainActor

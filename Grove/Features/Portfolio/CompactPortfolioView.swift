@@ -20,26 +20,30 @@ struct CompactPortfolioView: View {
     @Query private var holdings: [Holding]
     @State private var viewModel = PortfolioViewModel()
     @State private var showingImport = false
+    @State private var showingAddTicker = false
+    @State private var pendingAdd: AddTickerSelection?
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    topBar
                     PortfolioTotalHeader(
                         totalValue: viewModel.totalValue,
-                        monthlyIncomeNet: viewModel.summary?.monthlyIncomeNet
+                        monthlyIncomeNet: viewModel.summary?.monthlyIncomeNet,
+                        isLoading: viewModel.isLoading && viewModel.summary == nil
                     )
-                    if !viewModel.allocationByClass.isEmpty {
+
+                    if viewModel.isLoading && viewModel.summary == nil {
+                        ProgressView()
+                            .padding(.top, 40)
+                    } else if viewModel.allocationByClass.isEmpty {
+                        emptyState
+                    } else {
                         AllocationBar(allocations: viewModel.allocationByClass)
                             .padding(.horizontal, Theme.Spacing.md)
                             .padding(.bottom, Theme.Spacing.md)
-                    }
 
-                    if viewModel.allocationByClass.isEmpty {
-                        emptyState
-                    } else {
                         PortfolioClassTable(
                             allocations: viewModel.allocationByClass,
                             holdings: viewModel.holdings,
@@ -56,11 +60,35 @@ struct CompactPortfolioView: View {
                 }
             }
             .background(Color.tqBackground)
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(Text(verbatim: viewModel.portfolio?.name ?? String(localized: "Portfolio")))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        viewModel.showingEditPortfolio = true
+                    } label: {
+                        Label("Rename Portfolio", systemImage: "pencil")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingAddTicker = true
+                    } label: {
+                        Label("Add Ticker", systemImage: "plus")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingImport = true
+                    } label: {
+                        Label("Import", systemImage: "square.and.arrow.down")
+                    }
+                }
+            }
             .navigationDestination(for: AssetClassType.self) { classType in
                 AssetClassHoldingsView(
                     assetClass: classType,
-                    portfolio: viewModel.selectedPortfolio,
+                    portfolio: viewModel.portfolio,
                     path: $navigationPath
                 )
             }
@@ -70,6 +98,8 @@ struct CompactPortfolioView: View {
             .modifier(PortfolioSheetsAndAlerts(
                 viewModel: viewModel,
                 showingImport: $showingImport,
+                showingAddTicker: $showingAddTicker,
+                pendingAdd: $pendingAdd,
                 holdings: holdings
             ))
             .refreshable {
@@ -86,26 +116,6 @@ struct CompactPortfolioView: View {
                 viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
         }
-    }
-
-    // MARK: - Top bar
-
-    private var topBar: some View {
-        HStack {
-            PortfolioSelectorMenu(
-                portfolios: viewModel.portfolios,
-                selected: viewModel.selectedPortfolio,
-                onSelect: { viewModel.selectPortfolio($0, modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }
-            )
-            Spacer()
-            PortfolioOverflowMenu(
-                onEdit: { viewModel.showingEditPortfolio = true },
-                onNew: { viewModel.showingNewPortfolio = true },
-                onImport: { showingImport = true }
-            )
-        }
-        .padding(.horizontal, Theme.Spacing.md)
-        .padding(.vertical, Theme.Spacing.sm)
     }
 
     private var emptyState: some View {
