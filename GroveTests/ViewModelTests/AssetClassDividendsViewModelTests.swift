@@ -26,7 +26,7 @@ struct AssetClassDividendsViewModelTests {
         let vm = AssetClassDividendsViewModel()
 
         await vm.refresh(
-            symbols: ["HGLG11.SA", "KNRI11.SA"],
+            symbols: ["HGLG11", "KNRI11"],
             assetClass: .fiis,
             modelContext: ctx,
             backendService: backend,
@@ -35,7 +35,7 @@ struct AssetClassDividendsViewModelTests {
 
         let calls = await backend.refreshCalls
         #expect(calls.count == 1)
-        #expect(calls.first?.symbols == ["HGLG11.SA", "KNRI11.SA"])
+        #expect(calls.first?.symbols == ["HGLG11", "KNRI11"])
         #expect(calls.first?.assetClass == "fiis")
         #expect(calls.first?.since == nil, "Manual refresh must leave since unset so users can backfill full history")
         #expect(vm.errorMessage == nil)
@@ -73,7 +73,7 @@ struct AssetClassDividendsViewModelTests {
         let vm = AssetClassDividendsViewModel()
 
         await vm.refresh(
-            symbols: ["HGLG11.SA"],
+            symbols: ["HGLG11"],
             assetClass: .fiis,
             modelContext: ctx,
             backendService: backend,
@@ -97,7 +97,7 @@ struct AssetClassDividendsViewModelTests {
 
         let backend = RecordingBackend()
         await vm.refresh(
-            symbols: ["HGLG11.SA"],
+            symbols: ["HGLG11"],
             assetClass: .fiis,
             modelContext: ctx,
             backendService: backend,
@@ -127,7 +127,6 @@ private actor RecordingBackend: BackendServiceProtocol {
         BackendExchangeRateDTO(pair: pair, rate: 5)
     }
     func fetchDividendsForSymbols(symbols: [String], year: Int?) async throws -> [MobileDividendDTO] { [] }
-    func fetchDividendSummary(symbols: [String]) async throws -> [String: DividendSummaryDTO] { [:] }
     func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO {
         refreshCalls.append(.init(symbols: symbols, assetClass: assetClass, since: since))
         return DividendRefreshResultDTO(scraped: symbols.count, newRecords: 0, failed: [])
@@ -146,7 +145,7 @@ private actor RecordingBackend: BackendServiceProtocol {
             compositeScore: nil, updatedAt: nil
         )
     }
-    func importPortfolio(fileData: Data?, filename: String?, text: String?) async throws -> [ImportedPosition] { [] }
+    func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] { [] }
 }
 
 private actor FailingBackend: BackendServiceProtocol {
@@ -164,7 +163,6 @@ private actor FailingBackend: BackendServiceProtocol {
         BackendExchangeRateDTO(pair: pair, rate: 5)
     }
     func fetchDividendsForSymbols(symbols: [String], year: Int?) async throws -> [MobileDividendDTO] { [] }
-    func fetchDividendSummary(symbols: [String]) async throws -> [String: DividendSummaryDTO] { [:] }
     func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO {
         throw TestError.refreshFailed
     }
@@ -182,5 +180,5 @@ private actor FailingBackend: BackendServiceProtocol {
             compositeScore: nil, updatedAt: nil
         )
     }
-    func importPortfolio(fileData: Data?, filename: String?, text: String?) async throws -> [ImportedPosition] { [] }
+    func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] { [] }
 }

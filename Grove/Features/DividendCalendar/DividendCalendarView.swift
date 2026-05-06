@@ -23,6 +23,10 @@ struct DividendCalendarView: View {
         .navigationTitle("Dividends")
         .refreshable {
             await syncService.syncAll(modelContext: modelContext, backendService: backendService)
+            // Explicit user tap on a dividend screen — bypass the once-per-day
+            // gate so newly-published payments land immediately.
+            try? await syncService.syncDividends(modelContext: modelContext, backendService: backendService)
+            try? modelContext.save()
             viewModel.loadFromLocal(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
         }
         .task {

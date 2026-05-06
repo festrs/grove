@@ -22,7 +22,7 @@ struct AllocationSettingsView: View {
             } header: {
                 Text("Allocation by Class")
             } footer: {
-                Text("Define how much of your total assets each class should represent. Must sum to 100%. Applies to all portfolios.")
+                Text("Define how much of your total assets each class should represent. Must sum to 100%.")
             }
 
             if !viewModel.isValid {

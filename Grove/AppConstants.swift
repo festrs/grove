@@ -11,9 +11,7 @@ enum AppConstants {
     }
 
     enum Defaults {
-        static let monthlyIncomeGoal: Decimal = 10_000
         static let monthlyCostOfLiving: Decimal = 15_000
-        static let emergencyReserveTarget: Decimal = 180_000
     }
 
     enum Debug {

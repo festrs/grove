@@ -164,6 +164,19 @@ public final class Holding {
 
     public var classifiedDividends: [ClassifiedDividend] { classifiedDividends(asOf: .now) }
 
+    /// `classifiedDividends` filtered to payments whose `paymentDate` falls
+    /// inside `window`. Used by the per-class drilldown so the listed
+    /// payments match the window the user picked on the parent screen.
+    public func classifiedDividends(
+        in window: IncomeWindow,
+        asOf: Date = .now,
+        calendar: Calendar = .current
+    ) -> [ClassifiedDividend] {
+        let range = window.dateRange(asOf: asOf, calendar: calendar)
+        return classifiedDividends(asOf: asOf)
+            .filter { range.contains($0.payment.paymentDate) }
+    }
+
     /// Sum of `paidDividends` totals, converted to `displayCurrency`. Excludes
     /// projected and informational rows so the figure matches what the user
     /// actually received.
@@ -224,6 +237,42 @@ public final class Holding {
             .sum(in: displayCurrency, using: rates)
     }
 
+    /// Annualized gross dividend rate projected forward from the trailing
+    /// 12 months of real `DividendPayment` records. Per-share rate × current
+    /// `quantity` so a recent quantity bump scales cleanly. When the holding
+    /// has been held for less than 12 months, the partial window is scaled
+    /// up to a full year — three months of records at R$1/share don't get
+    /// reported as a quarter-yield portfolio.
+    /// Returns zero when no records fall in the window or quantity is zero.
+    public func empiricalAnnualGross(
+        asOf: Date = .now,
+        displayCurrency: Currency,
+        rates: any ExchangeRates,
+        calendar: Calendar = .current
+    ) -> Money {
+        guard quantity > 0 else { return .zero(in: currency) }
+
+        let cutoff = calendar.date(byAdding: .month, value: -12, to: asOf) ?? asOf
+        let recent = dividends.filter {
+            $0.paymentDate > cutoff && $0.paymentDate <= asOf
+        }
+        guard !recent.isEmpty else { return .zero(in: currency) }
+
+        let totalPerShare = recent.map(\.amountPerShare).reduce(Decimal.zero, +)
+
+        // Annualize partial windows: a holding owned 3 months whose payments
+        // sum to R$1/share would be 4× that over 12 months at the same cadence.
+        let firstContribution = contributions.map(\.date).min() ?? asOf
+        let monthsHeld = max(1, calendar.dateComponents([.month], from: firstContribution, to: asOf).month ?? 12)
+        let annualizationFactor: Decimal = monthsHeld < 12
+            ? Decimal(12) / Decimal(monthsHeld)
+            : 1
+
+        let annualPerShare = totalPerShare * annualizationFactor
+        let annualNative = Money(amount: annualPerShare * quantity, currency: currency)
+        return annualNative.converted(to: displayCurrency, using: rates)
+    }
+
     /// Estimated monthly dividend income (gross)
     public var estimatedMonthlyIncome: Decimal {
         guard dividendYield > 0 else { return 0 }
@@ -248,8 +297,9 @@ public final class Holding {
         targetPercent: Decimal = 5,
         isCustom: Bool = false
     ) {
-        self.ticker = ticker
-        self.displayName = displayName.isEmpty ? ticker : displayName
+        let canonical = ticker.normalizedTicker
+        self.ticker = canonical
+        self.displayName = displayName.isEmpty ? canonical : displayName
         self.quantity = quantity
         self.averagePrice = averagePrice
         self.currentPrice = currentPrice

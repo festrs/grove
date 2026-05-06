@@ -10,6 +10,8 @@ import GroveDomain
 struct OnboardingPadContainer: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @Bindable var viewModel: OnboardingViewModel
 
     var body: some View {
@@ -68,6 +70,11 @@ struct OnboardingPadContainer: View {
     }
 
     private func complete() {
-        viewModel.completeOnboarding(modelContext: modelContext, backendService: backendService)
+        viewModel.completeOnboarding(
+            modelContext: modelContext,
+            backendService: backendService,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
     }
 }

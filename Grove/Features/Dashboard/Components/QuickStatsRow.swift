@@ -5,7 +5,6 @@ import GroveRepositories
 struct QuickStatsRow: View {
     let summary: PortfolioSummary
     let holdingCount: Int
-    let portfolioCount: Int
     @Environment(\.displayCurrency) private var displayCurrency
     @Environment(\.rates) private var rates
 
@@ -37,13 +36,6 @@ struct QuickStatsRow: View {
                 value: "\(summary.activeCount)",
                 suffix: "/ \(holdingCount)"
             )
-
-            if portfolioCount > 0 {
-                statCard(
-                    label: "Portfolios",
-                    value: "\(portfolioCount)"
-                )
-            }
         }
     }
 
@@ -97,8 +89,7 @@ struct QuickStatsRow: View {
             quarantineCount: 2,
             sellingCount: 1
         ),
-        holdingCount: 15,
-        portfolioCount: 3
+        holdingCount: 15
     )
     .padding()
 }

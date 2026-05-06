@@ -3,6 +3,15 @@ import GroveDomain
 
 actor BackendService: BackendServiceProtocol {
 
+    /// Backend caps every multi-symbol query at 50 (`MAX_SYMBOLS_PER_REQUEST`
+    /// in `routers/mobile.py`). We chunk client-side and merge results so
+    /// callers stay symbol-count-agnostic.
+    private static let batchChunkSize = 50
+
+    /// `/dividends/refresh` is stricter (`MAX_REFRESH_SYMBOLS = 20`) because
+    /// the backend hits upstream providers serially with a per-symbol delay.
+    private static let refreshChunkSize = 20
+
     private let baseURL: String
 
     private var apiHeaders: [String: String] {
@@ -36,11 +45,25 @@ actor BackendService: BackendServiceProtocol {
 
     func fetchBatchQuotes(symbols: [String]) async throws -> [BatchQuoteDTO] {
         guard !symbols.isEmpty else { return [] }
-        let url = try buildURL(path: "/mobile/quotes", queryItems: [
-            URLQueryItem(name: "symbols", value: symbols.joined(separator: ","))
-        ])
-        let response: BatchQuotesResponse = try await HTTPClient.fetch(url: url, headers: apiHeaders)
-        return response.quotes
+        let chunks = symbols.chunked(into: Self.batchChunkSize)
+        if chunks.count > 1 {
+            print("[Net] GET /mobile/quotes — \(symbols.count) symbols across \(chunks.count) chunk(s)")
+        }
+        let headers = apiHeaders
+        return try await withThrowingTaskGroup(of: [BatchQuoteDTO].self) { group in
+            for chunk in chunks {
+                let url = try self.buildURL(path: "/mobile/quotes", queryItems: [
+                    URLQueryItem(name: "symbols", value: chunk.joined(separator: ","))
+                ])
+                group.addTask {
+                    let response: BatchQuotesResponse = try await HTTPClient.fetch(url: url, headers: headers)
+                    return response.quotes
+                }
+            }
+            var merged: [BatchQuoteDTO] = []
+            for try await part in group { merged.append(contentsOf: part) }
+            return merged
+        }
     }
 
     // MARK: - Exchange Rate (mobile endpoint)
@@ -56,24 +79,61 @@ actor BackendService: BackendServiceProtocol {
 
     func fetchDividendsForSymbols(symbols: [String], year: Int?) async throws -> [MobileDividendDTO] {
         guard !symbols.isEmpty else { return [] }
-        var queryItems = [URLQueryItem(name: "symbols", value: symbols.joined(separator: ","))]
-        if let year { queryItems.append(URLQueryItem(name: "year", value: "\(year)")) }
-        let url = try buildURL(path: "/mobile/dividends", queryItems: queryItems)
-        return try await HTTPClient.fetch(url: url, headers: apiHeaders)
-    }
-
-    func fetchDividendSummary(symbols: [String]) async throws -> [String: DividendSummaryDTO] {
-        guard !symbols.isEmpty else { return [:] }
-        let url = try buildURL(path: "/mobile/dividends/summary", queryItems: [
-            URLQueryItem(name: "symbols", value: symbols.joined(separator: ","))
-        ])
-        return try await HTTPClient.fetch(url: url, headers: apiHeaders)
+        let chunks = symbols.chunked(into: Self.batchChunkSize)
+        let start = Date()
+        print("[Net] GET /mobile/dividends — \(symbols.count) symbols across \(chunks.count) chunk(s)")
+        let headers = apiHeaders
+        do {
+            let merged = try await withThrowingTaskGroup(of: [MobileDividendDTO].self) { group in
+                for chunk in chunks {
+                    var queryItems = [URLQueryItem(name: "symbols", value: chunk.joined(separator: ","))]
+                    if let year { queryItems.append(URLQueryItem(name: "year", value: "\(year)")) }
+                    let url = try self.buildURL(path: "/mobile/dividends", queryItems: queryItems)
+                    group.addTask {
+                        try await HTTPClient.fetch(url: url, headers: headers)
+                    }
+                }
+                var all: [MobileDividendDTO] = []
+                for try await part in group { all.append(contentsOf: part) }
+                return all
+            }
+            print("[Net] GET /mobile/dividends → \(merged.count) rows in \(String(format: "%.2f", Date().timeIntervalSince(start)))s")
+            return merged
+        } catch {
+            print("[Net] GET /mobile/dividends FAILED in \(String(format: "%.2f", Date().timeIntervalSince(start)))s — \(error.localizedDescription)")
+            throw error
+        }
     }
 
     func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO {
         guard !symbols.isEmpty else {
             return DividendRefreshResultDTO(scraped: 0, newRecords: 0, failed: [])
         }
+        let chunks = symbols.chunked(into: Self.refreshChunkSize)
+        let start = Date()
+        print("[Net] POST /mobile/dividends/refresh — \(symbols.count) symbols across \(chunks.count) chunk(s) (limit \(Self.refreshChunkSize)/chunk)")
+        let merged = try await withThrowingTaskGroup(of: DividendRefreshResultDTO.self) { group in
+            for chunk in chunks {
+                group.addTask {
+                    try await self.refreshDividendsChunk(symbols: chunk, assetClass: assetClass, since: since)
+                }
+            }
+            var scraped = 0
+            var newRecords = 0
+            var failed: [String] = []
+            for try await part in group {
+                scraped += part.scraped
+                newRecords += part.newRecords
+                failed.append(contentsOf: part.failed)
+            }
+            return DividendRefreshResultDTO(scraped: scraped, newRecords: newRecords, failed: failed)
+        }
+        let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
+        print("[Net] POST /mobile/dividends/refresh merged in \(elapsed)s — scraped=\(merged.scraped) new=\(merged.newRecords) failed=\(merged.failed)")
+        return merged
+    }
+
+    private func refreshDividendsChunk(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO {
         var queryItems = [
             URLQueryItem(name: "symbols", value: symbols.joined(separator: ",")),
             URLQueryItem(name: "asset_class", value: assetClass),
@@ -85,27 +145,32 @@ actor BackendService: BackendServiceProtocol {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         // Backend serially hits upstream providers with a per-symbol delay,
-        // so a 20-symbol refresh can take 40s+. Bump the timeout accordingly.
+        // so a 20-symbol chunk can take 40s+. Bump the timeout accordingly.
         request.timeoutInterval = 90
         for (key, value) in apiHeaders {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
+        let start = Date()
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch let urlError as URLError {
+            print("[Net] POST /refresh chunk(\(symbols.count)) URLError in \(String(format: "%.2f", Date().timeIntervalSince(start)))s — \(urlError.localizedDescription) code=\(urlError.code.rawValue)")
             throw APIError.networkError(urlError)
         } catch {
+            print("[Net] POST /refresh chunk(\(symbols.count)) failed in \(String(format: "%.2f", Date().timeIntervalSince(start)))s — \(error.localizedDescription)")
             throw APIError.unknown(error.localizedDescription)
         }
 
+        let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
             let body = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .prefix(200) ?? ""
+            print("[Net] POST /refresh chunk(\(symbols.count)) HTTP \(status) in \(elapsed)s — body=\(body)")
             let hint: String
             switch status {
             case 404, 405:
@@ -122,7 +187,9 @@ actor BackendService: BackendServiceProtocol {
             let detail = hint.isEmpty ? "" : " \(hint)"
             throw APIError.unknown("Refresh dividends HTTP \(status).\(detail) Body: \(body)")
         }
-        return try JSONDecoder().decode(DividendRefreshResultDTO.self, from: data)
+        let decoded = try JSONDecoder().decode(DividendRefreshResultDTO.self, from: data)
+        print("[Net] POST /refresh chunk(\(symbols.count)) 200 in \(elapsed)s — scraped=\(decoded.scraped) new=\(decoded.newRecords) failed=\(decoded.failed)")
+        return decoded
     }
 
     private static let dateFormatter: DateFormatter = {
@@ -168,28 +235,38 @@ actor BackendService: BackendServiceProtocol {
 
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {
         guard !pairs.isEmpty else { return }
-        let joined = pairs.map { "\($0.symbol):\($0.assetClass)" }.joined(separator: ",")
-        let url = try buildURL(path: "/mobile/track/sync", queryItems: [
-            URLQueryItem(name: "symbols", value: joined),
-        ])
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 30
-        for (key, value) in apiHeaders {
-            request.setValue(value, forHTTPHeaderField: key)
+        let chunks = pairs.chunked(into: Self.batchChunkSize)
+        if chunks.count > 1 {
+            print("[Net] POST /mobile/track/sync — \(pairs.count) pairs across \(chunks.count) chunk(s)")
         }
-
-        let response: URLResponse
-        do {
-            (_, response) = try await URLSession.shared.data(for: request)
-        } catch let urlError as URLError {
-            throw APIError.networkError(urlError)
-        } catch {
-            throw APIError.unknown(error.localizedDescription)
-        }
-
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.unknown("Failed to sync tracked symbols")
+        let headers = apiHeaders
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for chunk in chunks {
+                let joined = chunk.map { "\($0.symbol):\($0.assetClass)" }.joined(separator: ",")
+                let url = try self.buildURL(path: "/mobile/track/sync", queryItems: [
+                    URLQueryItem(name: "symbols", value: joined),
+                ])
+                group.addTask {
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.timeoutInterval = 30
+                    for (key, value) in headers {
+                        request.setValue(value, forHTTPHeaderField: key)
+                    }
+                    let response: URLResponse
+                    do {
+                        (_, response) = try await URLSession.shared.data(for: request)
+                    } catch let urlError as URLError {
+                        throw APIError.networkError(urlError)
+                    } catch {
+                        throw APIError.unknown(error.localizedDescription)
+                    }
+                    guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                        throw APIError.unknown("Failed to sync tracked symbols")
+                    }
+                }
+            }
+            try await group.waitForAll()
         }
     }
 
@@ -211,7 +288,7 @@ actor BackendService: BackendServiceProtocol {
 
     // MARK: - Import Portfolio
 
-    func importPortfolio(fileData: Data?, filename: String?, text: String?) async throws -> [ImportedPosition] {
+    func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] {
         let url = try buildURL(path: "/mobile/import/parse")
         let boundary = UUID().uuidString
         var request = URLRequest(url: url)
@@ -223,22 +300,11 @@ actor BackendService: BackendServiceProtocol {
         }
 
         var body = Data()
-
-        if let fileData, let filename {
-            body.append(Data("--\(boundary)\r\n".utf8))
-            body.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".utf8))
-            body.append(Data("Content-Type: application/octet-stream\r\n\r\n".utf8))
-            body.append(fileData)
-            body.append(Data("\r\n".utf8))
-        }
-
-        if let text, !text.isEmpty {
-            body.append(Data("--\(boundary)\r\n".utf8))
-            body.append(Data("Content-Disposition: form-data; name=\"text\"\r\n\r\n".utf8))
-            body.append(Data(text.utf8))
-            body.append(Data("\r\n".utf8))
-        }
-
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".utf8))
+        body.append(Data("Content-Type: application/octet-stream\r\n\r\n".utf8))
+        body.append(fileData)
+        body.append(Data("\r\n".utf8))
         body.append(Data("--\(boundary)--\r\n".utf8))
         request.httpBody = body
 
@@ -274,5 +340,17 @@ actor BackendService: BackendServiceProtocol {
             throw APIError.unknown("URL invalida: \(path)")
         }
         return url
+    }
+}
+
+private extension Array {
+    /// Splits the array into fixed-size chunks (last chunk may be smaller).
+    /// Returns `[]` for an empty array, or the array itself wrapped in a
+    /// single chunk when `size <= 0`.
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
     }
 }

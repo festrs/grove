@@ -63,6 +63,11 @@ struct IncomeHistoryView: View {
 
     private func refresh() async {
         await syncService.syncAll(modelContext: modelContext, backendService: backendService)
+        // Explicit user tap on the dividends screen — bypass the once-per-day
+        // gate and pull fresh records so the May/this-month rows land even if
+        // the background sync already ran today.
+        try? await syncService.syncDividends(modelContext: modelContext, backendService: backendService)
+        try? modelContext.save()
         viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
     }
 
@@ -127,7 +132,7 @@ struct IncomeHistoryView: View {
 
     private func assetClassCard(_ detail: MoneyTaxBreakdownDetail) -> some View {
         NavigationLink {
-            AssetClassDividendsView(assetClass: detail.assetClass)
+            AssetClassDividendsView(assetClass: detail.assetClass, window: viewModel.selectedWindow)
         } label: {
             TQCard {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {

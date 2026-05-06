@@ -7,7 +7,7 @@ struct PremiumSection: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Free")
                         .font(.headline)
-                    Text("Up to 10 assets, 1 portfolio")
+                    Text("Up to 10 assets")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -24,7 +24,7 @@ struct PremiumSection: View {
                 Text("Premium - R$ 9.90/month")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                Text("Unlimited assets, multiple portfolios, widgets, notifications, export")
+                Text("Unlimited assets, widgets, notifications, export")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

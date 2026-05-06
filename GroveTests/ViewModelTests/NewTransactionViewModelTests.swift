@@ -69,7 +69,7 @@ struct NewTransactionViewModelTests {
     @Test func submitBuyExistingCreatesContributionAndPromotesEstudo() async throws {
         let ctx = try makeTestContext()
         let (_, holdings) = seedTestData(ctx)
-        let study = holdings.first { $0.ticker == "WEGE3.SA" }!
+        let study = holdings.first { $0.ticker == "WEGE3" }!
         #expect(study.status == .estudo, "WEGE3 was seeded as study")
 
         let backend = MockBackendService()
@@ -82,7 +82,7 @@ struct NewTransactionViewModelTests {
         #expect(ok == true)
         #expect(study.status == .aportar, "First buy on a study holding promotes to aportar")
         let contributions = try ctx.fetch(FetchDescriptor<Contribution>())
-        #expect(contributions.contains { $0.holding?.ticker == "WEGE3.SA" })
+        #expect(contributions.contains { $0.holding?.ticker == "WEGE3" })
     }
 
     // MARK: - submit (buy with new asset)

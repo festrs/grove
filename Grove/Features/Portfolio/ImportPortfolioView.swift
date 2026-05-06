@@ -16,7 +16,6 @@ struct ImportPortfolioView: View {
         NavigationStack {
             ImportView(
                 viewModel: importVM,
-                showFileOption: true,
                 existingTickers: existingTickers,
                 confirmLabel: "Import"
             ) { positions in

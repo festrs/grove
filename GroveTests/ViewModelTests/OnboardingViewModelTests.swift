@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import SwiftData
 import GroveDomain
+import GroveServices
 @testable import Grove
 
 struct OnboardingViewModelTests {
@@ -48,18 +49,18 @@ struct OnboardingViewModelTests {
         #expect(vm.canAdvance == true)
     }
 
-    @Test func canAdvanceStep1RequiresHoldings() {
+    @Test func canAdvanceAddHoldingsStepRequiresHoldings() {
         let vm = OnboardingViewModel()
-        vm.currentStep = 1
+        vm.currentStep = OnboardingViewModel.Step.addHoldings.rawValue
         #expect(vm.canAdvance == false)
 
         vm.addHolding(ticker: "ITUB3")
         #expect(vm.canAdvance == true)
     }
 
-    @Test func canAdvanceStep3RequiresValidTarget() {
+    @Test func canAdvanceTargetsStepRequiresValidTarget() {
         let vm = OnboardingViewModel()
-        vm.currentStep = 3
+        vm.currentStep = OnboardingViewModel.Step.targets.rawValue
         vm.addHolding(ticker: "ITUB3")
         // Only acoesBR is in use — set its allocation to 100 so total = 100
         vm.targetAllocations = [.acoesBR: 100]
@@ -69,15 +70,81 @@ struct OnboardingViewModelTests {
         #expect(vm.canAdvance == false)
     }
 
+    // MARK: - Freedom Plan step
+
+    @Test func freedomPlanStartsAtSubStepZero() {
+        let vm = OnboardingViewModel()
+        #expect(vm.freedomPlanSubStep == 0)
+    }
+
+    @Test func freedomPlanCostSubStepRejectsZero() {
+        let vm = OnboardingViewModel()
+        vm.currentStep = OnboardingViewModel.Step.freedomPlan.rawValue
+        vm.freedomPlanSubStep = 0
+        vm.monthlyCostOfLiving = 0
+        #expect(vm.canAdvance == false)
+
+        vm.monthlyCostOfLiving = 5_000
+        #expect(vm.canAdvance == true)
+    }
+
+    @Test func advanceWalksFreedomPlanSubStepsBeforeMovingOn() {
+        let vm = OnboardingViewModel()
+        vm.advance() // welcome → freedomPlan, sub 0
+        #expect(vm.currentStep == OnboardingViewModel.Step.freedomPlan.rawValue)
+        #expect(vm.freedomPlanSubStep == 0)
+
+        for expectedSub in 1..<OnboardingViewModel.freedomPlanSubStepCount {
+            vm.advance()
+            #expect(vm.currentStep == OnboardingViewModel.Step.freedomPlan.rawValue)
+            #expect(vm.freedomPlanSubStep == expectedSub)
+        }
+
+        vm.advance() // last sub-step → addHoldings
+        #expect(vm.currentStep == OnboardingViewModel.Step.addHoldings.rawValue)
+    }
+
+    @Test func goBackWalksFreedomPlanSubStepsBeforeStepBoundary() {
+        let vm = OnboardingViewModel()
+        vm.currentStep = OnboardingViewModel.Step.freedomPlan.rawValue
+        vm.freedomPlanSubStep = 2
+
+        vm.goBack()
+        #expect(vm.currentStep == OnboardingViewModel.Step.freedomPlan.rawValue)
+        #expect(vm.freedomPlanSubStep == 1)
+
+        vm.goBack()
+        #expect(vm.freedomPlanSubStep == 0)
+
+        vm.goBack() // crosses out to welcome
+        #expect(vm.currentStep == OnboardingViewModel.Step.welcome.rawValue)
+    }
+
+    @Test func freedomNumberRecomputesFromInputs() {
+        let vm = OnboardingViewModel()
+        vm.monthlyCostOfLiving = 8_000
+        vm.costOfLivingCurrency = .brl
+        vm.fiIncomeMode = .lifestyle
+        let rates: any ExchangeRates = StaticRates(brlPerUsd: 5)
+        let n = vm.freedomNumber(displayCurrency: .brl, rates: rates)
+        #expect(n.amount == 12_000)
+    }
+
+    @Test func defaultTargetFIYearIsTwentyYearsOut() {
+        let vm = OnboardingViewModel()
+        let now = Calendar.current.component(.year, from: .now)
+        #expect(vm.targetFIYear == now + 20)
+    }
+
     // MARK: - Holdings Management
 
     @Test func addHoldingFromSearchResult() {
         let vm = OnboardingViewModel()
-        let result = StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "Itau", type: "stock", price: "32", currency: "BRL", change: nil, sector: nil, logo: nil)
+        let result = StockSearchResultDTO(id: "ITUB3", symbol: "ITUB3", name: "Itau", type: "stock", price: "32", currency: "BRL", change: nil, sector: nil, logo: nil)
         vm.addHolding(from: result)
 
         #expect(vm.pendingHoldings.count == 1)
-        #expect(vm.pendingHoldings[0].ticker == "ITUB3.SA")
+        #expect(vm.pendingHoldings[0].ticker == "ITUB3")
         #expect(vm.pendingHoldings[0].quantity == 0)
         #expect(vm.pendingHoldings[0].status == .estudo)
     }

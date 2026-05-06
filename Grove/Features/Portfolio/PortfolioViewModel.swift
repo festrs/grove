@@ -5,8 +5,7 @@ import GroveRepositories
 
 @Observable
 final class PortfolioViewModel {
-    var portfolios: [Portfolio] = []
-    var selectedPortfolio: Portfolio?
+    var portfolio: Portfolio?
     var holdings: [Holding] = []
     var allocationByClass: [AssetClassAllocation] = []
     var summary: PortfolioSummary?
@@ -14,19 +13,16 @@ final class PortfolioViewModel {
     var isLoading = false
 
     var showingEditPortfolio = false
-    var showingNewPortfolio = false
     var holdingToRemove: Holding?
 
     func loadData(modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
+        isLoading = true
+        defer { isLoading = false }
         let repo = PortfolioRepository(modelContext: modelContext)
         do {
-            portfolios = try repo.fetchAllPortfolios()
+            portfolio = try repo.fetchDefaultPortfolio()
 
-            if selectedPortfolio == nil {
-                selectedPortfolio = portfolios.first
-            }
-
-            if let portfolio = selectedPortfolio {
+            if let portfolio {
                 holdings = portfolio.holdings
             } else {
                 holdings = try repo.fetchAllHoldings()
@@ -47,11 +43,6 @@ final class PortfolioViewModel {
         }
     }
 
-    func selectPortfolio(_ portfolio: Portfolio, modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
-        selectedPortfolio = portfolio
-        loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-    }
-
     func deleteHolding(_ holding: Holding, modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
         if holding.hasPosition {
             let contribution = Contribution(
@@ -65,13 +56,5 @@ final class PortfolioViewModel {
         }
         modelContext.delete(holding)
         holdings.removeAll { $0.ticker == holding.ticker }
-    }
-
-    func createPortfolio(name: String, modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
-        let portfolio = Portfolio(name: name)
-        modelContext.insert(portfolio)
-        portfolios.append(portfolio)
-        selectedPortfolio = portfolio
-        loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
     }
 }

@@ -8,10 +8,10 @@ import GroveDomain
 /// agreed cost discipline:
 ///
 /// - **`bootstrap(holdings:)`** runs on every add path (study, buy, import).
-///   Uses the cheap, already-batched `fetchBatchQuotes` + `fetchDividendSummary`
-///   so the ticker shows a real `currentPrice` and a non-zero `dividendYield`
-///   immediately. No upstream provider scrape — it just reads what the
-///   backend already has.
+///   Uses the cheap, already-batched `fetchBatchQuotes` — the same payload
+///   carries `currentPrice` and `dividendYield`, so the ticker shows real
+///   numbers immediately. No upstream provider scrape — it just reads what
+///   the backend already has.
 ///
 /// - **`refreshDividendsAfterTransaction(holding:)`** triggers the on-demand
 ///   provider scrape via `BackendServiceProtocol.refreshDividends`, scoped to
@@ -26,9 +26,9 @@ import GroveDomain
 @MainActor
 struct TickerBootstrapService {
 
-    /// Pull a fresh quote and DY summary for the given holdings and write
-    /// `currentPrice` + `dividendYield` + `lastPriceUpdate`. Cheap — uses
-    /// only the aggregated mobile endpoints, never the provider scrape.
+    /// Pull a fresh quote for the given holdings and write `currentPrice` +
+    /// `dividendYield` + `lastPriceUpdate`. Cheap — uses only the aggregated
+    /// mobile quotes endpoint, never the provider scrape.
     func bootstrap(
         holdings: [Holding],
         backendService: any BackendServiceProtocol
@@ -37,22 +37,18 @@ struct TickerBootstrapService {
         guard !holdings.isEmpty else { return }
         let symbols = holdings.map(\.ticker)
 
-        async let quotesTask = (try? await backendService.fetchBatchQuotes(symbols: symbols)) ?? []
-        async let summaryTask = (try? await backendService.fetchDividendSummary(symbols: symbols)) ?? [:]
-
-        let quotes = await quotesTask
-        let summary = await summaryTask
+        let quotes = (try? await backendService.fetchBatchQuotes(symbols: symbols)) ?? []
 
         for holding in holdings {
-            if let quote = quotes.first(where: { $0.symbol == holding.ticker }),
-               let price = quote.price {
+            guard let quote = quotes.first(where: { $0.symbol == holding.ticker }) else { continue }
+            if let price = quote.price {
                 holding.currentPrice = price.decimalAmount
                 holding.lastPriceUpdate = .now
             }
-            if let dps = summary[holding.ticker]?.decimalValue,
-               holding.currentPrice > 0,
-               dps > 0 {
-                holding.dividendYield = (dps / holding.currentPrice) * 100
+            // Backend returns dividend_yield already in percent. Skip nil/zero
+            // so a missing value doesn't stomp an existing yield.
+            if let dy = quote.dividendYieldDecimal, dy > 0 {
+                holding.dividendYield = dy
             }
         }
     }

@@ -29,9 +29,9 @@ struct SetTargetsStepView: View {
                         TQAssetClassWeightsEditor(
                             weights: doubleWeightsBinding,
                             caption: { cls in
-                                let count = viewModel.pendingHoldings.filter { $0.assetClass == cls }.count
-                                if count == 0 { return String(localized: "No assets yet") }
-                                return count == 1 ? "1 asset" : "\(count) assets"
+                                let matching = viewModel.pendingHoldings.filter { $0.assetClass == cls }
+                                if matching.isEmpty { return String(localized: "No assets yet") }
+                                return matching.count == 1 ? "1 asset" : "\(matching.count) assets"
                             }
                         )
                     }

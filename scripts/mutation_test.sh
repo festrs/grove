@@ -102,14 +102,27 @@ I="Packages/GroveCore/Sources/GroveServices/IncomeProjector.swift"
 add "$I" "skip projection loop"              'totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0'  'totalNet.amount > goalDisplay.amount && contributionDisplay.amount > 0' "IncomeProjectorTests"
 add "$I" "monthlyYield: drop /12"            'monthlyYield = avgDY / 100 / 12'                       'monthlyYield = avgDY / 100'                                                             "IncomeProjectorTests"
 add "$I" "FIRE sim: drop tax multiplier"     'currentIncome += contributionDisplay.amount * monthlyYield * avgNetMultiplier'  'currentIncome += contributionDisplay.amount * monthlyYield'    "IncomeProjectorTests"
+add "$I" "targetYearStatus: hidden guard year > 0"  'guard let year = targetFIYear, year > 0 else { return .hidden }'  'guard let year = targetFIYear, year < 0 else { return .hidden }'                  "IncomeProjectorTests"
+add "$I" "targetYearStatus: goalReached >= 100"     'if progressPercent >= 100 { return .hidden }'   'if progressPercent > 100 { return .hidden }'                                            "IncomeProjectorTests"
+add "$I" "targetYearStatus: needContribution nil"   'if estimatedMonthsToGoal == nil {'              'if estimatedMonthsToGoal != nil {'                                                       "IncomeProjectorTests"
+add "$I" "targetYearStatus: tight threshold 36"     'let isTight = gapMonths <= 36'                  'let isTight = gapMonths <= 12'                                                           "IncomeProjectorTests"
+add "$I" "targetYearStatus: yearsShort round up"    '(Double(gapMonths) / 12.0).rounded(.up)'        '(Double(gapMonths) / 12.0).rounded(.down)'                                              "IncomeProjectorTests"
+add "$I" "targetYearStatus: onTrack branch flip"    'if onTrack { return .onTrack(year: year) }'     'if !onTrack { return .onTrack(year: year) }'                                            "IncomeProjectorTests"
+add "$I" "empirical-yield: max -> min"              'let bestAnnualGross = max(empiricalAnnualGross.amount, storedAnnualGross.amount)'  'let bestAnnualGross = min(empiricalAnnualGross.amount, storedAnnualGross.amount)'  "IncomeProjectorTests"
+
+# --- Holding: per-position P&L + cost basis + dividend windows ---
+H="Packages/GroveCore/Sources/GroveDomain/Holding.swift"
+
+# --- Holding.empiricalAnnualGross: rolling-window forward yield ---
+add "$H" "empirical: window cutoff > -> >="         '$0.paymentDate > cutoff && $0.paymentDate <= asOf'  '$0.paymentDate >= cutoff && $0.paymentDate <= asOf'                                "IncomeProjectorTests"
+add "$H" "empirical: drop × quantity"               'let annualNative = Money(amount: annualPerShare * quantity, currency: currency)'   'let annualNative = Money(amount: annualPerShare, currency: currency)'  "IncomeProjectorTests"
+add "$H" "empirical: drop partial-window scaling"   'let annualPerShare = totalPerShare * annualizationFactor'  'let annualPerShare = totalPerShare'                                                   "IncomeProjectorTests"
 
 # --- IncomeAggregator: passive-income drilldown ---
 IA="Packages/GroveCore/Sources/GroveServices/IncomeAggregator.swift"
 add "$IA" "byClass filter: nonzero -> negative" '$0.total.amount > 0'                                '$0.total.amount < 0'                                                                    "IncomeAggregatorTests"
 add "$IA" "byClass sort: descending -> ascending" '$0.total.amount > $1.total.amount'                '$0.total.amount < $1.total.amount'                                                      "IncomeAggregatorTests"
 
-# --- Holding: per-position P&L + cost basis + dividend windows ---
-H="Packages/GroveCore/Sources/GroveDomain/Holding.swift"
 add "$H" "flip gainLoss sign"                'currentValue - totalCost'                              'totalCost - currentValue'                                                               "TransactionTests"
 add "$H" "gainLossPercent: invert guard"     'guard totalCost > 0 else { return 0 }'                 'guard totalCost < 0 else { return 0 }'                                                  "TransactionTests"
 add "$H" "currentPercent: invert empty guard" 'guard totalValue.amount > 0 else { return 0 }'        'guard totalValue.amount < 0 else { return 0 }'                                          "PortfolioRepositoryTests,RebalancingEngineTests"
@@ -117,6 +130,7 @@ add "$H" "recalc: buy/sell branch flip"      'if c.shares > 0 {'                
 add "$H" "recalc: drop max-zero clamp"       'quantity = max(totalShares, 0)'                        'quantity = totalShares'                                                                 "TransactionTests"
 add "$H" "paidDividends ex-date: <= -> <"    '$0.exDate <= asOf'                                     '$0.exDate < asOf'                                                                       "HoldingDividendsTests,HoldingIncomeWindowTests"
 add "$H" "projectedDividends: > -> >="       '$0.exDate > asOf'                                      '$0.exDate >= asOf'                                                                      "HoldingDividendsTests,HoldingIncomeWindowTests"
+add "$H" "init: drop ticker normalization"   'let canonical = ticker.normalizedTicker'              'let canonical = ticker'                                                                 "TickerParserTests"
 
 # --- DividendPayment: per-payment tax + earnings ---
 D="Packages/GroveCore/Sources/GroveDomain/DividendPayment.swift"

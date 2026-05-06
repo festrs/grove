@@ -3,12 +3,11 @@ import UniformTypeIdentifiers
 import GroveDomain
 
 /// Reusable import component used by both onboarding and portfolio import.
-/// Handles text/file input → AI analysis → preview with checkboxes.
+/// Handles file input → AI analysis → preview with checkboxes.
 struct ImportView: View {
     @Bindable var viewModel: ImportViewModel
     @Environment(\.backendService) private var backendService
 
-    var showFileOption: Bool = true
     var existingTickers: Set<String> = []
     var confirmLabel: String = "Import"
     var onConfirm: ([ImportedPosition]) -> Void
@@ -28,52 +27,13 @@ struct ImportView: View {
 
     private var inputPhase: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            if showFileOption {
-                Picker("Mode", selection: $viewModel.inputMode) {
-                    Text("Text").tag(ImportInputMode.text)
-                    Text("File").tag(ImportInputMode.file)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, Theme.Spacing.lg)
-            }
-
-            if viewModel.inputMode == .text || !showFileOption {
-                textInput
-            } else {
-                fileInput
-            }
-
+            fileInput
             analyzeButton
         }
         .alert("Error", isPresented: $viewModel.showingError) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage)
-        }
-    }
-
-    private var textInput: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            Text("Paste your statement or asset list text")
-                .font(.system(size: Theme.FontSize.caption))
-                .foregroundStyle(Color.tqSecondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Theme.Spacing.lg)
-
-            TextEditor(text: $viewModel.pastedText)
-                .font(.system(size: Theme.FontSize.caption, design: .monospaced))
-                .scrollContentBackground(.hidden)
-                .padding(Theme.Spacing.sm)
-                .frame(minHeight: 120, maxHeight: 160)
-                .background(Color.tqCardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.small))
-                .padding(.horizontal, Theme.Spacing.lg)
-
-            Text("Accepts any format: tickers, CSV, B3 statement, spreadsheet text...")
-                .font(.system(size: Theme.FontSize.caption))
-                .foregroundStyle(Color.tqSecondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Theme.Spacing.lg)
         }
     }
 

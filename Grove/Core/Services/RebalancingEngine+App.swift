@@ -26,15 +26,16 @@ extension RebalancingEngine {
 
         let globalAllocations = settings.classAllocations
 
+        let raw: [RebalancingSuggestion]
         if globalAllocations.isEmpty {
-            return calculate(
+            raw = calculate(
                 holdings: holdings,
                 investmentAmount: investmentAmount,
                 maxRecommendations: settings.recommendationCount,
                 rates: rates
             )
         } else {
-            return calculate(
+            raw = calculate(
                 holdings: holdings,
                 investmentAmount: investmentAmount,
                 classAllocations: globalAllocations,
@@ -42,5 +43,15 @@ extension RebalancingEngine {
                 rates: rates
             )
         }
+
+        // Suggestions are keyed by ticker (RebalancingSuggestion.id == ticker).
+        // When duplicate Holdings exist (CloudKit-synced or import drift),
+        // the engine produces one suggestion per Holding row → SwiftUI ForEach
+        // emits "ID occurs multiple times" warnings. Keep the first by ticker;
+        // engine ordering already reflects priority. The proper fix is the
+        // duplicate-Holding cleanup migration, but that touches user data and
+        // ships separately.
+        var seen = Set<String>()
+        return raw.filter { seen.insert($0.ticker).inserted }
     }
 }

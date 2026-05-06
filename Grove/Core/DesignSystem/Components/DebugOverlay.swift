@@ -53,7 +53,6 @@ struct DebugMenuView: View {
         NavigationStack {
             List {
                 limitsSection
-                designPreviewsSection
                 notificationsSection
                 dataSection
                 infoSection
@@ -84,27 +83,6 @@ struct DebugMenuView: View {
             Text("Free-tier limits")
         } footer: {
             Text("Bypasses the \(AppConstants.freeTierMaxHoldings)-asset cap. DEBUG builds only.")
-        }
-    }
-
-    // MARK: - Design Previews
-
-    private var designPreviewsSection: some View {
-        Section {
-            NavigationLink {
-                PortfoliosOverviewPreviewView()
-            } label: {
-                Label("Portfolios overview (all at once)", systemImage: "square.stack.3d.up")
-            }
-            Button {
-                loadMultiPortfolioSample()
-            } label: {
-                Label("Seed multi-portfolio sample", systemImage: "tray.and.arrow.down")
-            }
-        } header: {
-            Text("Design previews")
-        } footer: {
-            Text("Prototype layouts gated to DEBUG. The seeder creates 3 portfolios (Aposentadoria, Filhos, Curto prazo) so the overview has data to chew on.")
         }
     }
 
@@ -223,76 +201,14 @@ struct DebugMenuView: View {
         if let settings = try? modelContext.fetch(settingsDesc).first {
             settings.hasCompletedOnboarding = true
             settings.monthlyIncomeGoal = 10_000
+            settings.freedomPlanCompletedAt = .now
         } else {
             let settings = UserSettings(
                 monthlyIncomeGoal: 10_000,
                 monthlyCostOfLiving: 15_000,
                 hasCompletedOnboarding: true
             )
-            modelContext.insert(settings)
-        }
-
-        try? modelContext.save()
-    }
-
-    // MARK: - Multi-Portfolio Sample
-
-    /// Creates three themed portfolios (Aposentadoria / Filhos / Curto prazo)
-    /// and distributes the standard sample holdings across them so the
-    /// "Portfolios overview" prototype has real data. Idempotent: skips any
-    /// portfolio that already exists by name and any holding whose ticker
-    /// already exists anywhere in the store.
-    private func loadMultiPortfolioSample() {
-        let buckets: [(name: String, tickers: [String])] = [
-            ("Aposentadoria", ["ITUB3", "TAEE11", "BTLG11", "KNRI11", "MXRF11", "VTI", "O"]),
-            ("Filhos",        ["WEGE3", "LREN3", "AAPL", "NVDA", "GOOG"]),
-            ("Curto prazo",   ["PETR4", "XPML11", "DLR", "BTC", "IPCA2035"])
-        ]
-
-        let existingPortfolios = (try? modelContext.fetch(FetchDescriptor<Portfolio>())) ?? []
-        let existingByName = Dictionary(uniqueKeysWithValues: existingPortfolios.map { ($0.name, $0) })
-        let allExistingTickers = Set(((try? modelContext.fetch(FetchDescriptor<Holding>())) ?? []).map(\.ticker))
-
-        let samplesByTicker = Dictionary(uniqueKeysWithValues: Holding.allSamples.map { ($0.ticker, $0) })
-
-        var seedIndex = 0
-        for bucket in buckets {
-            let portfolio: Portfolio
-            if let found = existingByName[bucket.name] {
-                portfolio = found
-            } else {
-                portfolio = Portfolio(name: bucket.name)
-                modelContext.insert(portfolio)
-            }
-
-            for ticker in bucket.tickers {
-                guard !allExistingTickers.contains(ticker),
-                      let sample = samplesByTicker[ticker] else { continue }
-                modelContext.insert(sample)
-                sample.portfolio = portfolio
-                seedTransactions(for: sample, seedIndex: seedIndex)
-                sample.recalculateFromContributions()
-                seedIndex += 1
-            }
-        }
-
-        if let settings = (try? modelContext.fetch(FetchDescriptor<UserSettings>()))?.first {
-            settings.classAllocations = [
-                .acoesBR: 27, .fiis: 15, .usStocks: 28,
-                .reits: 10, .crypto: 5, .rendaFixa: 5,
-            ]
-            settings.hasCompletedOnboarding = true
-            if settings.monthlyIncomeGoal == 0 { settings.monthlyIncomeGoal = 10_000 }
-        } else {
-            let settings = UserSettings(
-                monthlyIncomeGoal: 10_000,
-                monthlyCostOfLiving: 15_000,
-                hasCompletedOnboarding: true
-            )
-            settings.classAllocations = [
-                .acoesBR: 27, .fiis: 15, .usStocks: 28,
-                .reits: 10, .crypto: 5, .rendaFixa: 5,
-            ]
+            settings.freedomPlanCompletedAt = .now
             modelContext.insert(settings)
         }
 

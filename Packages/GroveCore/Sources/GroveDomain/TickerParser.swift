@@ -1,5 +1,19 @@
 import Foundation
 
+public extension String {
+    /// Canonical storage form for a ticker symbol: uppercased, `.SA` suffix
+    /// stripped. Use this whenever a ticker crosses a write boundary
+    /// (Holding init, API call key, lookup map) so duplicates from mixed
+    /// `.SA`/no-`.SA` sources collapse to a single identity.
+    var normalizedTicker: String {
+        let upper = uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if upper.hasSuffix(".SA") {
+            return String(upper.dropLast(3))
+        }
+        return upper
+    }
+}
+
 public enum TickerParser {
     /// Extract uppercased tickers from free-form text — one per line, with the
     /// first column kept when a separator (",", ";", "\t") is present. Filters

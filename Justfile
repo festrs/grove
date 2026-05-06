@@ -33,6 +33,40 @@ test: generate
 test-only name: generate
     xcodebuild test -scheme Grove -destination '{{destination}}' -only-testing:GroveTests/{{name}}
 
+# Run SwiftLint over the whole project
+lint:
+    swiftlint
+
+# Alias: same as `just lint`
+alias swiftlint := lint
+
+# Run SwiftLint with auto-fix where safe
+lint-fix:
+    swiftlint --fix && swiftlint
+
+# Run tests with coverage on, then print overall + per-file summary
+coverage: generate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    BUNDLE=".coverage.xcresult"
+    rm -rf "$BUNDLE"
+    xcodebuild test \
+        -scheme Grove \
+        -destination '{{destination}}' \
+        -only-testing:GroveTests \
+        -enableCodeCoverage YES \
+        -resultBundlePath "$BUNDLE" \
+        -quiet
+    echo ""
+    echo "=== Overall coverage ==="
+    xcrun xccov view --report --only-targets "$BUNDLE"
+    echo ""
+    echo "=== Lowest-covered files (top 30) ==="
+    xcrun xccov view --report --files-for-target Grove.app "$BUNDLE" 2>/dev/null \
+        | awk 'NR>2 && NF>=4 {print}' \
+        | sort -k4 -n \
+        | head -30
+
 # Clean DerivedData
 clean:
     rm -rf ~/Library/Developer/Xcode/DerivedData/Grove-*

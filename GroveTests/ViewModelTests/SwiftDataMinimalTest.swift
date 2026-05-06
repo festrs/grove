@@ -22,7 +22,7 @@ struct SwiftDataMinimalTest {
         let ctx = try makeTestContext()
         let portfolio = Portfolio(name: "Test")
         ctx.insert(portfolio)
-        let h = Holding(ticker: "ITUB3.SA", quantity: 100, assetClass: .acoesBR)
+        let h = Holding(ticker: "ITUB3", quantity: 100, assetClass: .acoesBR)
         ctx.insert(h)
         h.portfolio = portfolio
         try ctx.save()

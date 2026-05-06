@@ -79,7 +79,6 @@ struct AddHoldingsStepView: View {
             } else {
                 ImportView(
                     viewModel: importViewModel,
-                    showFileOption: true,
                     existingTickers: Set(viewModel.pendingHoldings.map { $0.ticker.uppercased() }),
                     confirmLabel: "Add"
                 ) { positions in
@@ -279,7 +278,6 @@ struct AddHoldingsStepView: View {
         } else {
             ImportView(
                 viewModel: importViewModel,
-                showFileOption: true,
                 existingTickers: Set(viewModel.pendingHoldings.map { $0.ticker.uppercased() }),
                 confirmLabel: "Add"
             ) { positions in

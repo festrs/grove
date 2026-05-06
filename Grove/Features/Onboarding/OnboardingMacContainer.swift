@@ -10,6 +10,8 @@ import GroveDomain
 struct OnboardingMacContainer: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
+    @Environment(\.displayCurrency) private var displayCurrency
+    @Environment(\.rates) private var rates
     @Bindable var viewModel: OnboardingViewModel
 
     private let cardWidth: CGFloat = 720
@@ -78,6 +80,11 @@ struct OnboardingMacContainer: View {
     }
 
     private func complete() {
-        viewModel.completeOnboarding(modelContext: modelContext, backendService: backendService)
+        viewModel.completeOnboarding(
+            modelContext: modelContext,
+            backendService: backendService,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
     }
 }

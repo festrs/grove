@@ -22,6 +22,9 @@ Use `just` (task runner). It auto-detects the latest iOS simulator — no hardco
 just build              # xcodegen generate + xcodebuild build
 just test               # run all unit tests
 just test-only <Name>   # run specific test struct (e.g. just test-only RebalancingEngineTests)
+just lint               # run SwiftLint (alias: just swiftlint)
+just lint-fix           # swiftlint --fix, then re-lint
+just coverage           # run tests with -enableCodeCoverage YES, print overall + lowest-covered files
 just clean              # rm DerivedData
 just rebuild            # clean + generate + build
 just resolve            # resolve SPM packages
@@ -32,6 +35,10 @@ just --list             # show all available recipes
 ```
 
 **Deployment target:** iOS 26.0. **Simulator:** Use "iPhone Air" (not "iPhone 16 Pro" — may not exist).
+
+**SwiftLint** runs as a `preBuildScripts` Run Script phase on the Grove target (configured in `project.yml`), so violations appear in Xcode's issue navigator on every build. Config is in `.swiftlint.yml`. `force_try` is downgraded to a warning because `try!` is canonical inside `#Preview` blocks and the app's `ModelContainer` bootstrap. Errors break the build; warnings don't.
+
+**Coverage** writes a result bundle to `.coverage.xcresult` (git-ignored, recreated each run) and uses `xcrun xccov view --report` to summarize. Run `just coverage` and inspect the "Lowest-covered files" tail — that's where new tests pay off most.
 
 ## Architecture
 
@@ -51,6 +58,8 @@ just --list             # show all available recipes
 - **Holding status (Bastter pipeline):** `.estudo` (studying, no position yet), `.aportar` (good company, receives monthly contributions), `.quarentena` (first stage of exit — counts toward allocation but receives no money), `.vender` (decision made to exit — excluded from allocation math entirely, sell gradually). A Holding without Contributions is in estudo; first buy promotes to aportar.
 - **Contributions as source of truth:** `Holding.quantity` and `averagePrice` are cached but derived from `Contribution` records via `recalculateFromContributions()`. Always create a Contribution then call recalculate — never write quantity/averagePrice directly.
 - **Asset class detection:** `AssetClassType.detect(from:apiType:)` uses the Brapi API `type` field (`"fund"` → FII, `"stock"` → Ações BR, `"bdr"` → US Stocks) as primary source, falls back to ticker heuristics. Always strip `.SA` suffix before display.
+- **Add-ticker flow (single entry point):** A `+` toolbar button on the Portfolio root (and on each `AssetClassHoldingsView`) opens `AddTickerSheet` — unfiltered backend search plus an "Add custom ticker" row at the bottom. Both paths route to the same `AddAssetDetailSheet`; class is decided by `detect(...)` for real results and by the user picker for custom. Never gate search by the screen's class — that lies to the user about routing. New holdings persist via `AddAssetViewModel.addAsset(...)`.
+- **Custom holdings (`Holding.isCustom`):** Local-only — no backend quote, dividends, fundamentals, or symbol record. `SyncService` and `TickerBootstrapService` skip them; `AddAssetViewModel` skips `trackSymbol`/`bootstrap` when `isCustom`; `HoldingDetailView` hides `PriceChartView`, `HoldingStatsStrip`, `CompanyInfoCard`, dividend history, and the `refreshAll` call. Buy/sell/transactions still work locally.
 
 ## Backend (grove-platform)
 

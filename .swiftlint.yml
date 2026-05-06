@@ -1,0 +1,83 @@
+excluded:
+  - .build
+  - .mutation-derived
+  - .mutation-derived-mac
+  - DerivedData
+  - Grove.xcodeproj
+  - Grove/Preview Content
+  - Packages/GroveCore/.build
+  - Packages/*/.build
+
+# Default rules we don't want noise from
+disabled_rules:
+  - trailing_comma            # SwiftUI multiline params look fine without it
+  - todo                      # we keep TODOs intentionally
+  - opening_brace             # SwiftUI `View {` patterns
+  - multiple_closures_with_trailing_closure
+  - nesting                   # SwiftData / SwiftUI generics nest deep
+  - type_name                 # short DTO names fail on min length
+  - identifier_name           # we use short names like `id`, `vm`
+  - non_optional_string_data_conversion  # preview/test helpers use `String(data:encoding:)`
+  - redundant_optional_initialization    # noise on `var x: T? = nil` in @Observable
+
+# `try!` is canonical inside `#Preview` and at app entry for ModelContainer
+# bootstrapping; downgrade to a warning so it doesn't break the build.
+force_try:
+  severity: warning
+
+# Opt-in rules that catch real bugs / noise
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - first_where
+  - last_where
+  - sorted_first_last
+  - redundant_type_annotation
+  - redundant_nil_coalescing
+  - unused_import
+  - unneeded_parentheses_in_closure_argument
+  - prefer_zero_over_explicit_init
+  - closure_spacing
+  - operator_usage_whitespace
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+  - toggle_bool
+
+# Rules that only fire under `swiftlint analyze`
+analyzer_rules:
+  - unused_import
+
+# SwiftUI files are long by nature; relax the defaults
+line_length:
+  warning: 140
+  error: 240
+  ignores_comments: true
+  ignores_urls: true
+  ignores_function_declarations: true
+
+file_length:
+  warning: 600
+  error: 1000
+  ignore_comment_only_lines: true
+
+type_body_length:
+  warning: 400
+  error: 600
+
+function_body_length:
+  warning: 80
+  error: 150
+
+function_parameter_count:
+  warning: 8
+  error: 10
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+large_tuple:
+  warning: 4
+  error: 5
+
+reporter: "xcode"

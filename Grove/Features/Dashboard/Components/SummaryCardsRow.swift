@@ -6,7 +6,6 @@ import GroveRepositories
 struct SummaryCardsRow: View {
     let summary: PortfolioSummary
     let projection: IncomeProjection?
-    let portfolioCount: Int
     @Environment(\.displayCurrency) private var displayCurrency
     @Environment(\.rates) private var rates
 
@@ -37,15 +36,6 @@ struct SummaryCardsRow: View {
                     label: "FI in",
                     value: "\(formatted) years",
                     hint: "At current pace"
-                )
-            }
-            if portfolioCount > 0 {
-                summaryCard(
-                    label: "Portfolios",
-                    value: "\(portfolioCount)",
-                    hint: portfolioCount == 1
-                        ? String(localized: "1 portfolio")
-                        : String(localized: "\(portfolioCount) portfolios")
                 )
             }
         }
