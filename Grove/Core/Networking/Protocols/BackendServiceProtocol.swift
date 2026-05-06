@@ -15,7 +15,6 @@ protocol BackendServiceProtocol: Sendable {
 
     // Dividends (send local symbols, get dividend data back)
     func fetchDividendsForSymbols(symbols: [String], year: Int?) async throws -> [MobileDividendDTO]
-    func fetchDividendSummary(symbols: [String]) async throws -> [String: DividendSummaryDTO]
 
     // On-demand dividend scrape: ask the backend to fetch fresh dividend
     // history for these symbols inline (vs waiting for the next cron tick).
@@ -36,6 +35,6 @@ protocol BackendServiceProtocol: Sendable {
     // Fundamentals
     func fetchFundamentals(symbol: String) async throws -> FundamentalsDTO
 
-    // Import portfolio (file or text → parsed positions)
-    func importPortfolio(fileData: Data?, filename: String?, text: String?) async throws -> [ImportedPosition]
+    // Import portfolio (file → parsed positions)
+    func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition]
 }

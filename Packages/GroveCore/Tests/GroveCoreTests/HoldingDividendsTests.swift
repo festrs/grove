@@ -138,6 +138,36 @@ struct HoldingDividendsTests {
         #expect(classified.first?.kind == .paid)
     }
 
+    // MARK: - classifiedDividends(in: window)
+
+    @Test func classifiedDividendsInWindowFiltersByPaymentDate() throws {
+        let ctx = try Self.makeContext()
+        let h = Holding(ticker: "HGLG11", quantity: 10, currentPrice: 100, assetClass: .fiis, status: .aportar)
+        ctx.insert(h)
+        // 2026-05-15 12:00 UTC — sits inside May 2026 (the .month window
+        // computed from this asOf).
+        let asOf = Date(timeIntervalSince1970: 1_778_587_200)
+        let inWindow = DividendPayment(exDate: asOf.addingTimeInterval(-86_400),
+                                       paymentDate: asOf,
+                                       amountPerShare: 1)
+        let beforeWindow = DividendPayment(exDate: asOf.addingTimeInterval(-86_400 * 60),
+                                           paymentDate: asOf.addingTimeInterval(-86_400 * 60),
+                                           amountPerShare: 2)
+        let afterWindow = DividendPayment(exDate: asOf.addingTimeInterval(86_400 * 60),
+                                          paymentDate: asOf.addingTimeInterval(86_400 * 60),
+                                          amountPerShare: 3)
+        Self.attach(inWindow, to: h, in: ctx)
+        Self.attach(beforeWindow, to: h, in: ctx)
+        Self.attach(afterWindow, to: h, in: ctx)
+
+        let monthRows = h.classifiedDividends(in: .month, asOf: asOf)
+        #expect(monthRows.count == 1, "Only the May payment should appear in the month window")
+        #expect(monthRows.first?.payment.amountPerShare == 1)
+
+        let yearRows = h.classifiedDividends(in: .year, asOf: asOf)
+        #expect(yearRows.count == 3, "All three payments fall in the same calendar year")
+    }
+
     // MARK: - paidDividendsTotal / projectedDividendsTotal
 
     @Test func paidDividendsTotalScalesByCurrentQuantity() throws {

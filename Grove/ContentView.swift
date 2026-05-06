@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import GroveDomain
+import GroveRepositories
 
 /// App root. Routes between onboarding and the platform-appropriate
 /// navigation shell, wires environment values, and kicks off initial sync
@@ -34,14 +35,19 @@ struct ContentView: View {
         }
         .task {
             ensureSettingsExist()
+            collapseDuplicatePortfolios()
             await rateStore.refresh(using: backendService)
             guard settings.first?.hasCompletedOnboarding == true else { return }
             await syncService.syncAll(modelContext: modelContext, backendService: backendService)
+            Task {
+                await syncService.syncDividendsIfStale(modelContext: modelContext, backendService: backendService)
+            }
         }
         .onChange(of: settings.first?.hasCompletedOnboarding) { _, completed in
             guard completed == true else { return }
             Task {
                 await syncService.syncAll(modelContext: modelContext, backendService: backendService)
+                await syncService.syncDividendsIfStale(modelContext: modelContext, backendService: backendService)
             }
         }
     }
@@ -63,6 +69,13 @@ struct ContentView: View {
         if settings.isEmpty {
             modelContext.insert(UserSettings())
         }
+    }
+
+    /// Collapses any extra Portfolios into the oldest one — one-shot guard
+    /// against legacy multi-portfolio state from older builds.
+    private func collapseDuplicatePortfolios() {
+        let repo = PortfolioRepository(modelContext: modelContext)
+        _ = try? repo.collapseDuplicatePortfolios()
     }
 }
 

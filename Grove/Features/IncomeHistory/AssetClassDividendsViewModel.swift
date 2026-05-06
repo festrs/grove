@@ -28,21 +28,26 @@ final class AssetClassDividendsViewModel {
         errorMessage = nil
         defer { isRefreshing = false }
 
+        let start = Date()
+        print("[Dividends] AssetClassRefresh start — class=\(assetClass.rawValue) symbols=\(symbols.joined(separator: ","))")
         do {
             // Manual refresh — leave `since` nil so the user can backfill
             // the full history (e.g. after importing a legacy position).
-            _ = try await backendService.refreshDividends(
+            let result = try await backendService.refreshDividends(
                 symbols: symbols,
                 assetClass: assetClass.rawValue,
                 since: nil
             )
+            print("[Dividends] AssetClassRefresh /refresh result — scraped=\(result.scraped) new=\(result.newRecords) failed=\(result.failed)")
             try await syncService.syncDividends(
                 modelContext: modelContext,
                 backendService: backendService
             )
             try? modelContext.save()
+            print("[Dividends] AssetClassRefresh done in \(String(format: "%.2f", Date().timeIntervalSince(start)))s")
         } catch {
             errorMessage = "Couldn't refresh dividends: \(error.localizedDescription)"
+            print("[Dividends] AssetClassRefresh FAILED after \(String(format: "%.2f", Date().timeIntervalSince(start)))s — \(error.localizedDescription)")
         }
     }
 }

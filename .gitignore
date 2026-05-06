@@ -11,6 +11,8 @@ build/
 *.ipa
 *.dSYM.zip
 *.dSYM
+*.xcresult
+.coverage.xcresult/
 
 # Secrets - NEVER commit
 Secrets.xcconfig

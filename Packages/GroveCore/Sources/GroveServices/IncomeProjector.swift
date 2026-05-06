@@ -1,6 +1,22 @@
 import Foundation
 import GroveDomain
 
+/// Semantic state for the dashboard "on track for target FI year" pill.
+/// The model decides which case applies; the view picks colors and icons.
+public enum OnTrackStatus: Sendable, Equatable {
+    /// No pill — user has no target year, has reached the goal, or the
+    /// projector lacks enough data to classify.
+    case hidden
+    /// Projection reaches the goal on or before Jan 1 of the target year.
+    case onTrack(year: Int)
+    /// Behind by 1–36 months (≤3 years).
+    case tight(year: Int, yearsShort: Int)
+    /// Behind by more than 36 months.
+    case far(year: Int, yearsShort: Int)
+    /// Sim hit the 50-year cap — the user needs to bump contribution capacity.
+    case needContribution(year: Int)
+}
+
 public struct IncomeProjection: Sendable {
     public let currentMonthlyNet: Money
     public let currentMonthlyGross: Money
@@ -8,6 +24,14 @@ public struct IncomeProjection: Sendable {
     public let progressPercent: Decimal
     public let estimatedMonthsToGoal: Int?
     public let estimatedYearsToGoal: Decimal?
+    /// User's target FI year. Nil when not set.
+    public let targetFIYear: Int?
+    /// Months from `asOf` until Jan 1 of `targetFIYear`. Nil when no target year is set.
+    public let monthsRemainingToTargetYear: Int?
+    /// True when the user can reach the goal before their target FI year at
+    /// the current projection. Nil when either piece is missing (no target
+    /// year, or `estimatedMonthsToGoal == nil`).
+    public let onTrackForTargetYear: Bool?
 
     public init(
         currentMonthlyNet: Money,
@@ -15,7 +39,10 @@ public struct IncomeProjection: Sendable {
         goalMonthly: Money,
         progressPercent: Decimal,
         estimatedMonthsToGoal: Int?,
-        estimatedYearsToGoal: Decimal?
+        estimatedYearsToGoal: Decimal?,
+        targetFIYear: Int? = nil,
+        monthsRemainingToTargetYear: Int? = nil,
+        onTrackForTargetYear: Bool? = nil
     ) {
         self.currentMonthlyNet = currentMonthlyNet
         self.currentMonthlyGross = currentMonthlyGross
@@ -23,6 +50,31 @@ public struct IncomeProjection: Sendable {
         self.progressPercent = progressPercent
         self.estimatedMonthsToGoal = estimatedMonthsToGoal
         self.estimatedYearsToGoal = estimatedYearsToGoal
+        self.targetFIYear = targetFIYear
+        self.monthsRemainingToTargetYear = monthsRemainingToTargetYear
+        self.onTrackForTargetYear = onTrackForTargetYear
+    }
+
+    /// Classify the projection against the target FI year for display in
+    /// the on-track pill. Logic lives on the model so views are pure.
+    public var targetYearStatus: OnTrackStatus {
+        guard let year = targetFIYear, year > 0 else { return .hidden }
+        if progressPercent >= 100 { return .hidden }
+
+        if estimatedMonthsToGoal == nil {
+            return .needContribution(year: year)
+        }
+        guard let onTrack = onTrackForTargetYear else { return .hidden }
+        if onTrack { return .onTrack(year: year) }
+
+        let estMonths = estimatedMonthsToGoal ?? 0
+        let remMonths = monthsRemainingToTargetYear ?? 0
+        let gapMonths = max(estMonths - remMonths, 1)
+        let yearsShort = max(1, Int((Double(gapMonths) / 12.0).rounded(.up)))
+        let isTight = gapMonths <= 36
+        return isTight
+            ? .tight(year: year, yearsShort: yearsShort)
+            : .far(year: year, yearsShort: yearsShort)
     }
 }
 
@@ -33,12 +85,17 @@ public struct IncomeProjector {
     /// weighted DY% derived from `Holding.dividendYield` — that's the only
     /// stable proxy for "what new shares will earn" since they have no
     /// dividend records yet.
+    ///
+    /// When `targetYear` is supplied, also reports months remaining until
+    /// Jan 1 of that year and whether the user is on track to hit the goal
+    /// before then.
     public static func project(
         holdings: [Holding],
         incomeGoal: Money,
         monthlyContribution: Money,
         displayCurrency: Currency,
         rates: any ExchangeRates,
+        targetYear: Int? = nil,
         asOf: Date = .now,
         calendar: Calendar = .current
     ) -> IncomeProjection {
@@ -76,11 +133,25 @@ public struct IncomeProjector {
             // Sim parameters: stable, portfolio-composition-based.
             let totalValueDisplay = holdings.map { $0.currentValueMoney }
                 .sum(in: displayCurrency, using: rates)
-            let estAnnualGross = holdings.map { $0.estimatedMonthlyIncomeMoney * 12 }
+            // Two estimates of forward yield:
+            //   - Empirical: trailing-12-month real dividend records, scaled
+            //     by current quantity. Authoritative once a holding has paid.
+            //   - Stored: `dividendYield × price × qty / 12` × 12 from the
+            //     holding's `dividendYield` field. Best signal for brand-new
+            //     holdings with no records yet, but stale otherwise.
+            // Take the per-portfolio max so users with a real dividend
+            // history get the truthful number, while users with empty
+            // history still get the optimistic stored estimate they entered.
+            let empiricalAnnualGross = holdings.map {
+                $0.empiricalAnnualGross(asOf: asOf, displayCurrency: displayCurrency,
+                                        rates: rates, calendar: calendar)
+            }.sum(in: displayCurrency, using: rates)
+            let storedAnnualGross = holdings.map { $0.estimatedMonthlyIncomeMoney * 12 }
                 .sum(in: displayCurrency, using: rates)
+            let bestAnnualGross = max(empiricalAnnualGross.amount, storedAnnualGross.amount)
             let avgDY: Decimal
-            if totalValueDisplay.amount > 0 && estAnnualGross.amount > 0 {
-                avgDY = (estAnnualGross.amount / totalValueDisplay.amount) * 100
+            if totalValueDisplay.amount > 0 && bestAnnualGross > 0 {
+                avgDY = (bestAnnualGross / totalValueDisplay.amount) * 100
             } else {
                 avgDY = 6
             }
@@ -107,13 +178,35 @@ public struct IncomeProjector {
             estimatedYears = 0
         }
 
+        // Target-year reporting (independent of the sim above).
+        var monthsRemaining: Int?
+        var onTrack: Bool?
+        var resolvedTargetYear: Int?
+        if let targetYear, targetYear > 0 {
+            resolvedTargetYear = targetYear
+            var components = DateComponents()
+            components.year = targetYear
+            components.month = 1
+            components.day = 1
+            if let target = calendar.date(from: components) {
+                let diff = calendar.dateComponents([.month], from: asOf, to: target).month ?? 0
+                monthsRemaining = max(diff, 0)
+                if let estimatedMonths {
+                    onTrack = estimatedMonths <= max(diff, 0)
+                }
+            }
+        }
+
         return IncomeProjection(
             currentMonthlyNet: totalNet,
             currentMonthlyGross: totalGross,
             goalMonthly: goalDisplay,
             progressPercent: min(progress, 100),
             estimatedMonthsToGoal: estimatedMonths,
-            estimatedYearsToGoal: estimatedYears
+            estimatedYearsToGoal: estimatedYears,
+            targetFIYear: resolvedTargetYear,
+            monthsRemainingToTargetYear: monthsRemaining,
+            onTrackForTargetYear: onTrack
         )
     }
 }

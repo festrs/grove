@@ -161,8 +161,8 @@ struct BackendDTOTests {
         let json = """
         {
             "quotes": [
-                {"symbol": "ITUB3.SA", "name": "Itau", "price": {"amount": "32.50", "currency": "BRL"}, "currency": "BRL"},
-                {"symbol": "AAPL", "name": "Apple", "price": {"amount": "180.00", "currency": "USD"}, "currency": "USD"}
+                {"symbol": "ITUB3.SA", "name": "Itau", "price": {"amount": "32.50", "currency": "BRL"}, "currency": "BRL", "dividend_yield": "7.96"},
+                {"symbol": "AAPL", "name": "Apple", "price": {"amount": "180.00", "currency": "USD"}, "currency": "USD", "dividend_yield": null}
             ]
         }
         """.data(using: .utf8)!
@@ -170,13 +170,15 @@ struct BackendDTOTests {
         let response = try JSONDecoder().decode(BatchQuotesResponse.self, from: json)
         #expect(response.quotes.count == 2)
         #expect(response.quotes[0].price?.decimalAmount == Decimal(string: "32.50"))
+        #expect(response.quotes[0].dividendYieldDecimal == Decimal(string: "7.96"))
+        #expect(response.quotes[1].dividendYieldDecimal == nil)
     }
 
     @Test func decodesBatchQuoteWithNullPrice() throws {
         let json = """
         {
             "quotes": [
-                {"symbol": "UNKNOWN", "name": null, "price": null, "currency": null}
+                {"symbol": "UNKNOWN", "name": null, "price": null, "currency": null, "dividend_yield": null}
             ]
         }
         """.data(using: .utf8)!
@@ -184,6 +186,20 @@ struct BackendDTOTests {
         let response = try JSONDecoder().decode(BatchQuotesResponse.self, from: json)
         #expect(response.quotes[0].price == nil)
         #expect(response.quotes[0].name == nil)
+        #expect(response.quotes[0].dividendYieldDecimal == nil)
+    }
+
+    @Test func decodesBatchQuoteWithMissingDividendYieldKey() throws {
+        let json = """
+        {
+            "quotes": [
+                {"symbol": "BTC", "name": "Bitcoin", "price": {"amount": "350000", "currency": "BRL"}, "currency": "BRL"}
+            ]
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(BatchQuotesResponse.self, from: json)
+        #expect(response.quotes[0].dividendYieldDecimal == nil)
     }
 
     // MARK: - Mobile Dividend Decoding
@@ -221,14 +237,4 @@ struct BackendDTOTests {
         #expect(dto.paymentDate == nil)
     }
 
-    // MARK: - Dividend Summary Decoding
-
-    @Test func decodesDividendSummary() throws {
-        let json = """
-        {"dividend_per_share": "4.32"}
-        """.data(using: .utf8)!
-
-        let dto = try JSONDecoder().decode(DividendSummaryDTO.self, from: json)
-        #expect(dto.decimalValue == Decimal(string: "4.32"))
-    }
 }

@@ -19,7 +19,15 @@ actor MockBackendService: BackendServiceProtocol {
     }
 
     func fetchBatchQuotes(symbols: [String]) async throws -> [BatchQuoteDTO] {
-        symbols.map { BatchQuoteDTO(symbol: $0, name: $0, price: MoneyDTO(amount: "32.50", currency: "BRL"), currency: "BRL") }
+        symbols.map {
+            BatchQuoteDTO(
+                symbol: $0,
+                name: $0,
+                price: MoneyDTO(amount: "32.50", currency: "BRL"),
+                currency: "BRL",
+                dividendYield: "6.50"
+            )
+        }
     }
 
     func fetchExchangeRate(pair: String) async throws -> BackendExchangeRateDTO {
@@ -28,10 +36,6 @@ actor MockBackendService: BackendServiceProtocol {
 
     func fetchDividendsForSymbols(symbols: [String], year: Int?) async throws -> [MobileDividendDTO] {
         []
-    }
-
-    func fetchDividendSummary(symbols: [String]) async throws -> [String: DividendSummaryDTO] {
-        [:]
     }
 
     func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO {
@@ -67,7 +71,7 @@ actor MockBackendService: BackendServiceProtocol {
         )
     }
 
-    func importPortfolio(fileData: Data?, filename: String?, text: String?) async throws -> [ImportedPosition] {
+    func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] {
         []
     }
 }

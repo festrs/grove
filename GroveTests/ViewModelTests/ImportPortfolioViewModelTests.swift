@@ -35,8 +35,8 @@ struct ImportPortfolioViewModelTests {
 
         vm.confirmImport(
             positions: [
-                makePosition(ticker: "ITUB3.SA", quantity: 0),
-                makePosition(ticker: "HGLG11.SA", quantity: 0, assetClass: .fiis),
+                makePosition(ticker: "ITUB3", quantity: 0),
+                makePosition(ticker: "HGLG11", quantity: 0, assetClass: .fiis),
             ],
             portfolio: portfolio,
             modelContext: ctx,
@@ -59,13 +59,13 @@ struct ImportPortfolioViewModelTests {
         let backend = MockBackendService()
 
         vm.confirmImport(
-            positions: [makePosition(ticker: "ITUB3.SA", quantity: 100, price: 30)],
+            positions: [makePosition(ticker: "ITUB3", quantity: 100, price: 30)],
             portfolio: portfolio,
             modelContext: ctx,
             backendService: backend
         )
 
-        let h = try ctx.fetch(FetchDescriptor<Holding>()).first { $0.ticker == "ITUB3.SA" }!
+        let h = try ctx.fetch(FetchDescriptor<Holding>()).first { $0.ticker == "ITUB3" }!
         #expect(h.status == .aportar)
         #expect(h.quantity == 100, "Opening contribution recalculates quantity")
     }

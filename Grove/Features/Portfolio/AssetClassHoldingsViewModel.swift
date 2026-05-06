@@ -3,13 +3,9 @@ import SwiftData
 import GroveDomain
 import GroveRepositories
 
-/// Backs `AssetClassHoldingsView`. Owns the class-scoped holdings list,
-/// the inline search debouncer, and the no-results "custom ticker" path.
-///
-/// Custom tickers are local-only — we set `isCustom = true` so the sync
-/// service and bootstrap layer never query the backend for them. They
-/// start as `.estudo` with zero price; the user fills in details from
-/// `HoldingDetailView`.
+/// Backs `AssetClassHoldingsView`. Owns the class-scoped holdings list and
+/// the per-row buy/sell/remove sheet state. Add and search live in the
+/// global `AddTickerSheet` flow now — this VM no longer holds search state.
 @Observable
 @MainActor
 final class AssetClassHoldingsViewModel {
@@ -20,15 +16,9 @@ final class AssetClassHoldingsViewModel {
     var classCurrentPercent: Decimal = 0
     var classTargetPercent: Decimal = 0
 
-    // Search & add state
-    var searchText: String = ""
-    var debouncer = SearchDebouncer()
-    var selectedSearchResult: StockSearchResultDTO?
-    var showingAddDetails = false
     var holdingToBuy: Holding?
     var holdingToSell: Holding?
     var holdingToRemove: Holding?
-    var errorMessage: String?
 
     init(assetClass: AssetClassType) {
         self.assetClass = assetClass
@@ -76,91 +66,6 @@ final class AssetClassHoldingsViewModel {
         } catch {
             holdings = []
         }
-    }
-
-    // MARK: - Search
-
-    func isAlreadyAdded(_ symbol: String) -> Bool {
-        holdings.contains { $0.ticker.uppercased() == symbol.uppercased() }
-    }
-
-    func handleSearchAdd(_ result: StockSearchResultDTO) {
-        selectedSearchResult = result
-        showingAddDetails = true
-    }
-
-    func handleSearchRemove(
-        _ result: StockSearchResultDTO,
-        modelContext: ModelContext,
-        portfolio: Portfolio?,
-        displayCurrency: Currency,
-        rates: any ExchangeRates
-    ) {
-        let upper = result.symbol.uppercased()
-        guard let holding = holdings.first(where: { $0.ticker.uppercased() == upper }) else { return }
-        deleteHolding(
-            holding,
-            modelContext: modelContext,
-            portfolio: portfolio,
-            displayCurrency: displayCurrency,
-            rates: rates
-        )
-    }
-
-    // MARK: - Custom ticker
-
-    /// Create a local-only `Holding` from raw user input. Class is fixed to
-    /// `self.assetClass`, status is `.estudo`, price is zero, `isCustom` is
-    /// true. Returns false (and sets `errorMessage`) when the input is empty,
-    /// the ticker already exists in this class, or the free-tier cap blocks
-    /// the add.
-    @discardableResult
-    func addCustomTicker(
-        symbol: String,
-        modelContext: ModelContext
-    ) -> Bool {
-        let trimmed = symbol
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .uppercased()
-        guard !trimmed.isEmpty else { return false }
-
-        if holdings.contains(where: { $0.ticker.uppercased() == trimmed }) {
-            errorMessage = "\(trimmed) is already in your portfolio."
-            return false
-        }
-        guard Holding.canAddMore(modelContext: modelContext) else {
-            errorMessage = Holding.freeTierLimitMessage
-            return false
-        }
-        errorMessage = nil
-
-        let holding = Holding(
-            ticker: trimmed,
-            displayName: trimmed,
-            currentPrice: 0,
-            assetClass: assetClass,
-            status: .estudo,
-            isCustom: true
-        )
-
-        var descriptor = FetchDescriptor<Portfolio>(sortBy: [SortDescriptor(\.createdAt)])
-        descriptor.fetchLimit = 1
-        if let portfolio = try? modelContext.fetch(descriptor).first {
-            holding.portfolio = portfolio
-        } else {
-            let portfolio = Portfolio()
-            modelContext.insert(portfolio)
-            holding.portfolio = portfolio
-        }
-        modelContext.insert(holding)
-
-        do {
-            try modelContext.save()
-        } catch {
-            errorMessage = "Couldn't save: \(error.localizedDescription)"
-            return false
-        }
-        return true
     }
 
     // MARK: - Holding actions

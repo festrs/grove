@@ -15,7 +15,7 @@ struct TickerBootstrapServiceTests {
         let portfolio = Portfolio(name: "Test")
         ctx.insert(portfolio)
         let holding = Holding(
-            ticker: "HGLG11.SA", displayName: "HGLG",
+            ticker: "HGLG11", displayName: "HGLG",
             currentPrice: 0, dividendYield: 0,
             assetClass: .fiis, status: .estudo
         )
@@ -26,7 +26,7 @@ struct TickerBootstrapServiceTests {
         let backend = StubBackend(
             quoteAmount: "180.50",
             quoteCurrency: "BRL",
-            dpsBySymbol: ["HGLG11.SA": "12.00"]
+            dyBySymbol: ["HGLG11": "6.65"]
         )
         let service = TickerBootstrapService()
 
@@ -34,8 +34,8 @@ struct TickerBootstrapServiceTests {
 
         #expect(holding.currentPrice == Decimal(string: "180.50"))
         #expect(holding.lastPriceUpdate != nil)
-        // DY% = annualDPS / price * 100 = 12 / 180.50 * 100 ≈ 6.648
-        #expect(holding.dividendYield > 6 && holding.dividendYield < 7)
+        // Backend already returns dividend_yield in percent; assigned directly.
+        #expect(holding.dividendYield == Decimal(string: "6.65"))
     }
 
     @MainActor
@@ -53,7 +53,7 @@ struct TickerBootstrapServiceTests {
         let portfolio = Portfolio(name: "Test")
         ctx.insert(portfolio)
         let holding = Holding(
-            ticker: "HGLG11.SA", displayName: "HGLG",
+            ticker: "HGLG11", displayName: "HGLG",
             currentPrice: 0, assetClass: .fiis, status: .estudo
         )
         ctx.insert(holding)
@@ -76,7 +76,7 @@ struct TickerBootstrapServiceTests {
         let portfolio = Portfolio(name: "Test")
         ctx.insert(portfolio)
         let holding = Holding(
-            ticker: "HGLG11.SA", displayName: "HGLG",
+            ticker: "HGLG11", displayName: "HGLG",
             currentPrice: 100, assetClass: .fiis, status: .aportar
         )
         ctx.insert(holding)
@@ -103,7 +103,7 @@ struct TickerBootstrapServiceTests {
 
         let refreshCalls = await backend.refreshCalls
         #expect(refreshCalls.count == 1)
-        #expect(refreshCalls.first?.symbols == ["HGLG11.SA"])
+        #expect(refreshCalls.first?.symbols == ["HGLG11"])
         #expect(refreshCalls.first?.assetClass == "fiis")
         #expect(refreshCalls.first?.since == firstDate, "Must scope by the FIRST contribution, not the latest")
     }
@@ -147,16 +147,16 @@ private actor StubBackend: BackendServiceProtocol {
 
     private let quoteAmount: String
     private let quoteCurrency: String
-    private let dpsBySymbol: [String: String]
+    private let dyBySymbol: [String: String]
 
     init(
         quoteAmount: String = "10.00",
         quoteCurrency: String = "BRL",
-        dpsBySymbol: [String: String] = [:]
+        dyBySymbol: [String: String] = [:]
     ) {
         self.quoteAmount = quoteAmount
         self.quoteCurrency = quoteCurrency
-        self.dpsBySymbol = dpsBySymbol
+        self.dyBySymbol = dyBySymbol
     }
 
     func searchStocks(query: String, assetClass: AssetClassType?) async throws -> [StockSearchResultDTO] { [] }
@@ -173,7 +173,8 @@ private actor StubBackend: BackendServiceProtocol {
                 symbol: $0,
                 name: $0,
                 price: MoneyDTO(amount: quoteAmount, currency: quoteCurrency),
-                currency: quoteCurrency
+                currency: quoteCurrency,
+                dividendYield: dyBySymbol[$0]
             )
         }
     }
@@ -181,16 +182,6 @@ private actor StubBackend: BackendServiceProtocol {
         BackendExchangeRateDTO(pair: pair, rate: 5)
     }
     func fetchDividendsForSymbols(symbols: [String], year: Int?) async throws -> [MobileDividendDTO] { [] }
-    func fetchDividendSummary(symbols: [String]) async throws -> [String: DividendSummaryDTO] {
-        calls.append("summary:\(symbols.joined(separator: ","))")
-        var out: [String: DividendSummaryDTO] = [:]
-        for s in symbols {
-            if let dps = dpsBySymbol[s] {
-                out[s] = DividendSummaryDTO(dividendPerShare: dps)
-            }
-        }
-        return out
-    }
     func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO {
         refreshCalls.append(.init(symbols: symbols, assetClass: assetClass, since: since))
         return DividendRefreshResultDTO(scraped: symbols.count, newRecords: 0, failed: [])
@@ -209,7 +200,7 @@ private actor StubBackend: BackendServiceProtocol {
             compositeScore: nil, updatedAt: nil
         )
     }
-    func importPortfolio(fileData: Data?, filename: String?, text: String?) async throws -> [ImportedPosition] { [] }
+    func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] { [] }
 }
 
 private actor ThrowingBackend: BackendServiceProtocol {
@@ -219,12 +210,11 @@ private actor ThrowingBackend: BackendServiceProtocol {
     func fetchBatchQuotes(symbols: [String]) async throws -> [BatchQuoteDTO] { throw E.nope }
     func fetchExchangeRate(pair: String) async throws -> BackendExchangeRateDTO { throw E.nope }
     func fetchDividendsForSymbols(symbols: [String], year: Int?) async throws -> [MobileDividendDTO] { throw E.nope }
-    func fetchDividendSummary(symbols: [String]) async throws -> [String: DividendSummaryDTO] { throw E.nope }
     func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO { throw E.nope }
     func trackSymbol(symbol: String, assetClass: String) async throws { throw E.nope }
     func untrackSymbol(symbol: String) async throws {}
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {}
     func fetchPriceHistory(symbol: String, period: String) async throws -> [PriceHistoryPointDTO] { throw E.nope }
     func fetchFundamentals(symbol: String) async throws -> FundamentalsDTO { throw E.nope }
-    func importPortfolio(fileData: Data?, filename: String?, text: String?) async throws -> [ImportedPosition] { throw E.nope }
+    func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] { throw E.nope }
 }

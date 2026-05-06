@@ -79,6 +79,28 @@ public struct PortfolioRepository {
         return try modelContext.fetch(descriptor)
     }
 
+    /// One-shot migration: collapse multiple portfolios into the oldest.
+    /// Reassigns every Holding to the first portfolio (by `createdAt`) and
+    /// deletes the rest. No-op when 0 or 1 portfolio exists. Returns the
+    /// number of portfolios removed (for logging / tests).
+    @discardableResult
+    public func collapseDuplicatePortfolios() throws -> Int {
+        let portfolios = try fetchAllPortfolios()
+        guard portfolios.count > 1 else { return 0 }
+
+        let primary = portfolios[0]
+        let extras = portfolios.dropFirst()
+
+        for extra in extras {
+            for holding in extra.holdings {
+                holding.portfolio = primary
+            }
+            modelContext.delete(extra)
+        }
+        try modelContext.save()
+        return extras.count
+    }
+
     public func fetchAllHoldings() throws -> [Holding] {
         let descriptor = FetchDescriptor<Holding>(
             sortBy: [SortDescriptor(\.ticker)]
@@ -156,14 +178,45 @@ public struct PortfolioRepository {
     ///
     /// `nameFallbacks` is a pool of alternative names tried in order when
     /// `preferredName` already exists. The view layer owns the copywriting.
+    public struct FreedomPlanInput {
+        public var monthlyCostOfLiving: Decimal
+        public var costOfLivingCurrency: Currency
+        public var targetFIYear: Int
+        public var incomeMode: FIIncomeMode
+        public var monthlyContributionCapacity: Decimal
+        public var contributionCurrency: Currency
+        public var currencyMixBRLPercent: Decimal
+        /// Computed Freedom Number — persisted as `monthlyIncomeGoal`.
+        public var freedomNumber: Money
+
+        public init(
+            monthlyCostOfLiving: Decimal,
+            costOfLivingCurrency: Currency,
+            targetFIYear: Int,
+            incomeMode: FIIncomeMode,
+            monthlyContributionCapacity: Decimal,
+            contributionCurrency: Currency,
+            currencyMixBRLPercent: Decimal,
+            freedomNumber: Money
+        ) {
+            self.monthlyCostOfLiving = monthlyCostOfLiving
+            self.costOfLivingCurrency = costOfLivingCurrency
+            self.targetFIYear = targetFIYear
+            self.incomeMode = incomeMode
+            self.monthlyContributionCapacity = monthlyContributionCapacity
+            self.contributionCurrency = contributionCurrency
+            self.currencyMixBRLPercent = currencyMixBRLPercent
+            self.freedomNumber = freedomNumber
+        }
+    }
+
     @discardableResult
     public func saveOnboardingPortfolio(
         preferredName: String,
         nameFallbacks: [String],
         pendingHoldings: [PendingHolding],
         targetAllocations: [AssetClassType: Decimal],
-        monthlyIncomeGoal: Decimal,
-        monthlyCostOfLiving: Decimal
+        freedomPlan: FreedomPlanInput
     ) throws -> Portfolio {
         let existing = (try? modelContext.fetch(FetchDescriptor<Portfolio>())) ?? []
         let existingNames = Set(existing.map(\.name))
@@ -216,8 +269,17 @@ public struct PortfolioRepository {
         )
 
         let settings = try fetchSettings()
-        settings.monthlyIncomeGoal = monthlyIncomeGoal
-        settings.monthlyCostOfLiving = monthlyCostOfLiving
+        // Persist the Freedom Plan as the source of truth for the income goal.
+        settings.monthlyIncomeGoalMoney = freedomPlan.freedomNumber
+        settings.monthlyCostOfLiving = freedomPlan.monthlyCostOfLiving
+        settings.monthlyCostOfLivingCurrencyRaw = freedomPlan.costOfLivingCurrency.rawValue
+        settings.targetFIYear = freedomPlan.targetFIYear
+        settings.fiIncomeMode = freedomPlan.incomeMode
+        settings.costAtFIMultiplier = freedomPlan.incomeMode.multiplier
+        settings.monthlyContributionCapacity = freedomPlan.monthlyContributionCapacity
+        settings.monthlyContributionCapacityCurrencyRaw = freedomPlan.contributionCurrency.rawValue
+        settings.fiCurrencyMixBRLPercent = freedomPlan.currencyMixBRLPercent
+        settings.freedomPlanCompletedAt = .now
         settings.classAllocations = allocationsToPersist
         settings.hasCompletedOnboarding = true
 

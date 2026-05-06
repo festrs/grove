@@ -32,12 +32,23 @@ final class DashboardViewModel {
             )
             summary = computedSummary
 
+            // Contribution: prefer the user's declared capacity from the
+            // Freedom Plan; fall back to a small placeholder so first-run
+            // users (who haven't filled the plan yet) still see a non-empty
+            // projection instead of "—".
+            let capacity = settings.monthlyContributionCapacityMoney
+            let contribution = capacity.amount > 0
+                ? capacity
+                : Money(amount: 1_000, currency: displayCurrency)
+            let targetYear: Int? = settings.targetFIYear > 0 ? settings.targetFIYear : nil
+
             projection = IncomeProjector.project(
                 holdings: holdings,
                 incomeGoal: settings.monthlyIncomeGoalMoney,
-                monthlyContribution: Money(amount: 5_000, currency: displayCurrency),
+                monthlyContribution: contribution,
                 displayCurrency: displayCurrency,
-                rates: rates
+                rates: rates,
+                targetYear: targetYear
             )
 
             let totalValueAmount = computedSummary.totalValue.amount

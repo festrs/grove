@@ -32,8 +32,7 @@ struct PortfolioViewModelTests {
         #expect(!vm.holdings.isEmpty)
         #expect(vm.summary != nil)
         #expect(vm.totalValue.amount > 0)
-        #expect(!vm.portfolios.isEmpty)
-        #expect(vm.selectedPortfolio != nil)
+        #expect(vm.portfolio != nil)
     }
 
     // MARK: - deleteHolding
@@ -51,20 +50,48 @@ struct PortfolioViewModelTests {
         #expect(vm.holdings.count == initialCount - 1)
     }
 
-    // MARK: - createPortfolio
+    // MARK: - Migration
 
     @MainActor
-    @Test func createPortfolioAddsAndSelects() throws {
+    @Test func collapseDuplicatePortfoliosMovesHoldingsAndDeletesExtras() throws {
         let ctx = try makeTestContext()
-        let (_, _) = seedTestData(ctx)
+        let oldest = Portfolio(name: "Oldest", createdAt: Date(timeIntervalSince1970: 1_000_000))
+        let middle = Portfolio(name: "Middle", createdAt: Date(timeIntervalSince1970: 2_000_000))
+        let newest = Portfolio(name: "Newest", createdAt: Date(timeIntervalSince1970: 3_000_000))
+        ctx.insert(oldest)
+        ctx.insert(middle)
+        ctx.insert(newest)
 
-        let vm = PortfolioViewModel()
-        vm.loadData(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
-        let initialCount = vm.portfolios.count
+        let h1 = Holding(ticker: "ITUB3", quantity: 10, currentPrice: 30, assetClass: .acoesBR, status: .aportar)
+        let h2 = Holding(ticker: "WEGE3", quantity: 5, currentPrice: 40, assetClass: .acoesBR, status: .aportar)
+        let h3 = Holding(ticker: "AAPL", quantity: 2, currentPrice: 200, assetClass: .usStocks, status: .aportar)
+        ctx.insert(h1); h1.portfolio = oldest
+        ctx.insert(h2); h2.portfolio = middle
+        ctx.insert(h3); h3.portfolio = newest
+        try ctx.save()
 
-        vm.createPortfolio(name: "New Portfolio", modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
-        #expect(vm.portfolios.count == initialCount + 1)
-        #expect(vm.selectedPortfolio?.name == "New Portfolio")
+        let repo = PortfolioRepository(modelContext: ctx)
+        let removed = try repo.collapseDuplicatePortfolios()
+
+        #expect(removed == 2)
+        let remaining = try ctx.fetch(FetchDescriptor<Portfolio>())
+        #expect(remaining.count == 1)
+        #expect(remaining.first?.name == "Oldest")
+        #expect(remaining.first?.holdings.count == 3)
+    }
+
+    @MainActor
+    @Test func collapseDuplicatePortfoliosIsNoOpForSinglePortfolio() throws {
+        let ctx = try makeTestContext()
+        let only = Portfolio(name: "Only")
+        ctx.insert(only)
+        try ctx.save()
+
+        let repo = PortfolioRepository(modelContext: ctx)
+        let removed = try repo.collapseDuplicatePortfolios()
+
+        #expect(removed == 0)
+        #expect(try ctx.fetch(FetchDescriptor<Portfolio>()).count == 1)
     }
 
     // MARK: - allocationByClass

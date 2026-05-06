@@ -47,6 +47,15 @@ targets:
     configFiles:
       Debug: Secrets.xcconfig
       Release: Secrets.xcconfig
+    preBuildScripts:
+      - name: SwiftLint
+        basedOnDependencyAnalysis: false
+        script: |
+          if which swiftlint >/dev/null; then
+            swiftlint --quiet
+          else
+            echo "warning: SwiftLint not installed — install via 'brew install swiftlint'"
+          fi
     sources:
       - Grove
     resources:

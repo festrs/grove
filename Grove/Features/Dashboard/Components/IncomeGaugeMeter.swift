@@ -49,6 +49,8 @@ struct IncomeGaugeMeter: View {
                         .font(.system(size: Theme.FontSize.body, weight: .medium))
                         .foregroundStyle(.primary)
 
+                    OnTrackPill(projection: projection)
+
                     // Estimated time or goal reached
                     if goalReached {
                         Label("Goal reached!", systemImage: "checkmark.seal.fill")

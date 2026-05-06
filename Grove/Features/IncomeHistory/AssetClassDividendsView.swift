@@ -8,6 +8,7 @@ import GroveDomain
 /// generating the cash.
 struct AssetClassDividendsView: View {
     let assetClass: AssetClassType
+    let window: IncomeWindow
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
     @Environment(\.syncService) private var syncService
@@ -16,8 +17,9 @@ struct AssetClassDividendsView: View {
     @Query private var holdings: [Holding]
     @State private var viewModel = AssetClassDividendsViewModel()
 
-    init(assetClass: AssetClassType) {
+    init(assetClass: AssetClassType, window: IncomeWindow = .year) {
         self.assetClass = assetClass
+        self.window = window
         let raw = assetClass.rawValue
         _holdings = Query(
             filter: #Predicate<Holding> { $0.assetClassRaw == raw },
@@ -26,7 +28,7 @@ struct AssetClassDividendsView: View {
     }
 
     private var holdingsWithPayments: [Holding] {
-        holdings.filter { !$0.dividends.isEmpty }
+        holdings.filter { !$0.classifiedDividends(in: window).isEmpty }
     }
 
     var body: some View {
@@ -50,7 +52,7 @@ struct AssetClassDividendsView: View {
             .padding(Theme.Spacing.md)
             .frame(maxWidth: Theme.Layout.maxContentWidth)
         }
-        .navigationTitle(assetClass.displayName)
+        .navigationTitle(navigationTitle)
         .refreshable { await refresh() }
         .toolbar {
             #if os(macOS)
@@ -99,12 +101,26 @@ struct AssetClassDividendsView: View {
         }
     }
 
+    private var navigationTitle: String {
+        let suffix: String? = {
+            switch window {
+            case .day: return "Today"
+            case .week: return "This Week"
+            case .month: return "This Month"
+            case .year: return "This Year"
+            case .custom: return nil
+            }
+        }()
+        guard let suffix else { return assetClass.displayName }
+        return "\(assetClass.displayName) · \(suffix)"
+    }
+
     private func holdingCard(_ holding: Holding) -> some View {
-        let rows = holding.classifiedDividends
-        let paidTotal = holding.paidDividendsTotal(in: displayCurrency, rates: rates)
-        let projectedTotal = holding.projectedDividendsTotal(in: displayCurrency, rates: rates)
-        let paidCount = holding.paidDividends.count
-        let projectedCount = holding.projectedDividends.count
+        let rows = holding.classifiedDividends(in: window)
+        let paidTotal = holding.paidIncome(in: window, displayCurrency: displayCurrency, rates: rates)
+        let projectedTotal = holding.projectedIncome(in: window, displayCurrency: displayCurrency, rates: rates)
+        let paidCount = rows.filter { $0.kind == .paid }.count
+        let projectedCount = rows.filter { $0.kind == .projected }.count
 
         return TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -199,7 +215,7 @@ struct AssetClassDividendsView: View {
 
 #Preview {
     NavigationStack {
-        AssetClassDividendsView(assetClass: .fiis)
+        AssetClassDividendsView(assetClass: .fiis, window: .month)
             .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, Contribution.self, UserSettings.self], inMemory: true)
     }
 }

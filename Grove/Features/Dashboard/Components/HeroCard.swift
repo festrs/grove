@@ -36,6 +36,8 @@ struct HeroCard: View {
                     }
 
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        OnTrackPill(projection: projection)
+
                         Text("For this month")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)

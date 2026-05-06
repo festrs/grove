@@ -31,7 +31,7 @@ struct HoldingDetailViewModelTests {
         vm.loadHolding(id: holdingID, modelContext: ctx)
 
         #expect(vm.holding != nil)
-        #expect(vm.holding!.ticker == "ITUB3.SA")
+        #expect(vm.holding!.ticker == "ITUB3")
     }
 
     // MARK: - updatePrice
@@ -73,7 +73,7 @@ struct HoldingDetailViewModelTests {
         vm.removeHolding(modelContext: ctx)
 
         #expect(vm.holding == nil)
-        let leftover = try ctx.fetch(FetchDescriptor<Holding>()).filter { $0.ticker == "ITUB3.SA" }
+        let leftover = try ctx.fetch(FetchDescriptor<Holding>()).filter { $0.ticker == "ITUB3" }
         #expect(leftover.isEmpty)
     }
 
@@ -81,7 +81,7 @@ struct HoldingDetailViewModelTests {
     @Test func removeHoldingWritesClosingContributionWhenPositionOpen() throws {
         let ctx = try makeTestContext()
         let (_, holdings) = seedTestData(ctx)
-        let target = holdings.first { $0.ticker == "ITUB3.SA" }!  // qty=100, price=32
+        let target = holdings.first { $0.ticker == "ITUB3" }!  // qty=100, price=32
         let vm = HoldingDetailViewModel()
         vm.loadHolding(id: target.persistentModelID, modelContext: ctx)
 
@@ -94,7 +94,7 @@ struct HoldingDetailViewModelTests {
         // historical sums in-memory but cascade removes it. Acceptable —
         // this is documenting the current behavior rather than asserting
         // historical preservation.
-        let leftover = try ctx.fetch(FetchDescriptor<Holding>()).filter { $0.ticker == "ITUB3.SA" }
+        let leftover = try ctx.fetch(FetchDescriptor<Holding>()).filter { $0.ticker == "ITUB3" }
         #expect(leftover.isEmpty)
     }
 

@@ -159,60 +159,15 @@ private struct PortfolioSettingsTab: View {
 // MARK: - Goals
 
 private struct GoalsSettingsTab: View {
-    @Environment(\.displayCurrency) private var displayCurrency
-    @Environment(\.rates) private var rates
     @Query private var settings: [UserSettings]
 
     var body: some View {
-        Form {
-            if let s = settings.first {
-                @Bindable var bound = s
-                Section {
-                    TQCurrencyField(
-                        title: "Monthly Passive Income",
-                        currency: displayCurrency,
-                        value: binding(for: \.monthlyIncomeGoal, currency: \.monthlyIncomeGoalCurrency, on: bound)
-                    )
-                    TQCurrencyField(
-                        title: "Monthly Cost of Living",
-                        currency: displayCurrency,
-                        value: binding(for: \.monthlyCostOfLiving, currency: \.monthlyCostOfLivingCurrency, on: bound)
-                    )
-                    TQCurrencyField(
-                        title: "Emergency Reserve (Target)",
-                        currency: displayCurrency,
-                        value: binding(for: \.emergencyReserveTarget, currency: \.emergencyReserveTargetCurrency, on: bound)
-                    )
-                    TQCurrencyField(
-                        title: "Emergency Reserve (Current)",
-                        currency: displayCurrency,
-                        value: binding(for: \.emergencyReserveCurrent, currency: \.emergencyReserveCurrentCurrency, on: bound)
-                    )
-                } footer: {
-                    Text("Edited in your display currency; stored amounts are FX-converted for display.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+        if let s = settings.first {
+            GoalSettingsView(settings: s)
+                .formStyle(.grouped)
+        } else {
+            Form { Text("No settings available.") }.formStyle(.grouped)
         }
-        .formStyle(.grouped)
-    }
-
-    private func binding(
-        for amount: ReferenceWritableKeyPath<UserSettings, Decimal>,
-        currency: ReferenceWritableKeyPath<UserSettings, Currency>,
-        on settings: UserSettings
-    ) -> Binding<Decimal> {
-        Binding<Decimal>(
-            get: {
-                let stored = Money(amount: settings[keyPath: amount], currency: settings[keyPath: currency])
-                return stored.converted(to: displayCurrency, using: rates).amount
-            },
-            set: { newValue in
-                settings[keyPath: amount] = newValue
-                settings[keyPath: currency] = displayCurrency
-            }
-        )
     }
 }
 

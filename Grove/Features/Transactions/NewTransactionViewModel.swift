@@ -166,6 +166,10 @@ final class NewTransactionViewModel {
         let bootstrap = TickerBootstrapService()
         Task { @MainActor in
             if isFreshAsset {
+                try? await backendService.trackSymbol(
+                    symbol: holding.ticker,
+                    assetClass: holding.assetClass.rawValue
+                )
                 await bootstrap.bootstrap(holdings: [holding], backendService: backendService)
             }
             await bootstrap.refreshDividendsAfterTransaction(

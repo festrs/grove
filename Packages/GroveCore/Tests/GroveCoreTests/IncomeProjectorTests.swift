@@ -224,6 +224,359 @@ struct IncomeProjectorTests {
 
     // MARK: - Mixed Portfolio
 
+    // MARK: - Target Year
+
+    @Test func targetYearReportsMonthsRemaining() throws {
+        // asOf = 2026-04-29; target = 2030-01-01 → 44 months.
+        let ctx = try Self.makeContext()
+        let h = Self.makeHolding(in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 12,
+                                 assetClass: .fiis, aprilDividendPerShare: 1)
+        let projection = IncomeProjector.project(
+            holdings: [h], incomeGoal: Self.brlGoal,
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            targetYear: 2030,
+            asOf: Self.asOf, calendar: Self.utcCal
+        )
+        #expect(projection.monthsRemainingToTargetYear == 44)
+    }
+
+    @Test func onTrackTrueWhenEstimateBeatsTarget() throws {
+        // estimatedMonths = 18 (from goalSimUsesDYFromHoldings) vs 44 months remaining → on track.
+        let ctx = try Self.makeContext()
+        let h = Self.makeHolding(in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 12,
+                                 assetClass: .fiis, aprilDividendPerShare: 1)
+        let projection = IncomeProjector.project(
+            holdings: [h], incomeGoal: Self.brlGoal,
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            targetYear: 2030,
+            asOf: Self.asOf, calendar: Self.utcCal
+        )
+        #expect(projection.onTrackForTargetYear == true)
+    }
+
+    @Test func onTrackFalseWhenEstimateExceedsTarget() throws {
+        // 18 months estimated vs target 2026-12-31 → only 8 months remain → off track.
+        let ctx = try Self.makeContext()
+        let h = Self.makeHolding(in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 12,
+                                 assetClass: .fiis, aprilDividendPerShare: 1)
+        let projection = IncomeProjector.project(
+            holdings: [h], incomeGoal: Self.brlGoal,
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            targetYear: 2027,
+            asOf: Self.asOf, calendar: Self.utcCal
+        )
+        #expect(projection.monthsRemainingToTargetYear == 8)
+        #expect(projection.onTrackForTargetYear == false)
+    }
+
+    @Test func targetYearNilWhenNotProvided() throws {
+        let ctx = try Self.makeContext()
+        let h = Self.makeHolding(in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 12,
+                                 assetClass: .fiis, aprilDividendPerShare: 1)
+        let projection = IncomeProjector.project(
+            holdings: [h], incomeGoal: Self.brlGoal,
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            asOf: Self.asOf, calendar: Self.utcCal
+        )
+        #expect(projection.monthsRemainingToTargetYear == nil)
+        #expect(projection.onTrackForTargetYear == nil)
+    }
+
+    // MARK: - OnTrackStatus
+
+    private static func projection(
+        targetFIYear: Int? = nil,
+        monthsRemaining: Int? = nil,
+        estMonths: Int? = nil,
+        onTrack: Bool? = nil,
+        progress: Decimal = 50
+    ) -> IncomeProjection {
+        IncomeProjection(
+            currentMonthlyNet: Money(amount: 1, currency: .brl),
+            currentMonthlyGross: Money(amount: 1, currency: .brl),
+            goalMonthly: Money(amount: 100, currency: .brl),
+            progressPercent: progress,
+            estimatedMonthsToGoal: estMonths,
+            estimatedYearsToGoal: estMonths.map { Decimal($0) / 12 },
+            targetFIYear: targetFIYear,
+            monthsRemainingToTargetYear: monthsRemaining,
+            onTrackForTargetYear: onTrack
+        )
+    }
+
+    @Test func statusHiddenWithoutTargetYear() {
+        #expect(Self.projection().targetYearStatus == .hidden)
+    }
+
+    @Test func statusHiddenWhenGoalReached() {
+        let p = Self.projection(targetFIYear: 2046, monthsRemaining: 240, estMonths: 24, onTrack: true, progress: 100)
+        #expect(p.targetYearStatus == .hidden)
+    }
+
+    @Test func statusOnTrack() {
+        let p = Self.projection(targetFIYear: 2046, monthsRemaining: 240, estMonths: 24, onTrack: true)
+        #expect(p.targetYearStatus == .onTrack(year: 2046))
+    }
+
+    @Test func statusTightUnder36MonthsGap() {
+        // gap = 60 - 36 = 24 months → 2 years short → tight
+        let p = Self.projection(targetFIYear: 2029, monthsRemaining: 36, estMonths: 60, onTrack: false)
+        #expect(p.targetYearStatus == .tight(year: 2029, yearsShort: 2))
+    }
+
+    @Test func statusFarOver36MonthsGap() {
+        // gap = 240 - 60 = 180 months → 15 years short → far
+        let p = Self.projection(targetFIYear: 2030, monthsRemaining: 60, estMonths: 240, onTrack: false)
+        #expect(p.targetYearStatus == .far(year: 2030, yearsShort: 15))
+    }
+
+    @Test func statusNeedContributionWhenSimCappedOut() {
+        // estimatedMonthsToGoal = nil → sim hit the 600-month cap
+        let p = Self.projection(targetFIYear: 2046, monthsRemaining: 240, estMonths: nil, onTrack: nil)
+        #expect(p.targetYearStatus == .needContribution(year: 2046))
+    }
+
+    @Test func statusTightAtExactly36MonthGapBoundary() {
+        // gap = 72 - 36 = 36 → exactly the boundary, still tight (≤ 36)
+        let p = Self.projection(targetFIYear: 2029, monthsRemaining: 36, estMonths: 72, onTrack: false)
+        #expect(p.targetYearStatus == .tight(year: 2029, yearsShort: 3))
+    }
+
+    @Test func statusYearsShortRoundsUpFromAnyRemainder() {
+        // gap = 49 - 36 = 13 months → ceil(13/12) = 2 years short
+        let p = Self.projection(targetFIYear: 2029, monthsRemaining: 36, estMonths: 49, onTrack: false)
+        #expect(p.targetYearStatus == .tight(year: 2029, yearsShort: 2))
+    }
+
+    @Test func targetYearInPastClampsToZero() throws {
+        let ctx = try Self.makeContext()
+        let h = Self.makeHolding(in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 12,
+                                 assetClass: .fiis, aprilDividendPerShare: 1)
+        let projection = IncomeProjector.project(
+            holdings: [h], incomeGoal: Self.brlGoal,
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            targetYear: 2020,
+            asOf: Self.asOf, calendar: Self.utcCal
+        )
+        #expect(projection.monthsRemainingToTargetYear == 0)
+        #expect(projection.onTrackForTargetYear == false,
+                "Estimated months (>0) cannot fit in 0 remaining months → off track.")
+    }
+
+    // MARK: - Empirical-yield rolling window
+
+    /// Seed a holding owned since `firstContribDate` with an arbitrary set
+    /// of `DividendPayment` records. Caller picks portfolio currency + qty.
+    private static func seedHoldingWithHistory(
+        in ctx: ModelContext,
+        ticker: String,
+        qty: Decimal,
+        price: Decimal,
+        dy: Decimal,
+        assetClass: AssetClassType,
+        firstContribDate: Date,
+        records: [(payment: Date, ex: Date, perShare: Decimal)]
+    ) -> Holding {
+        let h = Holding(ticker: ticker, quantity: qty, currentPrice: price,
+                        dividendYield: dy, assetClass: assetClass,
+                        status: .aportar, targetPercent: 100)
+        ctx.insert(h)
+        let contrib = Contribution(date: firstContribDate, amount: 1, shares: qty, pricePerShare: price)
+        ctx.insert(contrib); contrib.holding = h
+        for r in records {
+            let p = DividendPayment(exDate: r.ex, paymentDate: r.payment, amountPerShare: r.perShare)
+            ctx.insert(p); p.holding = h
+        }
+        return h
+    }
+
+    private static func calDate(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        var c = DateComponents()
+        c.year = y; c.month = m; c.day = d; c.hour = 12
+        c.timeZone = TimeZone(identifier: "UTC")
+        return Calendar(identifier: .gregorian).date(from: c)!
+    }
+
+    @Test func empiricalYieldKicksInWhenStoredDYIsZero() throws {
+        // Stored DY = 0 (so storedAnnualGross = 0).
+        // 12 monthly payments of R$1/share × 100 shares = R$1200/yr empirical.
+        // Portfolio value = 10 000 → 12% empirical DY → 1% monthly yield.
+        // Without the patch, avgDY collapses to the 6% default fallback,
+        // taking ~40 months. With empirical (12%), tighter than that.
+        let ctx = try Self.makeContext()
+        let payments: [(Date, Date, Decimal)] = (1...12).map { i in
+            (Self.calDate(2025, i, 15), Self.calDate(2025, i, 10), Decimal(1))
+        }
+        let h = Self.seedHoldingWithHistory(
+            in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 0,
+            assetClass: .fiis,
+            firstContribDate: Self.calDate(2025, 1, 1),
+            records: payments
+        )
+        let asOf = Self.calDate(2026, 1, 5)
+        let projection = IncomeProjector.project(
+            holdings: [h],
+            incomeGoal: Money(amount: 1_000, currency: .brl),
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            asOf: asOf, calendar: Self.utcCal
+        )
+        #expect(projection.estimatedMonthsToGoal != nil)
+        #expect((projection.estimatedMonthsToGoal ?? 999) < 40,
+                "Empirical 12% yield must beat the 6% default fallback (~40 months).")
+    }
+
+    @Test func storedYieldKicksInWhenNoRecordsYet() throws {
+        // No records — fresh holding. Stored DY = 12% must drive the sim.
+        let ctx = try Self.makeContext()
+        let h = Holding(ticker: "FII1", quantity: 100, currentPrice: 100,
+                        dividendYield: 12, assetClass: .fiis,
+                        status: .aportar, targetPercent: 100)
+        ctx.insert(h)
+        let contrib = Contribution(date: Self.calDate(2025, 12, 1), amount: 1, shares: 100, pricePerShare: 100)
+        ctx.insert(contrib); contrib.holding = h
+        let asOf = Self.calDate(2026, 1, 5)
+        let projection = IncomeProjector.project(
+            holdings: [h],
+            incomeGoal: Money(amount: 1_000, currency: .brl),
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            asOf: asOf, calendar: Self.utcCal
+        )
+        #expect(projection.estimatedMonthsToGoal != nil)
+    }
+
+    @Test func empiricalAnnualGrossExcludesPaymentExactlyAtCutoff() throws {
+        // The 12-month window is `(cutoff, asOf]` — strictly greater than
+        // cutoff. A payment on the exact boundary day must be excluded.
+        // Mutation `> cutoff` → `>= cutoff` would include it and double the total.
+        let ctx = try Self.makeContext()
+        let asOf = Self.calDate(2026, 1, 5)
+        let cutoff = Self.calDate(2025, 1, 5)
+        let h = Self.seedHoldingWithHistory(
+            in: ctx, ticker: "AB", qty: 100, price: 100, dy: 0,
+            assetClass: .fiis,
+            firstContribDate: Self.calDate(2024, 1, 1),
+            records: [
+                (cutoff, Self.calDate(2025, 1, 1), 1),                  // exactly on cutoff: excluded
+                (Self.calDate(2025, 6, 15), Self.calDate(2025, 6, 1), 1) // inside window: included
+            ]
+        )
+        let result = h.empiricalAnnualGross(
+            asOf: asOf, displayCurrency: .brl, rates: Self.rates, calendar: Self.utcCal
+        )
+        #expect(result.amount == 100,
+                "Boundary record at cutoff must be excluded; >= mutation would give 200.")
+    }
+
+    @Test func empiricalAnnualGrossExcludesPaymentsOlderThan12Months() throws {
+        let ctx = try Self.makeContext()
+        let h = Self.seedHoldingWithHistory(
+            in: ctx, ticker: "AB", qty: 100, price: 100, dy: 0,
+            assetClass: .fiis,
+            firstContribDate: Self.calDate(2024, 1, 1),
+            records: [
+                (Self.calDate(2024, 11, 15), Self.calDate(2024, 11, 10), 1),
+                (Self.calDate(2025, 2, 15), Self.calDate(2025, 2, 10), 1),
+            ]
+        )
+        let asOf = Self.calDate(2026, 1, 5)
+        let result = h.empiricalAnnualGross(
+            asOf: asOf, displayCurrency: .brl, rates: Self.rates, calendar: Self.utcCal
+        )
+        #expect(result.amount == 100,
+                "Records older than 12 months from asOf must be excluded.")
+    }
+
+    @Test func empiricalAnnualGrossScalesByCurrentQuantity() throws {
+        let ctx = try Self.makeContext()
+        let h = Self.seedHoldingWithHistory(
+            in: ctx, ticker: "AB", qty: 100, price: 100, dy: 0,
+            assetClass: .fiis,
+            firstContribDate: Self.calDate(2024, 1, 1),
+            records: [(Self.calDate(2025, 6, 15), Self.calDate(2025, 6, 10), 1)]
+        )
+        let asOf = Self.calDate(2026, 1, 5)
+        let result = h.empiricalAnnualGross(
+            asOf: asOf, displayCurrency: .brl, rates: Self.rates, calendar: Self.utcCal
+        )
+        #expect(result.amount == 100)
+    }
+
+    @Test func empiricalAnnualGrossAnnualizesPartialWindow() throws {
+        let ctx = try Self.makeContext()
+        // Held 3 months with 3 monthly R$1/share records → R$300 raw, ×4 → R$1200/yr.
+        let h = Self.seedHoldingWithHistory(
+            in: ctx, ticker: "AB", qty: 100, price: 100, dy: 0,
+            assetClass: .fiis,
+            firstContribDate: Self.calDate(2025, 10, 1),
+            records: [
+                (Self.calDate(2025, 11, 15), Self.calDate(2025, 11, 10), 1),
+                (Self.calDate(2025, 12, 15), Self.calDate(2025, 12, 10), 1),
+                (Self.calDate(2026, 1, 5), Self.calDate(2025, 12, 28), 1),
+            ]
+        )
+        let asOf = Self.calDate(2026, 1, 6)
+        let result = h.empiricalAnnualGross(
+            asOf: asOf, displayCurrency: .brl, rates: Self.rates, calendar: Self.utcCal
+        )
+        #expect(result.amount == 1_200,
+                "3 months of R$300 must annualize to R$1200 (drop scaling -> 300).")
+    }
+
+    @Test func empiricalAnnualGrossReturnsZeroWithNoQuantity() throws {
+        let ctx = try Self.makeContext()
+        let h = Holding(ticker: "X", quantity: 0, currentPrice: 100,
+                        dividendYield: 0, assetClass: .fiis,
+                        status: .estudo, targetPercent: 0)
+        ctx.insert(h)
+        let result = h.empiricalAnnualGross(
+            asOf: Self.calDate(2026, 1, 5),
+            displayCurrency: .brl, rates: Self.rates, calendar: Self.utcCal
+        )
+        #expect(result.amount == 0)
+    }
+
+    @Test func portfolioMaxOfStoredAndEmpiricalPrefersHigher() throws {
+        // Records span 2025/02 → 2026/01 so the latest one falls in the
+        // asOf calendar month — totalGross > 0 → avgNetMultiplier == 1.0
+        // for FIIs (exempt). Sim starts at totalNet = R$100/mo (the Jan payment).
+        // Empirical = R$1200/yr. Stored DY = 24% → R$2400/yr.
+        // max → avgDY 24% → 0.02/mo → +R$100/iter → (1000-100)/100 = 9 iter.
+        // min flip → avgDY 12% → 0.01/mo → +R$50/iter → 900/50 = 18 iter.
+        let ctx = try Self.makeContext()
+        // Build 12 monthly records ending in Jan 2026 so the latest one is in
+        // the current calendar month at asOf.
+        let recs: [(Date, Date, Decimal)] = (0..<12).map { offset in
+            let y = offset >= 11 ? 2026 : 2025
+            let m = offset >= 11 ? 1 : (offset + 2)
+            return (Self.calDate(y, m, 15), Self.calDate(y, m, 3), 1)
+        }
+        let h = Self.seedHoldingWithHistory(
+            in: ctx, ticker: "AB", qty: 100, price: 100, dy: 24,
+            assetClass: .fiis,
+            firstContribDate: Self.calDate(2025, 1, 1),
+            records: recs
+        )
+        let asOf = Self.calDate(2026, 1, 20)
+        let projection = IncomeProjector.project(
+            holdings: [h],
+            incomeGoal: Money(amount: 1_000, currency: .brl),
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            asOf: asOf, calendar: Self.utcCal
+        )
+        #expect(projection.estimatedMonthsToGoal == 9,
+                "max() must pick stored (R$2400) → 9 months; min() flip would give 18.")
+    }
+
+    // MARK: - Mixed Portfolio
+
     @Test func mixedPortfolioAggregatesCorrectly() throws {
         let ctx = try Self.makeContext()
         let fii = Self.makeHolding(in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 12,

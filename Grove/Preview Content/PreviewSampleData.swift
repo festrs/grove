@@ -25,8 +25,6 @@ struct PreviewSampleData {
         let settings = UserSettings(
             monthlyIncomeGoal: 10_000,
             monthlyCostOfLiving: 15_000,
-            emergencyReserveTarget: 180_000,
-            emergencyReserveCurrent: 120_000,
             hasCompletedOnboarding: true
         )
         context.insert(settings)

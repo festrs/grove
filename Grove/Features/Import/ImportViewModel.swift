@@ -3,18 +3,11 @@ import SwiftData
 import UniformTypeIdentifiers
 import GroveDomain
 
-enum ImportInputMode {
-    case file
-    case text
-}
-
 @Observable
 final class ImportViewModel {
-    var inputMode: ImportInputMode = .text
     var showingFilePicker = false
     var selectedFileData: Data?
     var selectedFilename: String?
-    var pastedText = ""
     var isLoading = false
     var positions: [ImportedPosition] = []
     var selectedTickers: Set<String> = []
@@ -23,10 +16,7 @@ final class ImportViewModel {
 
     var canAnalyze: Bool {
         guard !isLoading else { return false }
-        switch inputMode {
-        case .file: return selectedFileData != nil
-        case .text: return !pastedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
+        return selectedFileData != nil
     }
 
     var selectedPositions: [ImportedPosition] {
@@ -57,17 +47,14 @@ final class ImportViewModel {
     }
 
     func analyze(backendService: any BackendServiceProtocol) async {
+        guard let fileData = selectedFileData, let filename = selectedFilename else { return }
         isLoading = true
         defer { isLoading = false }
 
         do {
-            let fileData = inputMode == .file ? selectedFileData : nil
-            let filename = inputMode == .file ? selectedFilename : nil
-            let text = inputMode == .text ? pastedText : nil
             let result = try await backendService.importPortfolio(
                 fileData: fileData,
-                filename: filename,
-                text: text
+                filename: filename
             )
             positions = result
             let tickers = result.map(\.ticker)

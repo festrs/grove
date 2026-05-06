@@ -1,24 +1,49 @@
 import Foundation
 import SwiftData
 
+public enum FIIncomeMode: String, CaseIterable, Sendable {
+    case essentials
+    case lifestyle
+    case lifestylePlusBuffer = "lifestyle_plus_buffer"
+
+    public var multiplier: Decimal {
+        switch self {
+        case .essentials: 1.0
+        case .lifestyle: 1.5
+        case .lifestylePlusBuffer: 2.0
+        }
+    }
+}
+
 @Model
 public final class UserSettings {
     public var monthlyIncomeGoal: Decimal
     public var monthlyCostOfLiving: Decimal
-    public var emergencyReserveTarget: Decimal
-    public var emergencyReserveCurrent: Decimal
     public var hasCompletedOnboarding: Bool
     public var preferredCurrencyRaw: String
     public var recommendationCount: Int = 2
 
     public var monthlyIncomeGoalCurrencyRaw: String = Currency.brl.rawValue
     public var monthlyCostOfLivingCurrencyRaw: String = Currency.brl.rawValue
-    public var emergencyReserveTargetCurrencyRaw: String = Currency.brl.rawValue
-    public var emergencyReserveCurrentCurrencyRaw: String = Currency.brl.rawValue
 
     /// Global asset class allocation targets as JSON: {"acoesBR": 40, "fiis": 30, ...}
     /// Must sum to 100. Single source of truth for rebalancing across all portfolios.
     public var classAllocationJSON: String = "{}"
+
+    // MARK: - Freedom Plan
+
+    /// Year the user wants to reach financial independence. 0 = unset.
+    public var targetFIYear: Int = 0
+    public var fiIncomeModeRaw: String = FIIncomeMode.essentials.rawValue
+    /// Cost of living at FI / cost of living today. Falls back to the mode's
+    /// multiplier when the user hasn't authored a plan.
+    public var costAtFIMultiplier: Decimal = 1.0
+    public var monthlyContributionCapacity: Decimal = 0
+    public var monthlyContributionCapacityCurrencyRaw: String = Currency.brl.rawValue
+    /// 0–100. Remainder is USD. Informational in v1 (drives copy, not math).
+    public var fiCurrencyMixBRLPercent: Decimal = 100
+    /// nil = user hasn't completed the Freedom Plan flow yet.
+    public var freedomPlanCompletedAt: Date? = nil
 
     public var preferredCurrency: Currency {
         get { Currency(rawValue: preferredCurrencyRaw) ?? .brl }
@@ -35,14 +60,14 @@ public final class UserSettings {
         set { monthlyCostOfLivingCurrencyRaw = newValue.rawValue }
     }
 
-    public var emergencyReserveTargetCurrency: Currency {
-        get { Currency(rawValue: emergencyReserveTargetCurrencyRaw) ?? .brl }
-        set { emergencyReserveTargetCurrencyRaw = newValue.rawValue }
+    public var monthlyContributionCapacityCurrency: Currency {
+        get { Currency(rawValue: monthlyContributionCapacityCurrencyRaw) ?? .brl }
+        set { monthlyContributionCapacityCurrencyRaw = newValue.rawValue }
     }
 
-    public var emergencyReserveCurrentCurrency: Currency {
-        get { Currency(rawValue: emergencyReserveCurrentCurrencyRaw) ?? .brl }
-        set { emergencyReserveCurrentCurrencyRaw = newValue.rawValue }
+    public var fiIncomeMode: FIIncomeMode {
+        get { FIIncomeMode(rawValue: fiIncomeModeRaw) ?? .essentials }
+        set { fiIncomeModeRaw = newValue.rawValue }
     }
 
     public var monthlyIncomeGoalMoney: Money {
@@ -61,20 +86,21 @@ public final class UserSettings {
         }
     }
 
-    public var emergencyReserveTargetMoney: Money {
-        get { Money(amount: emergencyReserveTarget, currency: emergencyReserveTargetCurrency) }
+    public var monthlyContributionCapacityMoney: Money {
+        get { Money(amount: monthlyContributionCapacity, currency: monthlyContributionCapacityCurrency) }
         set {
-            emergencyReserveTarget = newValue.amount
-            emergencyReserveTargetCurrencyRaw = newValue.currency.rawValue
+            monthlyContributionCapacity = newValue.amount
+            monthlyContributionCapacityCurrencyRaw = newValue.currency.rawValue
         }
     }
 
-    public var emergencyReserveCurrentMoney: Money {
-        get { Money(amount: emergencyReserveCurrent, currency: emergencyReserveCurrentCurrency) }
-        set {
-            emergencyReserveCurrent = newValue.amount
-            emergencyReserveCurrentCurrencyRaw = newValue.currency.rawValue
-        }
+    /// Cost of living projected to FI (cost-today × multiplier), expressed in
+    /// the same currency as `monthlyCostOfLiving`.
+    public var costAtFIMoney: Money {
+        Money(
+            amount: monthlyCostOfLiving * costAtFIMultiplier,
+            currency: monthlyCostOfLivingCurrency
+        )
     }
 
     public var classAllocations: [AssetClassType: Double] {
@@ -101,23 +127,18 @@ public final class UserSettings {
     }
 
     public init(
-        monthlyIncomeGoal: Decimal = 10_000,
+        monthlyIncomeGoal: Decimal = 0,
         monthlyCostOfLiving: Decimal = 15_000,
-        emergencyReserveTarget: Decimal = 180_000,
-        emergencyReserveCurrent: Decimal = 0,
         hasCompletedOnboarding: Bool = false,
         preferredCurrency: Currency = .brl,
         goalCurrency: Currency = .brl
     ) {
         self.monthlyIncomeGoal = monthlyIncomeGoal
         self.monthlyCostOfLiving = monthlyCostOfLiving
-        self.emergencyReserveTarget = emergencyReserveTarget
-        self.emergencyReserveCurrent = emergencyReserveCurrent
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.preferredCurrencyRaw = preferredCurrency.rawValue
         self.monthlyIncomeGoalCurrencyRaw = goalCurrency.rawValue
         self.monthlyCostOfLivingCurrencyRaw = goalCurrency.rawValue
-        self.emergencyReserveTargetCurrencyRaw = goalCurrency.rawValue
-        self.emergencyReserveCurrentCurrencyRaw = goalCurrency.rawValue
+        self.monthlyContributionCapacityCurrencyRaw = goalCurrency.rawValue
     }
 }

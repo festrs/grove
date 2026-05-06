@@ -150,12 +150,33 @@ public nonisolated struct BatchQuoteDTO: Codable, Sendable, Identifiable {
     public let name: String?
     public let price: MoneyDTO?
     public let currency: String?
+    /// Annual dividend yield expressed in percent (e.g. `"7.96"` = 7.96%).
+    /// Already-percent semantics — assign directly to `Holding.dividendYield`,
+    /// do not multiply by 100.
+    public let dividendYield: String?
 
-    public init(symbol: String, name: String? = nil, price: MoneyDTO? = nil, currency: String? = nil) {
+    public init(
+        symbol: String,
+        name: String? = nil,
+        price: MoneyDTO? = nil,
+        currency: String? = nil,
+        dividendYield: String? = nil
+    ) {
         self.symbol = symbol
         self.name = name
         self.price = price
         self.currency = currency
+        self.dividendYield = dividendYield
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case symbol, name, price, currency
+        case dividendYield = "dividend_yield"
+    }
+
+    public var dividendYieldDecimal: Decimal? {
+        guard let dividendYield, !dividendYield.isEmpty else { return nil }
+        return Decimal(string: dividendYield)
     }
 }
 
@@ -183,22 +204,6 @@ public nonisolated struct MobileDividendDTO: Codable, Sendable, Identifiable {
         case value
         case exDate = "ex_date"
         case paymentDate = "payment_date"
-    }
-}
-
-public nonisolated struct DividendSummaryDTO: Codable, Sendable {
-    public let dividendPerShare: String
-
-    public init(dividendPerShare: String) {
-        self.dividendPerShare = dividendPerShare
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case dividendPerShare = "dividend_per_share"
-    }
-
-    public var decimalValue: Decimal {
-        Decimal(string: dividendPerShare) ?? .zero
     }
 }
 

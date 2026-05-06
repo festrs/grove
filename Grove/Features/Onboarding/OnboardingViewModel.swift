@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import GroveDomain
 import GroveRepositories
+import GroveServices
 
 // MARK: - OnboardingViewModel
 
@@ -11,7 +12,19 @@ final class OnboardingViewModel {
     // MARK: - Navigation
 
     var currentStep: Int = 0
-    static let totalSteps = 5
+    /// Sub-step inside the Freedom Plan step (currentStep == 1). 0..<5.
+    var freedomPlanSubStep: Int = 0
+    static let totalSteps = 6
+    static let freedomPlanSubStepCount = 5
+
+    enum Step: Int {
+        case welcome = 0
+        case freedomPlan = 1
+        case addHoldings = 2
+        case classification = 3
+        case targets = 4
+        case status = 5
+    }
 
     // MARK: - Portfolio
 
@@ -35,10 +48,27 @@ final class OnboardingViewModel {
         .rendaFixa: 15
     ]
 
-    // MARK: - Financial Goals
+    // MARK: - Freedom Plan
 
-    var monthlyIncomeGoal: Decimal = AppConstants.Defaults.monthlyIncomeGoal
     var monthlyCostOfLiving: Decimal = AppConstants.Defaults.monthlyCostOfLiving
+    var costOfLivingCurrency: Currency = .brl
+    var targetFIYear: Int = Calendar.current.component(.year, from: .now) + 20
+    var fiIncomeMode: FIIncomeMode = .essentials
+    var monthlyContributionCapacity: Decimal = 0
+    var contributionCurrency: Currency = .brl
+    var fiCurrencyMixBRLPercent: Decimal = 100
+
+    /// Computed lazily on the reveal screen. Requires display currency + rates
+    /// from the environment, so callers pass those in.
+    func freedomNumber(displayCurrency: Currency, rates: any ExchangeRates) -> Money {
+        FreedomPlanCalculator.freedomNumber(
+            monthlyCostOfLiving: Money(amount: monthlyCostOfLiving, currency: costOfLivingCurrency),
+            incomeMode: fiIncomeMode,
+            currencyMixBRLPercent: fiCurrencyMixBRLPercent,
+            displayCurrency: displayCurrency,
+            rates: rates
+        ).total
+    }
 
     /// Load existing allocations from UserSettings if redoing onboarding
     func loadExistingAllocations(modelContext: ModelContext) {
@@ -85,22 +115,45 @@ final class OnboardingViewModel {
     // MARK: - Navigation Helpers
 
     var canAdvance: Bool {
-        switch currentStep {
-        case 0: return true
-        case 1: return !pendingHoldings.isEmpty
-        case 2: return true
-        case 3: return isTargetValid
-        case 4: return true
+        guard let step = Step(rawValue: currentStep) else { return false }
+        switch step {
+        case .welcome: return true
+        case .freedomPlan: return canAdvanceFreedomPlanSubStep
+        case .addHoldings: return !pendingHoldings.isEmpty
+        case .classification: return true
+        case .targets: return isTargetValid
+        case .status: return true
+        }
+    }
+
+    /// Per-screen validation inside the Freedom Plan step.
+    var canAdvanceFreedomPlanSubStep: Bool {
+        switch freedomPlanSubStep {
+        case 0: return monthlyCostOfLiving > 0
+        case 1: return targetFIYear >= Calendar.current.component(.year, from: .now)
+        case 2: return true // mode picker has a default
+        case 3: return true // capacity allowed to be 0 (filled later in Settings)
+        case 4: return true // reveal
         default: return false
         }
     }
 
     func advance() {
+        guard let step = Step(rawValue: currentStep) else { return }
+        if step == .freedomPlan && freedomPlanSubStep < Self.freedomPlanSubStepCount - 1 {
+            freedomPlanSubStep += 1
+            return
+        }
         guard currentStep < Self.totalSteps - 1 else { return }
         currentStep += 1
     }
 
     func goBack() {
+        guard let step = Step(rawValue: currentStep) else { return }
+        if step == .freedomPlan && freedomPlanSubStep > 0 {
+            freedomPlanSubStep -= 1
+            return
+        }
         guard currentStep > 0 else { return }
         currentStep -= 1
     }
@@ -266,17 +319,28 @@ final class OnboardingViewModel {
 
     func completeOnboarding(
         modelContext: ModelContext,
-        backendService: any BackendServiceProtocol
+        backendService: any BackendServiceProtocol,
+        displayCurrency: Currency = .brl,
+        rates: any ExchangeRates = StaticRates(brlPerUsd: 5)
     ) {
         let repo = PortfolioRepository(modelContext: modelContext)
         do {
+            let plan = PortfolioRepository.FreedomPlanInput(
+                monthlyCostOfLiving: monthlyCostOfLiving,
+                costOfLivingCurrency: costOfLivingCurrency,
+                targetFIYear: targetFIYear,
+                incomeMode: fiIncomeMode,
+                monthlyContributionCapacity: monthlyContributionCapacity,
+                contributionCurrency: contributionCurrency,
+                currencyMixBRLPercent: fiCurrencyMixBRLPercent,
+                freedomNumber: freedomNumber(displayCurrency: displayCurrency, rates: rates)
+            )
             let portfolio = try repo.saveOnboardingPortfolio(
                 preferredName: portfolioName,
                 nameFallbacks: Self.portfolioAdjectives.shuffled(),
                 pendingHoldings: pendingHoldings,
                 targetAllocations: targetAllocations,
-                monthlyIncomeGoal: monthlyIncomeGoal,
-                monthlyCostOfLiving: monthlyCostOfLiving
+                freedomPlan: plan
             )
 
             // Bootstrap price + DY for every holding the user just created so
@@ -290,7 +354,13 @@ final class OnboardingViewModel {
             let svc = backendService
             let ctx = modelContext
             let bootstrap = TickerBootstrapService()
+            let trackPairs = snapshot
+                .filter { !$0.isCustom }
+                .map { (symbol: $0.ticker, assetClass: $0.assetClass.rawValue) }
             Task { @MainActor in
+                if !trackPairs.isEmpty {
+                    try? await svc.syncTrackedSymbols(pairs: trackPairs)
+                }
                 await bootstrap.bootstrap(holdings: snapshot, backendService: svc)
                 try? ctx.save()
             }

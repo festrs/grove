@@ -90,13 +90,22 @@ struct PortfolioRepositoryTests {
             .acoesBR: 30, .fiis: 25, .usStocks: 15, .reits: 10, .crypto: 5, .rendaFixa: 15
         ]
 
+        let plan = PortfolioRepository.FreedomPlanInput(
+            monthlyCostOfLiving: 8_000,
+            costOfLivingCurrency: .brl,
+            targetFIYear: 2046,
+            incomeMode: .lifestyle,
+            monthlyContributionCapacity: 3_000,
+            contributionCurrency: .brl,
+            currencyMixBRLPercent: 70,
+            freedomNumber: Money(amount: 12_000, currency: .brl)
+        )
         _ = try repo.saveOnboardingPortfolio(
             preferredName: "Test",
             nameFallbacks: ["Fallback"],
             pendingHoldings: pending,
             targetAllocations: allocations,
-            monthlyIncomeGoal: 0,
-            monthlyCostOfLiving: 0
+            freedomPlan: plan
         )
 
         let settings = try repo.fetchSettings()
@@ -105,6 +114,39 @@ struct PortfolioRepositoryTests {
         #expect(settings.classAllocations.count == AssetClassType.allCases.count)
         #expect(settings.classAllocations[.fiis] == 25)
         #expect(settings.classAllocations[.crypto] == 5)
+    }
+
+    @Test func saveOnboardingPortfolioPersistsFreedomPlan() throws {
+        let ctx = try Self.makeContext()
+        let repo = PortfolioRepository(modelContext: ctx)
+
+        let plan = PortfolioRepository.FreedomPlanInput(
+            monthlyCostOfLiving: 6_000,
+            costOfLivingCurrency: .brl,
+            targetFIYear: 2050,
+            incomeMode: .lifestylePlusBuffer,
+            monthlyContributionCapacity: 4_500,
+            contributionCurrency: .brl,
+            currencyMixBRLPercent: 60,
+            freedomNumber: Money(amount: 12_000, currency: .brl)
+        )
+        _ = try repo.saveOnboardingPortfolio(
+            preferredName: "Plan Test",
+            nameFallbacks: ["Plan Fallback"],
+            pendingHoldings: [],
+            targetAllocations: [.acoesBR: 100],
+            freedomPlan: plan
+        )
+
+        let settings = try repo.fetchSettings()
+        #expect(settings.monthlyIncomeGoal == 12_000)
+        #expect(settings.targetFIYear == 2050)
+        #expect(settings.fiIncomeMode == .lifestylePlusBuffer)
+        #expect(settings.costAtFIMultiplier == 2.0)
+        #expect(settings.monthlyContributionCapacity == 4_500)
+        #expect(settings.fiCurrencyMixBRLPercent == 60)
+        #expect(settings.freedomPlanCompletedAt != nil,
+                "completedAt must be stamped so the dashboard nudge banner stays hidden after onboarding.")
     }
 
     @Test func driftIsNegativeWhenUnderweight() throws {

@@ -111,13 +111,14 @@ struct OnboardingStepRouter: View {
     @Bindable var viewModel: OnboardingViewModel
 
     var body: some View {
-        switch viewModel.currentStep {
-        case 0: WelcomeStepView(viewModel: viewModel)
-        case 1: AddHoldingsStepView(viewModel: viewModel)
-        case 2: ClassificationStepView(viewModel: viewModel)
-        case 3: SetTargetsStepView(viewModel: viewModel)
-        case 4: SetStatusStepView(viewModel: viewModel)
-        default: EmptyView()
+        switch OnboardingViewModel.Step(rawValue: viewModel.currentStep) {
+        case .welcome: WelcomeStepView(viewModel: viewModel)
+        case .freedomPlan: FreedomPlanStepView(viewModel: viewModel)
+        case .addHoldings: AddHoldingsStepView(viewModel: viewModel)
+        case .classification: ClassificationStepView(viewModel: viewModel)
+        case .targets: SetTargetsStepView(viewModel: viewModel)
+        case .status: SetStatusStepView(viewModel: viewModel)
+        case .none: EmptyView()
         }
     }
 }

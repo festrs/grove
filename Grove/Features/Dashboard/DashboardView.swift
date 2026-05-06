@@ -18,7 +18,6 @@ struct DashboardView: View {
     @Environment(\.rates) private var rates
 
     @Query(sort: \Holding.ticker) private var holdings: [Holding]
-    @Query private var portfolios: [Portfolio]
     @Query private var settingsList: [UserSettings]
 
     @State private var viewModel = DashboardViewModel()
@@ -98,7 +97,14 @@ struct DashboardView: View {
                 case .incomeHistory:
                     IncomeHistoryView()
                 case .dividendCalendar:
-                    DividendCalendarView()
+                    // On iPhone, route through the Dividends Hub so the user
+                    // also has access to income history (the sidebar handles
+                    // that on iPad/Mac).
+                    if sizeClass == .compact {
+                        DividendsHubView()
+                    } else {
+                        DividendCalendarView()
+                    }
                 }
             }
             .refreshable {
@@ -129,18 +135,40 @@ struct DashboardView: View {
     }
 
     @ViewBuilder
-    private var compactDashboard: some View {
-        if let projection = viewModel.projection {
-            NavigationLink(value: DashboardDestination.incomeHistory) {
-                IncomeGaugeMeter(projection: projection)
+    private var freedomPlanBanner: some View {
+        if let settings,
+           settings.hasCompletedOnboarding,
+           settings.freedomPlanCompletedAt == nil {
+            NavigationLink {
+                GoalSettingsView(settings: settings)
+            } label: {
+                FreedomPlanBanner()
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var compactDashboard: some View {
+        freedomPlanBanner
+
+        if let projection = viewModel.projection {
+            if let settings {
+                NavigationLink {
+                    GoalSettingsView(settings: settings)
+                } label: {
+                    IncomeGaugeMeter(projection: projection)
+                }
+                .buttonStyle(.plain)
+            } else {
+                IncomeGaugeMeter(projection: projection)
+            }
         }
 
         MonthlyActionCard(suggestions: viewModel.topSuggestions)
 
         if let summary = viewModel.summary {
-            QuickStatsRow(summary: summary, holdingCount: holdings.count, portfolioCount: portfolios.count)
+            QuickStatsRow(summary: summary, holdingCount: holdings.count)
         }
 
         NavigationLink(value: DashboardDestination.dividendCalendar) {
@@ -151,14 +179,25 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var wideDashboard: some View {
+        freedomPlanBanner
+
         // Row 1: KPI summary cards.
         if let summary = viewModel.summary {
-            SummaryCardsRow(summary: summary, projection: viewModel.projection, portfolioCount: portfolios.count)
+            SummaryCardsRow(summary: summary, projection: viewModel.projection)
         }
 
         // Row 2: Hero card (gauge + action + suggestions).
         if let projection = viewModel.projection {
-            HeroCard(projection: projection, suggestions: viewModel.topSuggestions)
+            if let settings {
+                NavigationLink {
+                    GoalSettingsView(settings: settings)
+                } label: {
+                    HeroCard(projection: projection, suggestions: viewModel.topSuggestions)
+                }
+                .buttonStyle(.plain)
+            } else {
+                HeroCard(projection: projection, suggestions: viewModel.topSuggestions)
+            }
         }
 
         // Row 3: Adaptive grid — allocation drift + upcoming dividends.
