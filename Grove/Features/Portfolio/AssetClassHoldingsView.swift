@@ -43,7 +43,7 @@ struct AssetClassHoldingsView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+            LazyVStack(spacing: Theme.Spacing.xs, pinnedViews: [.sectionHeaders]) {
                 classHeader
 
                 Section {

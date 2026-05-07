@@ -40,7 +40,7 @@ public final class Holding {
     // MARK: - Computed Properties
 
     public var displayTicker: String {
-        ticker.replacingOccurrences(of: ".SA", with: "")
+        ticker.displayTicker
     }
 
     public var assetClass: AssetClassType {
@@ -299,7 +299,7 @@ public final class Holding {
     ) {
         let canonical = ticker.normalizedTicker
         self.ticker = canonical
-        self.displayName = displayName.isEmpty ? canonical : displayName
+        self.displayName = displayName.isEmpty ? canonical.displayTicker : displayName
         self.quantity = quantity
         self.averagePrice = averagePrice
         self.currentPrice = currentPrice

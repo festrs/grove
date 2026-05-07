@@ -49,25 +49,33 @@ struct OnboardingViewModelTests {
         #expect(vm.canAdvance == true)
     }
 
-    @Test func canAdvanceAddHoldingsStepRequiresHoldings() {
+    @Test func canAdvanceHoldingsStepIsAlwaysTrue() {
+        // Holdings step is optional now — empty list means the user
+        // chose to skip and add tickers post-onboarding.
         let vm = OnboardingViewModel()
-        vm.currentStep = OnboardingViewModel.Step.addHoldings.rawValue
-        #expect(vm.canAdvance == false)
+        vm.currentStep = OnboardingViewModel.Step.holdings.rawValue
+        #expect(vm.canAdvance == true)
 
         vm.addHolding(ticker: "ITUB3")
         #expect(vm.canAdvance == true)
     }
 
-    @Test func canAdvanceTargetsStepRequiresValidTarget() {
+    @Test func canAdvanceStrategyStepRequiresValidTarget() {
         let vm = OnboardingViewModel()
-        vm.currentStep = OnboardingViewModel.Step.targets.rawValue
-        vm.addHolding(ticker: "ITUB3")
-        // Only acoesBR is in use — set its allocation to 100 so total = 100
-        vm.targetAllocations = [.acoesBR: 100]
+        vm.currentStep = OnboardingViewModel.Step.strategy.rawValue
+        // Sum of default allocations is 100 — should be valid.
         #expect(vm.canAdvance == true)
 
         vm.targetAllocations = [.acoesBR: 50] // only 50, not 100
         #expect(vm.canAdvance == false)
+    }
+
+    @Test func canAdvanceHowGroveWorksAndRecapAlwaysTrue() {
+        let vm = OnboardingViewModel()
+        vm.currentStep = OnboardingViewModel.Step.howGroveWorks.rawValue
+        #expect(vm.canAdvance == true)
+        vm.currentStep = OnboardingViewModel.Step.recap.rawValue
+        #expect(vm.canAdvance == true)
     }
 
     // MARK: - Freedom Plan step
@@ -100,8 +108,8 @@ struct OnboardingViewModelTests {
             #expect(vm.freedomPlanSubStep == expectedSub)
         }
 
-        vm.advance() // last sub-step → addHoldings
-        #expect(vm.currentStep == OnboardingViewModel.Step.addHoldings.rawValue)
+        vm.advance() // last sub-step → howGroveWorks
+        #expect(vm.currentStep == OnboardingViewModel.Step.howGroveWorks.rawValue)
     }
 
     @Test func goBackWalksFreedomPlanSubStepsBeforeStepBoundary() {
@@ -140,7 +148,7 @@ struct OnboardingViewModelTests {
 
     @Test func addHoldingFromSearchResult() {
         let vm = OnboardingViewModel()
-        let result = StockSearchResultDTO(id: "ITUB3", symbol: "ITUB3", name: "Itau", type: "stock", price: "32", currency: "BRL", change: nil, sector: nil, logo: nil)
+        let result = StockSearchResultDTO(id: "ITUB3", symbol: "ITUB3", name: "Itau", type: "stock", price: MoneyDTO(amount: "32", currency: "BRL"), currency: "BRL", change: nil, sector: nil, logo: nil)
         vm.addHolding(from: result)
 
         #expect(vm.pendingHoldings.count == 1)
@@ -190,7 +198,7 @@ struct OnboardingViewModelTests {
         }
         #expect(vm.canAddMoreHoldings == false)
 
-        let result = StockSearchResultDTO(id: "EXTRA.SA", symbol: "EXTRA.SA", name: "Extra", type: "stock", price: "10", currency: "BRL", change: nil, sector: nil, logo: nil)
+        let result = StockSearchResultDTO(id: "EXTRA.SA", symbol: "EXTRA.SA", name: "Extra", type: "stock", price: MoneyDTO(amount: "10", currency: "BRL"), currency: "BRL", change: nil, sector: nil, logo: nil)
         vm.addHolding(from: result)
 
         #expect(vm.pendingHoldings.count == AppConstants.freeTierMaxHoldings, "Should not exceed limit via search")

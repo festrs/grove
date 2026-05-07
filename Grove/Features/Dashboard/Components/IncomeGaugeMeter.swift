@@ -4,6 +4,7 @@ import GroveServices
 
 struct IncomeGaugeMeter: View {
     let projection: IncomeProjection
+    var isInteractive: Bool = true
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.displayCurrency) private var displayCurrency
     @Environment(\.rates) private var rates
@@ -19,6 +20,16 @@ struct IncomeGaugeMeter: View {
     var body: some View {
         TQCard {
             VStack(spacing: Theme.Spacing.lg) {
+                if isInteractive {
+                    HStack {
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.tqSecondaryText)
+                    }
+                    .padding(.bottom, -Theme.Spacing.md)
+                }
+
                 // Progress ring with income inside
                 ZStack {
                     TQProgressRing(

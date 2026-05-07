@@ -14,9 +14,17 @@ struct HoldingDetailView: View {
     @State private var showingBuy = false
     @State private var showingSell = false
 
+    /// Synchronous in-memory lookup so the first render has the holding —
+    /// avoids a `TQLoadingView()` flash on every navigation. The viewModel
+    /// still owns the reference for `refreshAll` / `removeHolding`, but
+    /// rendering doesn't wait on the async `.task` to populate it.
+    private var holding: Holding? {
+        viewModel.holding ?? (modelContext.model(for: holdingID) as? Holding)
+    }
+
     var body: some View {
         Group {
-            if let holding = viewModel.holding {
+            if let holding {
                 VStack(spacing: 0) {
                     ScrollView {
                         VStack(spacing: Theme.Spacing.md) {
@@ -75,14 +83,6 @@ struct HoldingDetailView: View {
                     if sizeClass == .regular {
                         ToolbarItemGroup(placement: .primaryAction) {
                             Button {
-                                showingBuy = true
-                            } label: {
-                                Label("Buy", systemImage: "plus.circle.fill")
-                            }
-                            .keyboardShortcut("b", modifiers: .command)
-                            .help("Buy (⌘B)")
-
-                            Button {
                                 showingSell = true
                             } label: {
                                 Label("Sell", systemImage: "minus.circle.fill")
@@ -90,6 +90,14 @@ struct HoldingDetailView: View {
                             .keyboardShortcut("s", modifiers: .command)
                             .disabled(!holding.hasPosition)
                             .help("Sell (⌘S)")
+
+                            Button {
+                                showingBuy = true
+                            } label: {
+                                Label("Buy", systemImage: "plus.circle.fill")
+                            }
+                            .keyboardShortcut("b", modifiers: .command)
+                            .help("Buy (⌘B)")
                         }
                     }
                     ToolbarItem(placement: .primaryAction) {
@@ -140,16 +148,6 @@ struct HoldingDetailView: View {
     private func actionBar(_ holding: Holding) -> some View {
         HStack(spacing: Theme.Spacing.sm) {
             Button {
-                showingBuy = true
-            } label: {
-                Label("Buy", systemImage: "plus.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.tqAccentGreen)
-
-            Button {
                 showingSell = true
             } label: {
                 Label("Sell", systemImage: "minus.circle.fill")
@@ -159,6 +157,16 @@ struct HoldingDetailView: View {
             .buttonStyle(.bordered)
             .tint(.orange)
             .disabled(!holding.hasPosition)
+
+            Button {
+                showingBuy = true
+            } label: {
+                Label("Buy", systemImage: "plus.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.tqAccentGreen)
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
@@ -244,23 +252,13 @@ struct HoldingDetailView: View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Allocation Weight").font(.headline)
-                HStack {
-                    Slider(
-                        value: Binding(
-                            get: { NSDecimalNumber(decimal: holding.targetPercent).doubleValue },
-                            set: { holding.targetPercent = Decimal($0) }
-                        ),
-                        in: 1...5, step: 1
-                    )
-                    .tint(.tqAccentGreen)
-                    Text("\(Int(NSDecimalNumber(decimal: holding.targetPercent).doubleValue))")
-                        .font(.headline)
-                        .monospacedDigit()
-                        .frame(width: 30)
-                }
-                Text("Relative weight for rebalancing (1 = lowest, 5 = highest priority).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                TQPriorityPicker(
+                    value: Binding(
+                        get: { holding.targetPercent },
+                        set: { holding.targetPercent = $0 }
+                    ),
+                    variant: .full
+                )
             }
         }
     }

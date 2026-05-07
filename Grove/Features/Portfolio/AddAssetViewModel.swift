@@ -27,6 +27,9 @@ final class AddAssetViewModel {
     var quantityText: String = ""
     var priceText: String = ""
     var date: Date = .now
+    /// Within-class priority surfaced during onboarding so the user picks
+    /// it next to class and status. 1–5, default 5.
+    var targetPercent: Decimal = 5
 
     // Async / display state
     var isFetchingPrice: Bool = false
@@ -109,10 +112,17 @@ final class AddAssetViewModel {
     /// Pre-fill the price field from the search result, falling back to a
     /// fresh quote if needed. View calls this from `.task`. Custom tickers
     /// have no backend record, so we don't query.
-    func fetchPrice(backendService: any BackendServiceProtocol) async {
+    ///
+    /// Currency-aware: the search result may price the symbol in a different
+    /// currency than the form (e.g. yfinance returns USD for an AAPL34 BDR
+    /// while the form runs in BRL). We convert through `rates` so the field
+    /// matches the form's currency. When rates aren't available the search
+    /// result is skipped and the live quote takes over.
+    func fetchPrice(backendService: any BackendServiceProtocol, rates: any ExchangeRates) async {
         if isCustom { return }
-        if let p = searchResult.priceDecimal, p > 0 {
-            priceText = "\(p)"
+        if let money = searchResult.priceMoney, money.amount > 0 {
+            let converted = money.converted(to: currency, using: rates)
+            priceText = "\(converted.amount)"
             return
         }
         isFetchingPrice = true
@@ -129,7 +139,8 @@ final class AddAssetViewModel {
     @discardableResult
     func addAsset(
         modelContext: ModelContext,
-        backendService: any BackendServiceProtocol
+        backendService: any BackendServiceProtocol,
+        rates: any ExchangeRates
     ) -> Bool {
         guard isValid else { return false }
         guard Holding.canAddMore(modelContext: modelContext) else {
@@ -140,8 +151,11 @@ final class AddAssetViewModel {
 
         // currentPrice on the Holding always reflects the live quote when
         // available — even in track-only mode — so the dashboard projection
-        // works without waiting for the next sync.
-        let livePrice = searchResult.priceDecimal ?? price ?? 0
+        // works without waiting for the next sync. Convert via `rates` so a
+        // search result priced in a different currency than the holding's
+        // class default lands as the right number for the holding's currency.
+        let convertedSearchPrice = searchResult.priceMoney?.converted(to: currency, using: rates).amount
+        let livePrice = convertedSearchPrice ?? price ?? 0
 
         let holding = Holding(
             ticker: searchResult.symbol,
@@ -149,6 +163,7 @@ final class AddAssetViewModel {
             currentPrice: livePrice,
             assetClass: detectedClass,
             status: selectedStatus,
+            targetPercent: targetPercent,
             isCustom: isCustom
         )
         if !isCustom {
@@ -158,14 +173,31 @@ final class AddAssetViewModel {
 
         var descriptor = FetchDescriptor<Portfolio>(sortBy: [SortDescriptor(\.createdAt)])
         descriptor.fetchLimit = 1
-        if let portfolio = try? modelContext.fetch(descriptor).first {
-            holding.portfolio = portfolio
+        let portfolio: Portfolio
+        if let existing = try? modelContext.fetch(descriptor).first {
+            portfolio = existing
         } else {
-            let portfolio = Portfolio()
+            portfolio = Portfolio()
             modelContext.insert(portfolio)
-            holding.portfolio = portfolio
         }
-        modelContext.insert(holding)
+
+        // Upsert by canonical ticker. The picker dims already-added rows, but
+        // races (custom-add path, stale snapshot) can still land here — and
+        // there's no DB-level unique constraint to fall back on.
+        let canonical = searchResult.symbol.normalizedTicker
+        let existingHolding = portfolio.holdings.first { $0.ticker == canonical }
+
+        let target: Holding
+        let isNewHolding: Bool
+        if let existingHolding {
+            target = existingHolding
+            isNewHolding = false
+        } else {
+            target = holding
+            holding.portfolio = portfolio
+            modelContext.insert(holding)
+            isNewHolding = true
+        }
 
         if ownsPosition, let qty = quantity, let prc = price, qty > 0, prc > 0 {
             let contribution = Contribution(
@@ -174,9 +206,12 @@ final class AddAssetViewModel {
                 shares: qty,
                 pricePerShare: prc
             )
-            contribution.holding = holding
+            contribution.holding = target
             modelContext.insert(contribution)
-            holding.recalculateFromContributions()
+            target.recalculateFromContributions()
+            if target.status == .estudo {
+                target.status = .aportar
+            }
         }
 
         // Persist immediately so the Holding gets a permanent
@@ -197,12 +232,15 @@ final class AddAssetViewModel {
             let assetClass = detectedClass
             let bootstrap = TickerBootstrapService()
             let owns = ownsPosition
+            let trackAndBootstrap = isNewHolding
             Task { @MainActor in
-                try? await backendService.trackSymbol(symbol: symbol, assetClass: assetClass.rawValue)
-                await bootstrap.bootstrap(holdings: [holding], backendService: backendService)
+                if trackAndBootstrap {
+                    try? await backendService.trackSymbol(symbol: symbol, assetClass: assetClass.rawValue)
+                    await bootstrap.bootstrap(holdings: [target], backendService: backendService)
+                }
                 if owns {
                     await bootstrap.refreshDividendsAfterTransaction(
-                        holding: holding,
+                        holding: target,
                         modelContext: modelContext,
                         backendService: backendService
                     )
@@ -215,18 +253,22 @@ final class AddAssetViewModel {
 
     /// Snapshot the form as a `PendingHolding` for the onboarding flow,
     /// which buffers drafts in memory until the user finishes the wizard.
-    func toPendingHolding() -> PendingHolding {
-        PendingHolding(
+    /// Currency-aware: the search result's price is converted to the form's
+    /// currency before being stashed.
+    func toPendingHolding(rates: any ExchangeRates) -> PendingHolding {
+        let convertedSearchPrice = searchResult.priceMoney?.converted(to: currency, using: rates).amount
+        return PendingHolding(
             ticker: searchResult.symbol.uppercased(),
             displayName: searchResult.name ?? searchResult.symbol,
             quantity: ownsPosition ? (quantity ?? 0) : 0,
             assetClass: detectedClass,
             status: selectedStatus,
-            currentPrice: searchResult.priceDecimal ?? price ?? 0,
+            currentPrice: convertedSearchPrice ?? price ?? 0,
             dividendYield: 0,
             apiType: searchResult.type,
             averagePrice: ownsPosition ? price : nil,
-            purchaseDate: ownsPosition ? date : nil
+            purchaseDate: ownsPosition ? date : nil,
+            targetPercent: targetPercent
         )
     }
 }

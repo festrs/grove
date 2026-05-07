@@ -57,10 +57,10 @@ struct AddHoldingsStepView: View {
     private var compactBody: some View {
         VStack(spacing: Theme.Spacing.md) {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text("Add Your Assets")
+                Text("Add what you already own (optional)")
                     .font(.system(size: Theme.FontSize.title2, weight: .bold))
 
-                Text("Add the tickers you already own or want to track. Transactions will be recorded later.")
+                Text("Search or paste tickers. Class is auto-detected — adjust the status and priority to match your strategy. Skip if you'd rather start fresh.")
                     .font(.system(size: Theme.FontSize.caption))
                     .foregroundStyle(Color.tqSecondaryText)
             }
@@ -121,8 +121,8 @@ struct AddHoldingsStepView: View {
                             .foregroundStyle(Color.tqAccentGreen)
                     }
 
-                    ForEach(viewModel.pendingHoldings) { holding in
-                        compactHoldingRow(holding)
+                    ForEach($viewModel.pendingHoldings) { $holding in
+                        compactHoldingRow($holding)
                     }
                 }
             }
@@ -189,30 +189,46 @@ struct AddHoldingsStepView: View {
         .buttonStyle(.plain)
     }
 
-    private func compactHoldingRow(_ holding: PendingHolding) -> some View {
-        TQCard {
-            HStack {
-                Image(systemName: holding.assetClass.icon)
-                    .foregroundStyle(holding.assetClass.color)
-                    .frame(width: 24)
+    private func compactHoldingRow(_ holding: Binding<PendingHolding>) -> some View {
+        let h = holding.wrappedValue
+        return TQCard {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: h.assetClass.icon)
+                        .foregroundStyle(h.assetClass.color)
+                        .frame(width: 24)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(holding.ticker)
-                        .font(.system(size: Theme.FontSize.body, weight: .semibold))
-                    Text(holding.displayName)
-                        .font(.system(size: Theme.FontSize.caption))
-                        .foregroundStyle(Color.tqSecondaryText)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(h.ticker)
+                            .font(.system(size: Theme.FontSize.body, weight: .semibold))
+                        Text(h.displayName)
+                            .font(.system(size: Theme.FontSize.caption))
+                            .foregroundStyle(Color.tqSecondaryText)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        withAnimation { viewModel.removeHolding(id: h.id) }
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                 }
 
-                Spacer()
+                HStack(spacing: Theme.Spacing.sm) {
+                    TQAssetClassPicker(selection: holding.assetClass)
+                    TQStatusPicker(selection: holding.status)
+                    Spacer(minLength: 0)
+                }
 
-                Button {
-                    withAnimation { viewModel.removeHolding(id: holding.id) }
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                HStack(spacing: Theme.Spacing.sm) {
+                    Text("Priority")
+                        .font(.system(size: Theme.FontSize.caption, weight: .medium))
+                        .foregroundStyle(Color.tqSecondaryText)
+                    TQPriorityPicker(value: holding.targetPercent, variant: .compact)
                 }
             }
         }
@@ -244,9 +260,9 @@ struct AddHoldingsStepView: View {
     private var regularHeader: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Add Your Assets")
+                Text("Add what you already own (optional)")
                     .font(.system(size: Theme.FontSize.title3, weight: .semibold))
-                Text("Add the tickers you already own or want to track. Transactions will be recorded later.")
+                Text("Search or paste tickers. Class is auto-detected — adjust the status and priority to match your strategy. Skip if you'd rather start fresh.")
                     .font(.caption)
                     .foregroundStyle(Color.tqSecondaryText)
             }
@@ -425,8 +441,8 @@ struct AddHoldingsStepView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(viewModel.pendingHoldings) { holding in
-                            regularHoldingRow(holding)
+                        ForEach($viewModel.pendingHoldings) { $holding in
+                            regularHoldingRow($holding)
                             Divider().opacity(0.5)
                         }
                     }
@@ -435,23 +451,29 @@ struct AddHoldingsStepView: View {
         }
     }
 
-    private func regularHoldingRow(_ holding: PendingHolding) -> some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: holding.assetClass.icon)
-                .foregroundStyle(holding.assetClass.color)
+    private func regularHoldingRow(_ holding: Binding<PendingHolding>) -> some View {
+        let h = holding.wrappedValue
+        return HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: h.assetClass.icon)
+                .foregroundStyle(h.assetClass.color)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 1) {
-                Text(holding.ticker)
+                Text(h.ticker)
                     .font(.system(.body, weight: .semibold))
-                Text(holding.displayName)
+                Text(h.displayName)
                     .font(.caption)
                     .foregroundStyle(Color.tqSecondaryText)
                     .lineLimit(1)
             }
+            .frame(minWidth: 120, alignment: .leading)
             Spacer()
-            if hoveredHoldingID == holding.id {
+            TQAssetClassPicker(selection: holding.assetClass)
+            TQStatusPicker(selection: holding.status)
+            TQPriorityPicker(value: holding.targetPercent, variant: .compact)
+                .frame(width: 140)
+            if hoveredHoldingID == h.id {
                 Button {
-                    withAnimation { viewModel.removeHolding(id: holding.id) }
+                    withAnimation { viewModel.removeHolding(id: h.id) }
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(Color.tqSecondaryText)
@@ -463,7 +485,7 @@ struct AddHoldingsStepView: View {
         .padding(.vertical, Theme.Spacing.sm)
         .contentShape(Rectangle())
         .onHover { hovering in
-            hoveredHoldingID = hovering ? holding.id : (hoveredHoldingID == holding.id ? nil : hoveredHoldingID)
+            hoveredHoldingID = hovering ? h.id : (hoveredHoldingID == h.id ? nil : hoveredHoldingID)
         }
     }
 }

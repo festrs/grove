@@ -15,11 +15,15 @@ struct NextDividendCard: View {
     var body: some View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                HStack {
+                HStack(spacing: Theme.Spacing.sm) {
                     Image(systemName: "calendar.badge.clock")
                         .foregroundStyle(Color.tqAccentGreen)
                     Text("Upcoming Dividends")
                         .font(.system(size: Theme.FontSize.body, weight: .semibold))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.tqSecondaryText)
                 }
 
                 if dividends.isEmpty {

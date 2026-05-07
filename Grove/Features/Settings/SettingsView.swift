@@ -21,6 +21,7 @@ struct SettingsView: View {
                     // NotificationSettingsSection()
                     PremiumSection()
                     AboutSection()
+                    diagnosticsSection
                     dangerSection
                 }
             }
@@ -87,6 +88,16 @@ struct SettingsView: View {
             Text("Currency")
         } footer: {
             Text("Used for portfolio totals and passive-income figures. Per-asset prices keep the asset's own currency.")
+        }
+    }
+
+    private var diagnosticsSection: some View {
+        Section("Diagnostics") {
+            NavigationLink {
+                NetworkInspectorView()
+            } label: {
+                Label("Network Inspector", systemImage: "antenna.radiowaves.left.and.right")
+            }
         }
     }
 

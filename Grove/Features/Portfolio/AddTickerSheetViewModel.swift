@@ -25,11 +25,11 @@ final class AddTickerSheetViewModel {
     func loadExistingTickers(modelContext: ModelContext) {
         let repo = PortfolioRepository(modelContext: modelContext)
         let holdings = (try? repo.fetchAllHoldings()) ?? []
-        existingTickers = Set(holdings.map { $0.ticker.normalizedTicker })
+        existingTickers = Set(holdings.map { $0.ticker.displayTicker })
     }
 
     func isAlreadyAdded(_ symbol: String) -> Bool {
-        existingTickers.contains(symbol.normalizedTicker)
+        existingTickers.contains(symbol.normalizedTicker.displayTicker)
     }
 
     /// True when the typed text could be saved as a custom ticker — non-empty,

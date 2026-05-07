@@ -36,10 +36,16 @@ struct ContentView: View {
         .task {
             ensureSettingsExist()
             collapseDuplicatePortfolios()
+            TickerCanonicalizationMigration.runIfNeeded(modelContext: modelContext)
+            DuplicateHoldingMigration.runIfNeeded(modelContext: modelContext)
             await rateStore.refresh(using: backendService)
             guard settings.first?.hasCompletedOnboarding == true else { return }
-            await syncService.syncAll(modelContext: modelContext, backendService: backendService)
-            Task {
+            // Detach the launch sync so a transient view-lifecycle event
+            // (Group child swap, navigation, etc.) doesn't cancel the
+            // in-flight `mobile/quotes` request. Observed as
+            // "GET /api/mobile/quotes → ERR in 3ms" + URLError.cancelled.
+            Task { @MainActor in
+                await syncService.syncAll(modelContext: modelContext, backendService: backendService)
                 await syncService.syncDividendsIfStale(modelContext: modelContext, backendService: backendService)
             }
         }

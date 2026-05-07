@@ -9,7 +9,9 @@ struct AddAssetViewModelTests {
 
     private static let sampleSearch = StockSearchResultDTO(
         id: "HGLG11.SA", symbol: "HGLG11.SA", name: "CSHG Logistica",
-        type: "fund", price: "180.00", currency: "BRL", change: "0",
+        type: "fund",
+        price: MoneyDTO(amount: "180.00", currency: "BRL"),
+        currency: "BRL", change: 0,
         sector: nil, logo: nil
     )
 
@@ -64,13 +66,13 @@ struct AddAssetViewModelTests {
         vm.priceText = "180.00"
         vm.date = Date(timeIntervalSince1970: 1_700_000_000)
 
-        let added = vm.addAsset(modelContext: ctx, backendService: backend)
+        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
 
         #expect(added == true)
         #expect(vm.errorMessage == nil)
         let holdings = try ctx.fetch(FetchDescriptor<Holding>())
         #expect(holdings.count == 1)
-        #expect(holdings.first?.ticker == "HGLG11")
+        #expect(holdings.first?.ticker == "HGLG11.SA")
         #expect(holdings.first?.status == .aportar)
         let contributions = try ctx.fetch(FetchDescriptor<Contribution>())
         #expect(contributions.count == 1)
@@ -84,7 +86,7 @@ struct AddAssetViewModelTests {
         let vm = AddAssetViewModel(searchResult: Self.sampleSearch)
         vm.ownsPosition = true
         // Empty fields with position toggle on — invalid
-        let added = vm.addAsset(modelContext: ctx, backendService: backend)
+        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
         #expect(added == false)
         #expect(try ctx.fetch(FetchDescriptor<Holding>()).isEmpty)
     }
@@ -97,7 +99,7 @@ struct AddAssetViewModelTests {
         let backend = MockBackendService()
         let vm = AddAssetViewModel(searchResult: Self.sampleSearch)
         // ownsPosition stays false
-        let added = vm.addAsset(modelContext: ctx, backendService: backend)
+        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
 
         #expect(added == true)
         let holdings = try ctx.fetch(FetchDescriptor<Holding>())
@@ -126,7 +128,7 @@ struct AddAssetViewModelTests {
         vm.quantityText = "10"
         vm.priceText = "100"
 
-        let added = vm.addAsset(modelContext: ctx, backendService: backend)
+        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
         #expect(added == false)
         #expect(vm.errorMessage == Holding.freeTierLimitMessage)
     }
@@ -136,7 +138,7 @@ struct AddAssetViewModelTests {
     @MainActor
     @Test func toPendingHoldingTrackOnlyHasZeroQuantity() {
         let vm = AddAssetViewModel(searchResult: Self.sampleSearch)
-        let pending = vm.toPendingHolding()
+        let pending = vm.toPendingHolding(rates: StaticRates(brlPerUsd: 5))
         #expect(pending.ticker == "HGLG11.SA")
         #expect(pending.quantity == 0)
         #expect(pending.status == .estudo)
@@ -180,7 +182,7 @@ struct AddAssetViewModelTests {
         let vm = AddAssetViewModel.custom(symbol: "myCoin")
         vm.detectedClass = .crypto
 
-        let added = vm.addAsset(modelContext: ctx, backendService: backend)
+        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
 
         #expect(added == true)
         let holdings = try ctx.fetch(FetchDescriptor<Holding>())
@@ -201,7 +203,7 @@ struct AddAssetViewModelTests {
         vm.quantityText = "2"
         vm.priceText = "150"
 
-        let added = vm.addAsset(modelContext: ctx, backendService: backend)
+        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
 
         #expect(added == true)
         let holding = try #require(try ctx.fetch(FetchDescriptor<Holding>()).first)
@@ -221,7 +223,7 @@ struct AddAssetViewModelTests {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         vm.date = date
 
-        let pending = vm.toPendingHolding()
+        let pending = vm.toPendingHolding(rates: StaticRates(brlPerUsd: 5))
         #expect(pending.quantity == 5)
         #expect(pending.status == .aportar)
         #expect(pending.averagePrice == 200)

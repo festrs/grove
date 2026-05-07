@@ -54,6 +54,11 @@ final class HoldingDetailViewModel {
             if let mc = quote.marketCap {
                 holding.marketCap = mc.amount
             }
+            // Skip nil/zero so a provider miss doesn't stomp a previously
+            // populated yield (mirrors SyncService.syncPrices).
+            if let dy = quote.dividendYieldDecimal, dy > 0 {
+                holding.dividendYield = dy
+            }
         } catch {
             self.error = error.localizedDescription
         }

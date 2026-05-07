@@ -113,8 +113,11 @@ struct RebalancingView: View {
             case .noAportarHoldings:
                 TQEmptyState(
                     icon: "tray",
-                    title: "No assets to invest in",
-                    message: "Change the status of at least one asset to \"Invest\" on the portfolio screen."
+                    title: "Nothing to invest in yet",
+                    message: """
+                    Add a ticker from the Portfolio tab and mark it Invest. \
+                    Grove will then rank where to put your monthly contribution.
+                    """
                 )
             case .noPortfolioValue:
                 TQEmptyState(

@@ -66,6 +66,15 @@ struct OnboardingNavigationBar: View {
         .buttonStyle(.plain)
     }
 
+    /// True when the user is on the optional holdings step with nothing
+    /// added yet — the primary button morphs to "Skip — I'll add later"
+    /// so the skip affordance is explicit instead of buried in the
+    /// implicit "Next is fine when empty" path.
+    private var isSkippableHoldingsStep: Bool {
+        OnboardingViewModel.Step(rawValue: viewModel.currentStep) == .holdings
+            && viewModel.pendingHoldings.isEmpty
+    }
+
     @ViewBuilder
     private var primaryButton: some View {
         if viewModel.currentStep < OnboardingViewModel.totalSteps - 1 {
@@ -73,8 +82,8 @@ struct OnboardingNavigationBar: View {
                 withAnimation { viewModel.advance() }
             } label: {
                 HStack(spacing: Theme.Spacing.xs) {
-                    Text("Next")
-                    Image(systemName: "chevron.right")
+                    Text(isSkippableHoldingsStep ? "Skip — I'll add later" : "Next")
+                    Image(systemName: isSkippableHoldingsStep ? "arrow.right" : "chevron.right")
                 }
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.white)
@@ -105,7 +114,7 @@ struct OnboardingNavigationBar: View {
     }
 }
 
-/// Switches between the five concrete step views. Lives outside the
+/// Switches between the six concrete step views. Lives outside the
 /// containers so the platform-specific chrome doesn't have to duplicate it.
 struct OnboardingStepRouter: View {
     @Bindable var viewModel: OnboardingViewModel
@@ -114,10 +123,10 @@ struct OnboardingStepRouter: View {
         switch OnboardingViewModel.Step(rawValue: viewModel.currentStep) {
         case .welcome: WelcomeStepView(viewModel: viewModel)
         case .freedomPlan: FreedomPlanStepView(viewModel: viewModel)
-        case .addHoldings: AddHoldingsStepView(viewModel: viewModel)
-        case .classification: ClassificationStepView(viewModel: viewModel)
-        case .targets: SetTargetsStepView(viewModel: viewModel)
-        case .status: SetStatusStepView(viewModel: viewModel)
+        case .howGroveWorks: HowGroveWorksStepView()
+        case .strategy: SetTargetsStepView(viewModel: viewModel)
+        case .holdings: AddHoldingsStepView(viewModel: viewModel)
+        case .recap: RecapStepView(viewModel: viewModel)
         case .none: EmptyView()
         }
     }

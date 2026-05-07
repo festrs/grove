@@ -9,6 +9,7 @@ import GroveDomain
 struct AddAssetDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.backendService) private var backendService
+    @Environment(\.rates) private var rates
     @Environment(\.dismiss) private var dismiss
 
     @State private var viewModel: AddAssetViewModel
@@ -41,6 +42,7 @@ struct AddAssetDetailSheet: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     headerCard
                     classificationSection
+                    prioritySection
                     positionToggle
                     if viewModel.ownsPosition {
                         positionSection
@@ -71,7 +73,7 @@ struct AddAssetDetailSheet: View {
                     .disabled(!viewModel.isValid)
                 }
             }
-            .task { await viewModel.fetchPrice(backendService: backendService) }
+            .task { await viewModel.fetchPrice(backendService: backendService, rates: rates) }
         }
         #if os(macOS)
         .frame(minWidth: 460, idealWidth: 520, minHeight: 480, idealHeight: 560)
@@ -81,12 +83,12 @@ struct AddAssetDetailSheet: View {
     private func confirm() {
         switch mode {
         case .portfolio:
-            if viewModel.addAsset(modelContext: modelContext, backendService: backendService) {
+            if viewModel.addAsset(modelContext: modelContext, backendService: backendService, rates: rates) {
                 dismiss()
             }
         case .onboarding(let onAdd):
             guard viewModel.isValid else { return }
-            onAdd(viewModel.toPendingHolding())
+            onAdd(viewModel.toPendingHolding(rates: rates))
             dismiss()
         }
     }
@@ -142,6 +144,21 @@ struct AddAssetDetailSheet: View {
                     TQStatusPicker(selection: $viewModel.selectedStatus)
                 }
             }
+            .padding(Theme.Spacing.md)
+            .background(Color.tqCardBackground, in: RoundedRectangle(cornerRadius: Theme.CornerRadius.medium))
+        }
+    }
+
+    private var prioritySection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            sectionTitle("Priority")
+            TQPriorityPicker(
+                value: Binding(
+                    get: { viewModel.targetPercent },
+                    set: { viewModel.targetPercent = $0 }
+                ),
+                variant: .full
+            )
             .padding(Theme.Spacing.md)
             .background(Color.tqCardBackground, in: RoundedRectangle(cornerRadius: Theme.CornerRadius.medium))
         }
@@ -231,6 +248,18 @@ struct AddAssetDetailSheet: View {
 }
 
 #Preview {
-    AddAssetDetailSheet(searchResult: StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "ITAU UNIBANCO HOLDING S.A.", type: "stock", price: "46.37", currency: "BRL", change: "-0.92", sector: "Finance", logo: nil))
+    AddAssetDetailSheet(
+        searchResult: StockSearchResultDTO(
+            id: "ITUB3.SA",
+            symbol: "ITUB3.SA",
+            name: "ITAU UNIBANCO HOLDING S.A.",
+            type: "stock",
+            price: MoneyDTO(amount: "46.37", currency: "BRL"),
+            currency: "BRL",
+            change: -0.92,
+            sector: "Finance",
+            logo: nil
+        )
+    )
         .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, Contribution.self, UserSettings.self], inMemory: true)
 }

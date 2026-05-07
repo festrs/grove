@@ -19,9 +19,22 @@ struct DashboardView: View {
 
     @Query(sort: \Holding.ticker) private var holdings: [Holding]
     @Query private var settingsList: [UserSettings]
+    // Observe the dividend + contribution stores so the gauge refreshes when
+    // iCloud fans new payments in after launch or a buy/sell updates a
+    // holding's share count. Without these, `loadData` only re-runs when the
+    // holdings *count* changes — which it doesn't on a dividend or contribution
+    // arrival — and the projection sticks at whatever it computed at launch.
+    @Query private var dividends: [DividendPayment]
+    @Query private var contributions: [Contribution]
 
     @State private var viewModel = DashboardViewModel()
     @State private var isLandscape: Bool = false
+    /// Coalesces the rapid burst of `loadData` triggers on cold launch
+    /// (iCloud fans Holdings / Contributions / DividendPayments in over a few
+    /// render cycles) and pull-to-refresh (`.refreshable` + the `isSyncing`
+    /// onChange both fire). One `send()` per signal; the consumer runs
+    /// `loadData` once after the window settles.
+    @State private var reloader = ReloadDebouncer()
 
     private static let fxTimeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -108,20 +121,32 @@ struct DashboardView: View {
                 }
             }
             .refreshable {
-                await syncService.syncAll(modelContext: modelContext, backendService: backendService)
-                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
+                // Run on an unstructured Task so the URL request isn't
+                // cancelled by SwiftUI's pull-to-refresh gesture lifecycle.
+                // The cancelled `mobile/quotes` request would surface as a
+                // 4ms `URLError.cancelled` followed by a ~5s freeze while
+                // URLSession completes cleanup, then a silent failure.
+                let work = Task { @MainActor in
+                    await syncService.syncAll(modelContext: modelContext, backendService: backendService)
+                    // The trailing `isSyncing` onChange will also send a
+                    // reload when sync flips back to false; the debouncer
+                    // collapses both.
+                    reloader.send()
+                }
+                await work.value
             }
         }
         .task {
-            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-        }
-        .onChange(of: holdings.count) {
-            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-        }
-        .onChange(of: syncService.isSyncing) { _, syncing in
-            if !syncing {
+            reloader.start {
                 viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
             }
+            reloader.send()
+        }
+        .onChange(of: holdings.count) { reloader.send() }
+        .onChange(of: dividends.count) { reloader.send() }
+        .onChange(of: contributions.count) { reloader.send() }
+        .onChange(of: syncService.isSyncing) { _, syncing in
+            if !syncing { reloader.send() }
         }
     }
 
@@ -161,7 +186,7 @@ struct DashboardView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                IncomeGaugeMeter(projection: projection)
+                IncomeGaugeMeter(projection: projection, isInteractive: false)
             }
         }
 
