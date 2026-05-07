@@ -20,6 +20,10 @@ public struct PendingHolding: Identifiable, Sendable {
     public var averagePrice: Decimal?
     /// User-entered purchase date. When nil, the repository uses `.now`.
     public var purchaseDate: Date?
+    /// Within-class priority for the rebalancing engine (1–5, default 5).
+    /// Only meaningful when ≥ 2 holdings share the same class; the engine
+    /// uses it to break ties for monthly buy ranking.
+    public var targetPercent: Decimal
 
     public init(
         id: UUID = UUID(),
@@ -32,7 +36,8 @@ public struct PendingHolding: Identifiable, Sendable {
         dividendYield: Decimal,
         apiType: String? = nil,
         averagePrice: Decimal? = nil,
-        purchaseDate: Date? = nil
+        purchaseDate: Date? = nil,
+        targetPercent: Decimal = 5
     ) {
         self.id = id
         self.ticker = ticker
@@ -45,5 +50,6 @@ public struct PendingHolding: Identifiable, Sendable {
         self.apiType = apiType
         self.averagePrice = averagePrice
         self.purchaseDate = purchaseDate
+        self.targetPercent = targetPercent
     }
 }

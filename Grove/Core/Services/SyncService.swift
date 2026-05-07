@@ -17,6 +17,14 @@ final class SyncService {
     /// `syncAll` runs. Dividend history is also out of band — see
     /// `syncDividendsIfStale` and `TickerBootstrapService`.
     func syncAll(modelContext: ModelContext, backendService: any BackendServiceProtocol) async {
+        // Re-entrancy guard. Without it, pull-to-refresh + the launch sync +
+        // tab-switch reloads can stack and trigger duplicate `mobile/quotes`
+        // calls; the second one tends to inherit cancellation from a
+        // gesture-bound Task and silently fails.
+        guard !isSyncing else {
+            print("[Sync] syncAll: already syncing, skipping")
+            return
+        }
         isSyncing = true
         syncError = nil
         defer { isSyncing = false }
@@ -36,19 +44,26 @@ final class SyncService {
 
     /// Fetch latest prices for all local holdings.
     ///
-    /// Holdings are grouped by `normalizedTicker` (uppercased, `.SA` stripped)
-    /// so suffix variants of the same asset (e.g. `ITUB3` vs `ITUB3.SA`) send
-    /// a single API symbol and every matching local row picks up the price.
+    /// Holdings are grouped by `displayTicker` (the `.SA`-stripped form) so
+    /// any legacy bare-form rows still in SwiftData merge with the canonical
+    /// `.SA` form the backend now returns. The wire request uses the stored
+    /// canonical ticker; the response is matched back via `displayTicker`.
     func syncPrices(modelContext: ModelContext, backendService: any BackendServiceProtocol) async throws {
         let descriptor = FetchDescriptor<Holding>()
         let holdings = try modelContext.fetch(descriptor).filter { !$0.isCustom }
         guard !holdings.isEmpty else { return }
 
-        var holdingsByNormalized: [String: [Holding]] = [:]
+        var holdingsByDisplay: [String: [Holding]] = [:]
+        var symbolForDisplay: [String: String] = [:]
         for h in holdings {
-            holdingsByNormalized[h.ticker.normalizedTicker, default: []].append(h)
+            let key = h.ticker.displayTicker
+            holdingsByDisplay[key, default: []].append(h)
+            // Prefer the canonical (`.SA`-suffixed) form when both exist.
+            if symbolForDisplay[key]?.hasSuffix(".SA") != true {
+                symbolForDisplay[key] = h.ticker
+            }
         }
-        let symbols = Array(holdingsByNormalized.keys).sorted()
+        let symbols = Array(symbolForDisplay.values).sorted()
         let dupCount = holdings.count - symbols.count
         if dupCount > 0 {
             print("[Sync] syncPrices: \(holdings.count) holdings → \(symbols.count) unique symbols (\(dupCount) duplicate-or-suffix-variant)")
@@ -57,8 +72,8 @@ final class SyncService {
         let quotes = try await backendService.fetchBatchQuotes(symbols: symbols)
 
         for quote in quotes {
-            let key = quote.symbol.normalizedTicker
-            guard let matches = holdingsByNormalized[key] else { continue }
+            let key = quote.symbol.displayTicker
+            guard let matches = holdingsByDisplay[key] else { continue }
             for holding in matches {
                 if let price = quote.price {
                     holding.currentPrice = price.decimalAmount
@@ -96,11 +111,11 @@ final class SyncService {
 
     /// Fetch dividend history for all local holdings.
     ///
-    /// Holdings are grouped by `normalizedTicker` so each unique asset is
-    /// requested once. When the backend returns rows for a symbol, the new
-    /// `DividendPayment` is fanned out to every local holding sharing that
-    /// normalized ticker (e.g. suffix variants). Per-holding dedupe key
-    /// prevents re-inserts on subsequent syncs.
+    /// Holdings are grouped by `displayTicker` so each unique asset is
+    /// requested once and any legacy bare-form rows merge with the canonical
+    /// `.SA` form. The wire request uses the stored canonical ticker; the
+    /// response symbol is matched back via `displayTicker`. Per-holding
+    /// dedupe key prevents re-inserts on subsequent syncs.
     func syncDividends(modelContext: ModelContext, backendService: any BackendServiceProtocol) async throws {
         let start = Date()
         let holdingDescriptor = FetchDescriptor<Holding>()
@@ -110,11 +125,16 @@ final class SyncService {
             return
         }
 
-        var holdingsByNormalized: [String: [Holding]] = [:]
+        var holdingsByDisplay: [String: [Holding]] = [:]
+        var symbolForDisplay: [String: String] = [:]
         for h in holdings {
-            holdingsByNormalized[h.ticker.normalizedTicker, default: []].append(h)
+            let key = h.ticker.displayTicker
+            holdingsByDisplay[key, default: []].append(h)
+            if symbolForDisplay[key]?.hasSuffix(".SA") != true {
+                symbolForDisplay[key] = h.ticker
+            }
         }
-        let symbols = Array(holdingsByNormalized.keys).sorted()
+        let symbols = Array(symbolForDisplay.values).sorted()
         let dupCount = holdings.count - symbols.count
         print("[Dividends] syncDividends: \(holdings.count) holdings → \(symbols.count) unique symbols (\(dupCount) duplicate-or-suffix-variant)")
         print("[Dividends] syncDividends: requesting → \(symbols.joined(separator: ","))")
@@ -142,8 +162,8 @@ final class SyncService {
         var insertedByTicker: [String: Int] = [:]
 
         for item in dividends {
-            let normalized = item.symbol.normalizedTicker
-            guard let matches = holdingsByNormalized[normalized] else {
+            let key = item.symbol.displayTicker
+            guard let matches = holdingsByDisplay[key] else {
                 skippedUnknownSymbol += 1
                 continue
             }
@@ -173,8 +193,8 @@ final class SyncService {
                 modelContext.insert(dividend)
 
                 inserted += 1
-                insertedByTicker[normalized, default: 0] += 1
-                print("[Dividends] inserted \(normalized) → holding.id=\(holding.persistentModelID) ex=\(item.exDate) pay=\(item.paymentDate ?? "nil") amt=\(item.value.decimalAmount)")
+                insertedByTicker[key, default: 0] += 1
+                print("[Dividends] inserted \(key) → holding.id=\(holding.persistentModelID) ex=\(item.exDate) pay=\(item.paymentDate ?? "nil") amt=\(item.value.decimalAmount)")
             }
         }
 

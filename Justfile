@@ -22,15 +22,15 @@ generate:
     xcodegen generate
 
 # Build the app
-build: generate
+build: lint generate
     xcodebuild -scheme Grove -destination '{{destination}}' build
 
 # Run unit tests
-test: generate
+test: lint generate
     xcodebuild test -scheme Grove -destination '{{destination}}' -only-testing:GroveTests
 
 # Run a specific test struct (e.g. just test-only RebalancingEngineTests)
-test-only name: generate
+test-only name: lint generate
     xcodebuild test -scheme Grove -destination '{{destination}}' -only-testing:GroveTests/{{name}}
 
 # Run SwiftLint over the whole project

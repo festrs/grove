@@ -26,20 +26,28 @@ struct HoldingCardsView: View {
     }
 
     var body: some View {
-        LazyVStack(spacing: Theme.Spacing.xs) {
-            ForEach(sortedRows) { row in
+        // Single grouped card with hairline dividers — matches the
+        // class-table pattern on the portfolio root so both screens read as
+        // continuous lists. Per-row card backgrounds were previously creating
+        // visible gaps between rows that don't exist on the root.
+        LazyVStack(spacing: 0) {
+            ForEach(Array(sortedRows.enumerated()), id: \.element.id) { index, row in
                 HoldingCardView(row: row)
-                    .contentShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium))
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         onSelect(row.holding.persistentModelID)
                     }
                     .contextMenu {
                         holdingContextMenu(row.holding)
                     }
+                if index < sortedRows.count - 1 {
+                    Divider().opacity(0.4)
+                }
             }
         }
+        .background(Color.tqCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium))
         .padding(.horizontal, Theme.Spacing.md)
-        .padding(.top, Theme.Spacing.sm)
     }
 
     @ViewBuilder
@@ -93,7 +101,6 @@ struct HoldingCardView: View {
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
-        .background(Color.tqCardBackground, in: RoundedRectangle(cornerRadius: Theme.CornerRadius.medium))
     }
 
     private var primaryLine: some View {

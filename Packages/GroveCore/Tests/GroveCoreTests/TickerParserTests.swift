@@ -34,15 +34,20 @@ struct TickerParserTests {
     }
 
     // MARK: - normalizedTicker
+    //
+    // The `.SA` suffix is owned by the backend (BR / FII responses always carry
+    // it). iOS preserves whatever the backend sent — `normalizedTicker` is just
+    // uppercase + trim so casing/whitespace from manual input doesn't leak in.
 
-    @Test func normalizedTickerStripsSASuffix() {
-        #expect("ITUB3.SA".normalizedTicker == "ITUB3")
-        #expect("BTLG11.SA".normalizedTicker == "BTLG11")
+    @Test func normalizedTickerPreservesSASuffix() {
+        #expect("ITUB3.SA".normalizedTicker == "ITUB3.SA")
+        #expect("BTLG11.SA".normalizedTicker == "BTLG11.SA")
     }
 
     @Test func normalizedTickerUppercasesAndTrims() {
-        #expect("  itub3  ".normalizedTicker == "ITUB3")
-        #expect("itub3.sa".normalizedTicker == "ITUB3")
+        #expect("  itub3.sa  ".normalizedTicker == "ITUB3.SA")
+        #expect("itub3".normalizedTicker == "ITUB3")
+        #expect("aapl".normalizedTicker == "AAPL")
     }
 
     @Test func normalizedTickerLeavesUSAlone() {
@@ -50,24 +55,38 @@ struct TickerParserTests {
         #expect("BRK.B".normalizedTicker == "BRK.B")
     }
 
-    @Test func normalizedTickerOnlyStripsTrailingSA() {
-        // "PSA" must NOT become "P" — only the literal `.SA` suffix is stripped.
-        #expect("PSA".normalizedTicker == "PSA")
-        #expect("USA.SA".normalizedTicker == "USA")
+    // MARK: - displayTicker
+
+    @Test func displayTickerStripsSA() {
+        #expect("ITUB3.SA".displayTicker == "ITUB3")
+        #expect("BTLG11.SA".displayTicker == "BTLG11")
+    }
+
+    @Test func displayTickerLeavesNonSAAlone() {
+        #expect("AAPL".displayTicker == "AAPL")
+        #expect("BRK.B".displayTicker == "BRK.B")
+        #expect("ITUB3".displayTicker == "ITUB3") // legacy bare BR — no SA to strip
     }
 }
 
-// MARK: - Holding init normalization
+// MARK: - Holding init
 
 struct HoldingTickerNormalizationTests {
 
-    @Test func holdingInitStripsSASuffix() {
+    @Test func holdingInitPreservesSASuffix() {
         let h = Holding(ticker: "ITUB3.SA", assetClass: .acoesBR)
-        #expect(h.ticker == "ITUB3")
+        #expect(h.ticker == "ITUB3.SA")
+        #expect(h.displayTicker == "ITUB3")
     }
 
     @Test func holdingInitUppercases() {
-        let h = Holding(ticker: "itub3", assetClass: .acoesBR)
-        #expect(h.ticker == "ITUB3")
+        let h = Holding(ticker: "itub3.sa", assetClass: .acoesBR)
+        #expect(h.ticker == "ITUB3.SA")
+    }
+
+    @Test func holdingInitLeavesUSAlone() {
+        let h = Holding(ticker: "aapl", assetClass: .usStocks)
+        #expect(h.ticker == "AAPL")
+        #expect(h.displayTicker == "AAPL")
     }
 }

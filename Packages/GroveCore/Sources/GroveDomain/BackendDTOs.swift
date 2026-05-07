@@ -35,9 +35,18 @@ public nonisolated struct StockSearchResultDTO: Codable, Sendable, Identifiable,
     public let symbol: String
     public let name: String?
     public let type: String?
-    public let price: String?
+    /// Backend returns price as a Money envelope (`{"amount": "42.25",
+    /// "currency": "BRL"}`) when the search result was enriched with a
+    /// quote, or omits the field for un-enriched US/ADR matches. Keep
+    /// `currency` as a top-level convenience for the rare crypto path that
+    /// returns a bare currency string with no price.
+    public let price: MoneyDTO?
     public let currency: String?
-    public let change: String?
+    /// Percent change as the backend reports it (JSON number, e.g. `-0.35`).
+    /// Decoded directly into `Decimal` via Swift's synthesized `Codable` — no
+    /// `Double` round-trip — to keep the DTO consistent with the rest of the
+    /// money-adjacent fields in the codebase.
+    public let change: Decimal?
     public let sector: String?
     public let logo: String?
 
@@ -46,9 +55,9 @@ public nonisolated struct StockSearchResultDTO: Codable, Sendable, Identifiable,
         symbol: String,
         name: String? = nil,
         type: String? = nil,
-        price: String? = nil,
+        price: MoneyDTO? = nil,
         currency: String? = nil,
-        change: String? = nil,
+        change: Decimal? = nil,
         sector: String? = nil,
         logo: String? = nil
     ) {
@@ -64,8 +73,23 @@ public nonisolated struct StockSearchResultDTO: Codable, Sendable, Identifiable,
     }
 
     public var priceDecimal: Decimal? {
+        price?.decimalAmount
+    }
+
+    /// Currency tagged on the price envelope, falling back to the top-level
+    /// `currency` field which is what the crypto search path emits.
+    public var resolvedCurrency: String? {
+        price?.currency ?? currency
+    }
+
+    /// Currency-aware price as a `Money` value. Prefer this over
+    /// `priceDecimal` when downstream code might compare or convert against
+    /// a target currency — the raw decimal alone is meaningless without
+    /// knowing whether it's BRL or USD.
+    public var priceMoney: Money? {
         guard let price else { return nil }
-        return Decimal(string: price)
+        guard let currency = Currency(rawValue: price.currency.lowercased()) else { return nil }
+        return Money(amount: price.decimalAmount, currency: currency)
     }
 
     public var displaySymbol: String {
@@ -98,9 +122,9 @@ public nonisolated struct StockSearchResultDTO: Codable, Sendable, Identifiable,
             }
         }
 
-        if let price, let currency {
-            let sym = currency == "BRL" ? "R$" : "$"
-            parts.append("\(sym) \(price)")
+        if let price {
+            let sym = price.currency == "BRL" ? "R$" : "$"
+            parts.append("\(sym) \(price.amount)")
         }
 
         return parts.joined(separator: " · ")
@@ -119,18 +143,37 @@ public nonisolated struct StockQuoteDTO: Codable, Sendable, Identifiable {
     public let price: MoneyDTO
     public let currency: String
     public let marketCap: MoneyDTO?
+    /// Annual dividend yield as the backend reports it (already in percent).
+    /// Optional because the field only appears on responses backed by a
+    /// provider that exposes DY (yfinance for BR/US stocks); falls back to
+    /// `nil` for fallback paths.
+    public let dividendYield: String?
 
-    public init(symbol: String, name: String, price: MoneyDTO, currency: String, marketCap: MoneyDTO? = nil) {
+    public init(
+        symbol: String,
+        name: String,
+        price: MoneyDTO,
+        currency: String,
+        marketCap: MoneyDTO? = nil,
+        dividendYield: String? = nil
+    ) {
         self.symbol = symbol
         self.name = name
         self.price = price
         self.currency = currency
         self.marketCap = marketCap
+        self.dividendYield = dividendYield
     }
 
     enum CodingKeys: String, CodingKey {
         case symbol, name, price, currency
         case marketCap = "market_cap"
+        case dividendYield = "dividend_yield"
+    }
+
+    public var dividendYieldDecimal: Decimal? {
+        guard let dividendYield, !dividendYield.isEmpty else { return nil }
+        return Decimal(string: dividendYield)
     }
 }
 

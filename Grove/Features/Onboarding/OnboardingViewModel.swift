@@ -17,13 +17,17 @@ final class OnboardingViewModel {
     static let totalSteps = 6
     static let freedomPlanSubStepCount = 5
 
+    /// 0 → 5. Order matters: the user sees the goal first (welcome →
+    /// freedomPlan), then learns *how* Grove will get them there
+    /// (howGroveWorks bridge → strategy allocations), then optionally
+    /// brings in their existing holdings, then lands on a recap.
     enum Step: Int {
         case welcome = 0
         case freedomPlan = 1
-        case addHoldings = 2
-        case classification = 3
-        case targets = 4
-        case status = 5
+        case howGroveWorks = 2
+        case strategy = 3
+        case holdings = 4
+        case recap = 5
     }
 
     // MARK: - Portfolio
@@ -119,10 +123,12 @@ final class OnboardingViewModel {
         switch step {
         case .welcome: return true
         case .freedomPlan: return canAdvanceFreedomPlanSubStep
-        case .addHoldings: return !pendingHoldings.isEmpty
-        case .classification: return true
-        case .targets: return isTargetValid
-        case .status: return true
+        case .howGroveWorks: return true
+        case .strategy: return isTargetValid
+        // Holdings is always advanceable — empty list means the user
+        // chose to skip and add tickers later from the Portfolio tab.
+        case .holdings: return true
+        case .recap: return true
         }
     }
 
@@ -229,6 +235,14 @@ final class OnboardingViewModel {
         )
         pendingHoldings.append(holding)
         errorMessage = nil
+    }
+
+    /// Update the priority for a pending holding by id. The view binds
+    /// to this so the inline 1–5 stepper writes through without the
+    /// ForEach having to re-anchor the index on every render.
+    func setTargetPercent(id: UUID, value: Decimal) {
+        guard let index = pendingHoldings.firstIndex(where: { $0.id == id }) else { return }
+        pendingHoldings[index].targetPercent = value
     }
 
     /// Append a pre-populated draft (from `AddAssetDetailSheet` in

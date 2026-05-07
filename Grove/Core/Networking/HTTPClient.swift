@@ -12,41 +12,7 @@ enum HTTPClient: Sendable {
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
-
-        let data: Data
-        let response: URLResponse
-
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch let urlError as URLError {
-            throw .networkError(urlError)
-        } catch {
-            throw .unknown(error.localizedDescription)
-        }
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw .unknown("Resposta invalida do servidor.")
-        }
-
-        switch httpResponse.statusCode {
-        case 200 ..< 300:
-            break
-        case 403:
-            throw .unauthorized
-        case 404:
-            throw .notFound
-        case 429:
-            throw .rateLimited
-        default:
-            throw .httpError(statusCode: httpResponse.statusCode)
-        }
-
-        do {
-            let decoder = JSONDecoder()
-            return try decoder.decode(T.self, from: data)
-        } catch {
-            throw .decodingError(error.localizedDescription)
-        }
+        return try await perform(request: request, url: url, method: "GET")
     }
 
     nonisolated static func post<T: Decodable & Sendable, B: Encodable & Sendable>(
@@ -65,42 +31,83 @@ enum HTTPClient: Sendable {
         do {
             request.httpBody = try JSONEncoder().encode(body)
         } catch {
+            record(method: "POST", url: url, started: Date(), status: nil, success: false)
             throw .unknown("Erro ao codificar dados: \(error.localizedDescription)")
         }
 
+        return try await perform(request: request, url: url, method: "POST")
+    }
+
+    private nonisolated static func perform<T: Decodable & Sendable>(
+        request: URLRequest,
+        url: URL,
+        method: String
+    ) async throws(APIError) -> T {
+        let started = Date()
         let data: Data
         let response: URLResponse
 
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch let urlError as URLError {
+            record(method: method, url: url, started: started, status: nil, success: false)
             throw .networkError(urlError)
         } catch {
+            record(method: method, url: url, started: started, status: nil, success: false)
             throw .unknown(error.localizedDescription)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            record(method: method, url: url, started: started, status: nil, success: false)
             throw .unknown("Resposta invalida do servidor.")
         }
 
-        switch httpResponse.statusCode {
+        let status = httpResponse.statusCode
+        switch status {
         case 200 ..< 300:
             break
         case 403:
+            record(method: method, url: url, started: started, status: status, success: false)
             throw .unauthorized
         case 404:
+            record(method: method, url: url, started: started, status: status, success: false)
             throw .notFound
         case 429:
+            record(method: method, url: url, started: started, status: status, success: false)
             throw .rateLimited
         default:
-            throw .httpError(statusCode: httpResponse.statusCode)
+            record(method: method, url: url, started: started, status: status, success: false)
+            throw .httpError(statusCode: status)
         }
 
         do {
             let decoder = JSONDecoder()
-            return try decoder.decode(T.self, from: data)
+            let value = try decoder.decode(T.self, from: data)
+            record(method: method, url: url, started: started, status: status, success: true)
+            return value
         } catch {
+            record(method: method, url: url, started: started, status: status, success: false)
             throw .decodingError(error.localizedDescription)
+        }
+    }
+
+    private nonisolated static func record(
+        method: String,
+        url: URL,
+        started: Date,
+        status: Int?,
+        success: Bool
+    ) {
+        let durationMS = Int(Date().timeIntervalSince(started) * 1000)
+        let path = url.path
+        Task { @MainActor in
+            NetworkActivityLog.shared.record(
+                method: method,
+                path: path,
+                status: status,
+                durationMS: durationMS,
+                success: success
+            )
         }
     }
 }

@@ -239,7 +239,8 @@ public struct PortfolioRepository {
                 currentPrice: pending.currentPrice,
                 dividendYield: pending.dividendYield,
                 assetClass: pending.assetClass,
-                status: pending.status
+                status: pending.status,
+                targetPercent: pending.targetPercent
             )
             holding.portfolio = portfolio
             modelContext.insert(holding)

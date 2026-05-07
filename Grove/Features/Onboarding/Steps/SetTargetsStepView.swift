@@ -8,10 +8,10 @@ struct SetTargetsStepView: View {
         VStack(spacing: Theme.Spacing.md) {
             // MARK: - Header
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text("Allocation Target")
+                Text("Strategy")
                     .font(.system(size: Theme.FontSize.title2, weight: .bold))
 
-                Text("Define how much of your portfolio each class should represent.")
+                Text("Set how much of every R$1 should go to each class. Grove uses this to rank your monthly Aportar list.")
                     .font(.system(size: Theme.FontSize.caption))
                     .foregroundStyle(Color.tqSecondaryText)
             }

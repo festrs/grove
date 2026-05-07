@@ -46,52 +46,66 @@ struct BackendDTOTests {
     }
 
     @Test func stockSearchResultIsHashable() {
-        let a = StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "Itau", type: nil, price: nil, currency: nil, change: nil, sector: nil, logo: nil)
+        let a = StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "Itau")
 
-        let b = StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "Itau Unibanco", type: "Stock", price: "46.37", currency: "BRL", change: nil, sector: nil, logo: nil)
+        let b = StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "Itau Unibanco", type: "Stock", price: MoneyDTO(amount: "46.37", currency: "BRL"))
         #expect(a == b, "Same id should be equal")
     }
 
     @Test func decodesEnrichedSearchResult() throws {
         let json = """
-        [{"id": "HGLG11.SA", "symbol": "HGLG11.SA", "name": "HGLG11", "type": "fund", "price": "157.9", "currency": "BRL", "change": "0.23", "sector": "Miscellaneous", "logo": "https://icons.brapi.dev/icons/BRAPI.svg"}]
+        [{"id": "HGLG11.SA", "symbol": "HGLG11.SA", "name": "HGLG11", "type": "fund", "price": {"amount": "157.9", "currency": "BRL"}, "currency": "BRL", "change": 0.23, "sector": "Miscellaneous", "logo": "https://icons.brapi.dev/icons/BRAPI.svg"}]
         """.data(using: .utf8)!
 
         let results = try JSONDecoder().decode([StockSearchResultDTO].self, from: json)
         #expect(results[0].type == "fund")
-        #expect(results[0].price == "157.9")
+        #expect(results[0].price?.amount == "157.9")
+        #expect(results[0].price?.currency == "BRL")
         #expect(results[0].priceDecimal == Decimal(string: "157.9"))
-        #expect(results[0].currency == "BRL")
+        #expect(results[0].resolvedCurrency == "BRL")
+        #expect(results[0].change == Decimal(string: "0.23"))
         #expect(results[0].sector == "Miscellaneous")
     }
 
+    @Test func decodesUnenrichedSearchResult() throws {
+        // Plain yfinance hit with no Brapi enrichment — `price` is omitted
+        // entirely. Must still decode cleanly into a nil-priced DTO.
+        let json = """
+        [{"id": "AAPL", "symbol": "AAPL", "name": "Apple Inc.", "type": "common stock", "sector": "Technology", "industry": "Consumer Electronics"}]
+        """.data(using: .utf8)!
+        let results = try JSONDecoder().decode([StockSearchResultDTO].self, from: json)
+        #expect(results[0].price == nil)
+        #expect(results[0].priceDecimal == nil)
+        #expect(results[0].resolvedCurrency == nil)
+    }
+
     @Test func displaySymbolStripsSA() {
-        let dto = StockSearchResultDTO(id: "HGLG11.SA", symbol: "HGLG11.SA", name: "HGLG11", type: "fund", price: "157.9", currency: "BRL", change: nil, sector: nil, logo: nil)
+        let dto = StockSearchResultDTO(id: "HGLG11.SA", symbol: "HGLG11.SA", name: "HGLG11", type: "fund", price: MoneyDTO(amount: "157.9", currency: "BRL"))
         #expect(dto.displaySymbol == "HGLG11")
     }
 
     @Test func displaySymbolKeepsUSSymbol() {
-        let dto = StockSearchResultDTO(id: "AAPL", symbol: "AAPL", name: "Apple Inc", type: nil, price: nil, currency: nil, change: nil, sector: nil, logo: nil)
+        let dto = StockSearchResultDTO(id: "AAPL", symbol: "AAPL", name: "Apple Inc")
         #expect(dto.displaySymbol == "AAPL")
     }
 
     @Test func displayDescriptionShowsFIIAndPrice() {
-        let dto = StockSearchResultDTO(id: "HGLG11.SA", symbol: "HGLG11.SA", name: "HGLG11", type: "fund", price: "157.9", currency: "BRL", change: nil, sector: nil, logo: nil)
+        let dto = StockSearchResultDTO(id: "HGLG11.SA", symbol: "HGLG11.SA", name: "HGLG11", type: "fund", price: MoneyDTO(amount: "157.9", currency: "BRL"))
         #expect(dto.displayDescription == "FII · R$ 157.9")
     }
 
     @Test func displayDescriptionShowsNameAndStockAndPrice() {
-        let dto = StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "ITAU UNIBANCO HOLDING S.A.", type: "stock", price: "46.37", currency: "BRL", change: nil, sector: nil, logo: nil)
+        let dto = StockSearchResultDTO(id: "ITUB3.SA", symbol: "ITUB3.SA", name: "ITAU UNIBANCO HOLDING S.A.", type: "stock", price: MoneyDTO(amount: "46.37", currency: "BRL"))
         #expect(dto.displayDescription == "ITAU UNIBANCO HOLDING S.A. · Acao BR · R$ 46.37")
     }
 
     @Test func displayDescriptionUSStockNoType() {
-        let dto = StockSearchResultDTO(id: "AAPL", symbol: "AAPL", name: "Apple Inc", type: "Common Stock", price: nil, currency: nil, change: nil, sector: nil, logo: nil)
+        let dto = StockSearchResultDTO(id: "AAPL", symbol: "AAPL", name: "Apple Inc", type: "Common Stock")
         #expect(dto.displayDescription == "Apple Inc")
     }
 
     @Test func displayDescriptionEmptyWhenNoData() {
-        let dto = StockSearchResultDTO(id: "X", symbol: "X", name: "X", type: nil, price: nil, currency: nil, change: nil, sector: nil, logo: nil)
+        let dto = StockSearchResultDTO(id: "X", symbol: "X", name: "X")
         #expect(dto.displayDescription == "")
     }
 

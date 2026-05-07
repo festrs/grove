@@ -95,8 +95,11 @@ struct WidePortfolioView: View {
                 } else if viewModel.allocationByClass.isEmpty {
                     TQEmptyState(
                         icon: "briefcase",
-                        title: "No Assets",
-                        message: "Tap a class to add tickers, or open Settings → Allocation to set targets."
+                        title: "No assets yet",
+                        message: """
+                        Tap a class to add your first ticker. Grove will \
+                        rank your monthly Aportar list as soon as one is marked Invest.
+                        """
                     )
                     .padding(.top, 40)
                 } else {

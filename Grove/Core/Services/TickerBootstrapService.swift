@@ -40,7 +40,8 @@ struct TickerBootstrapService {
         let quotes = (try? await backendService.fetchBatchQuotes(symbols: symbols)) ?? []
 
         for holding in holdings {
-            guard let quote = quotes.first(where: { $0.symbol == holding.ticker }) else { continue }
+            let key = holding.ticker.displayTicker
+            guard let quote = quotes.first(where: { $0.symbol.displayTicker == key }) else { continue }
             if let price = quote.price {
                 holding.currentPrice = price.decimalAmount
                 holding.lastPriceUpdate = .now
