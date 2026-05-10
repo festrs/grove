@@ -9,6 +9,7 @@ enum AppNavigationItem: String, Hashable, CaseIterable, Identifiable {
     case rebalancing
     case dividendCalendar
     case incomeHistory
+    case incomeTrends
     case settings
 
     var id: String { rawValue }
@@ -20,6 +21,7 @@ enum AppNavigationItem: String, Hashable, CaseIterable, Identifiable {
         case .rebalancing: "Invest"
         case .dividendCalendar: "Dividends"
         case .incomeHistory: "Passive Income"
+        case .incomeTrends: "Income Trends"
         case .settings: "Settings"
         }
     }
@@ -31,6 +33,7 @@ enum AppNavigationItem: String, Hashable, CaseIterable, Identifiable {
         case .rebalancing: "plus.circle.fill"
         case .dividendCalendar: "calendar"
         case .incomeHistory: "chart.bar.fill"
+        case .incomeTrends: "chart.line.uptrend.xyaxis"
         case .settings: "gearshape.fill"
         }
     }

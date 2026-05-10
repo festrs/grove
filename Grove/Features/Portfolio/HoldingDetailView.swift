@@ -308,7 +308,7 @@ struct HoldingDetailView: View {
                     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                         Text("Estimated Monthly Income")
                             .font(.subheadline).foregroundStyle(.secondary)
-                        Text(holding.estimatedMonthlyIncomeNetMoney.formatted())
+                        Text(holding.estimatedMonthlyIncomeNetMoney().formatted())
                             .font(.headline).foregroundStyle(Color.tqAccentGreen)
                     }
                     .padding(.vertical, Theme.Spacing.sm)

@@ -94,7 +94,11 @@ struct IncomeProjectorTests {
         #expect(projection.goalMonthly.amount == 1000)
     }
 
-    @Test func progressPercentMatchesNetOverGoal() throws {
+    @Test func progressPercentTracksAnnualizedRunRate() throws {
+        // Holding paid R$100 in April; held since Jan 1 (3 months by `.month`
+        // calendar diff) → empiricalAnnualGross = 100 × (12/3) = 400 →
+        // annualizedMonthlyNet = 400/12 = 33.33… → 33.33 / 1000 × 100 = 3.33%.
+        // Mutation flipping to `currentMonthlyNet/goal` would produce 10%.
         let ctx = try Self.makeContext()
         let h = Self.makeHolding(in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 12,
                                  assetClass: .fiis, aprilDividendPerShare: 1)
@@ -104,16 +108,52 @@ struct IncomeProjectorTests {
             displayCurrency: .brl, rates: Self.rates,
             asOf: Self.asOf, calendar: Self.utcCal
         )
-        // 100 / 1000 * 100 = 10
-        #expect(projection.progressPercent == 10)
+        let expected = Decimal(400) / Decimal(12) / Decimal(1000) * 100
+        #expect(projection.progressPercent == expected)
+    }
+
+    @Test func paidThisMonthIsRealPaidOnly() throws {
+        let ctx = try Self.makeContext()
+        let h = Self.makeHolding(in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 12,
+                                 assetClass: .fiis, aprilDividendPerShare: 1)
+        let projection = IncomeProjector.project(
+            holdings: [h], incomeGoal: Self.brlGoal,
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            asOf: Self.asOf, calendar: Self.utcCal
+        )
+        #expect(projection.paidThisMonthNet.amount == 100, "FII paid R$100 in April, exempt")
+    }
+
+    @Test func annualizedMonthlyAppliesTaxBreakdown() throws {
+        // US stock paid 1 USD/share × 100 shares in April = 100 USD raw.
+        // Held 3 months → annualize ×4 → 400 USD/yr → 33.33 USD/mo gross →
+        // 166.66 BRL/mo gross. NRA30 tax → 116.66 BRL/mo net.
+        // Decimal precision: the per-holding /12 then ×0.7 path produces a
+        // trailing-digit artifact vs (1400/12), so compare with tolerance.
+        let ctx = try Self.makeContext()
+        let h = Self.makeHolding(in: ctx, ticker: "AAPL", qty: 100, price: 100, dy: 12,
+                                 assetClass: .usStocks, currency: .usd,
+                                 aprilDividendPerShare: 1)
+        let projection = IncomeProjector.project(
+            holdings: [h],
+            incomeGoal: Money(amount: 10_000, currency: .brl),
+            monthlyContribution: Self.brlContribution,
+            displayCurrency: .brl, rates: Self.rates,
+            asOf: Self.asOf, calendar: Self.utcCal
+        )
+        let expected = Decimal(1400) / 12
+        let diff = projection.annualizedMonthlyNet.amount - expected
+        #expect(abs(diff) < Decimal(string: "0.0001")!,
+                "annualizedMonthlyNet \(projection.annualizedMonthlyNet.amount) ≠ \(expected)")
     }
 
     @Test func goalSimUsesDYFromHoldings() throws {
-        // Real records: 100 BRL/mo gross. Goal: 1000 BRL/mo.
-        // Sim: total value = 10000 BRL, est annual gross = (100 * 100 * 12%) = 1200,
-        // avgDY = (1200 / 10000) * 100 = 12%; monthly yield = 0.01.
-        // contribution = 5000 BRL × 0.01 × 1.0 = 50 BRL/mo added per iteration.
-        // Starting at 100 net, needs (1000 - 100) / 50 = 18 months.
+        // Real records: 100 BRL paid in April. Held 3 months → annualizes to
+        // 400 BRL/yr → seed annualizedMonthlyNet = 33.33 BRL/mo (FII exempt).
+        // Sim: total value = 10000 BRL; bestAnnualGross = max(empirical=400,
+        // stored=10000×12%=1200) = 1200 → avgDY=12% → monthlyYield=0.01.
+        // Per-iter += 5000 × 0.01 × 1.0 = 50. Need (1000 - 33.33)/50 → 20 iter.
         let ctx = try Self.makeContext()
         let h = Self.makeHolding(in: ctx, ticker: "FII1", qty: 100, price: 100, dy: 12,
                                  assetClass: .fiis, aprilDividendPerShare: 1)
@@ -124,16 +164,36 @@ struct IncomeProjectorTests {
             asOf: Self.asOf, calendar: Self.utcCal
         )
 
-        #expect(projection.estimatedMonthsToGoal == 18,
-                "Loop must run when net < goal — mutation flipping < to > would skip and return nil")
-        #expect(projection.estimatedYearsToGoal == Decimal(18) / 12)
+        #expect(projection.estimatedMonthsToGoal == 20,
+                "Loop must run when run-rate < goal — mutation flipping < to > would skip and return nil")
+        #expect(projection.estimatedYearsToGoal == Decimal(20) / 12)
     }
 
     @Test func goalReachedShowsZeroMonths() throws {
+        // 12 monthly payments of R$1/share × 1000 shares so the empirical
+        // annual gross sits well above the R$500 goal (annualizedMonthlyNet
+        // ≈ R$1 091/mo). Goal reached → progress capped at 100, sim returns 0.
         let ctx = try Self.makeContext()
-        // 1000 shares × 1/share = 1000 BRL/mo, goal = 500 → already past goal
-        let h = Self.makeHolding(in: ctx, ticker: "FII1", qty: 1000, price: 100, dy: 12,
-                                 assetClass: .fiis, aprilDividendPerShare: 1)
+        let recs: [(payment: Date, ex: Date, perShare: Decimal)] = [
+            (Self.calDate(2025, 5, 15), Self.calDate(2025, 5, 10), 1),
+            (Self.calDate(2025, 6, 15), Self.calDate(2025, 6, 10), 1),
+            (Self.calDate(2025, 7, 15), Self.calDate(2025, 7, 10), 1),
+            (Self.calDate(2025, 8, 15), Self.calDate(2025, 8, 10), 1),
+            (Self.calDate(2025, 9, 15), Self.calDate(2025, 9, 10), 1),
+            (Self.calDate(2025, 10, 15), Self.calDate(2025, 10, 10), 1),
+            (Self.calDate(2025, 11, 15), Self.calDate(2025, 11, 10), 1),
+            (Self.calDate(2025, 12, 15), Self.calDate(2025, 12, 10), 1),
+            (Self.calDate(2026, 1, 15), Self.calDate(2026, 1, 10), 1),
+            (Self.calDate(2026, 2, 15), Self.calDate(2026, 2, 10), 1),
+            (Self.calDate(2026, 3, 15), Self.calDate(2026, 3, 10), 1),
+            (Self.calDate(2026, 4, 15), Self.calDate(2026, 4, 10), 1)
+        ]
+        let h = Self.seedHoldingWithHistory(
+            in: ctx, ticker: "FII1", qty: 1000, price: 100, dy: 12,
+            assetClass: .fiis,
+            firstContribDate: Self.calDate(2025, 5, 1),
+            records: recs
+        )
         let projection = IncomeProjector.project(
             holdings: [h],
             incomeGoal: Money(amount: 500, currency: .brl),
@@ -202,11 +262,15 @@ struct IncomeProjectorTests {
     @Test func goalSimAppliesAvgNetMultiplier() throws {
         // Pure US-stocks portfolio so avgNetMultiplier ≠ 1.0 (NRA30 → 0.7).
         // 100 shares × 100 USD → 10,000 USD = 50,000 BRL portfolio value.
-        // 100 shares × 1 USD/share dividend → 100 USD = 500 BRL gross,
-        // 350 BRL net. avgDY = 12% → monthlyYield = 0.01.
-        // Per iteration: 5000 BRL × 0.01 × 0.7 = 35 BRL.
-        // Need (1000 - 350) / 35 ≈ 18.57 → 19 months.
-        // Dropping the multiplier yields 50/iter → 13 months instead.
+        // April dividend: 100 USD raw, held 3 mo → empiricalAnnualGross
+        // = 100 × 4 = 400 USD = 2000 BRL/yr → 1400 BRL/yr net (NRA30) →
+        // annualizedMonthlyNet = 116.66 BRL/mo (sim seed).
+        // bestAnnualGross = max(2000 BRL empirical, 12% × 50000 = 6000 BRL
+        // stored) = 6000 → avgDY = 12% → monthlyYield = 0.01.
+        // avgNetMultiplier from current month: 500 gross / 350 net = 0.7.
+        // Per-iter += 5000 × 0.01 × 0.7 = 35.
+        // Need (1000 - 116.66) / 35 ≈ 25.24 → 26 months.
+        // Dropping the multiplier yields 50/iter → 18 months instead.
         let ctx = try Self.makeContext()
         let h = Self.makeHolding(in: ctx, ticker: "AAPL", qty: 100, price: 100, dy: 12,
                                  assetClass: .usStocks, currency: .usd,
@@ -218,8 +282,8 @@ struct IncomeProjectorTests {
             asOf: Self.asOf, calendar: Self.utcCal
         )
 
-        #expect(projection.estimatedMonthsToGoal == 19,
-                "Sim must scale contribution growth by avgNetMultiplier — dropping it gives 13")
+        #expect(projection.estimatedMonthsToGoal == 26,
+                "Sim must scale contribution growth by avgNetMultiplier — dropping it gives 18")
     }
 
     // MARK: - Mixed Portfolio
@@ -298,6 +362,8 @@ struct IncomeProjectorTests {
         IncomeProjection(
             currentMonthlyNet: Money(amount: 1, currency: .brl),
             currentMonthlyGross: Money(amount: 1, currency: .brl),
+            paidThisMonthNet: Money(amount: 1, currency: .brl),
+            annualizedMonthlyNet: Money(amount: 1, currency: .brl),
             goalMonthly: Money(amount: 100, currency: .brl),
             progressPercent: progress,
             estimatedMonthsToGoal: estMonths,
@@ -527,6 +593,31 @@ struct IncomeProjectorTests {
         )
         #expect(result.amount == 1_200,
                 "3 months of R$300 must annualize to R$1200 (drop scaling -> 300).")
+    }
+
+    @Test func empiricalAnnualGrossUsesTrailingWindowWhenNoContributions() throws {
+        // Imported holding: dividend records exist but no Contribution row
+        // was seeded. Earlier behaviour defaulted firstContribution to asOf,
+        // collapsing the window to empty and silently returning 0 — which is
+        // why "Top dividend payers" and "Income concentration" were empty
+        // for users with real records but no contribution history.
+        let ctx = try Self.makeContext()
+        let h = Holding(ticker: "ITUB4", quantity: 100, currentPrice: 30,
+                        dividendYield: 0, assetClass: .acoesBR,
+                        status: .aportar, targetPercent: 100)
+        ctx.insert(h)
+        let payment = DividendPayment(
+            exDate: Self.calDate(2025, 8, 1),
+            paymentDate: Self.calDate(2025, 8, 15),
+            amountPerShare: 1
+        )
+        ctx.insert(payment); payment.holding = h
+        let asOf = Self.calDate(2026, 1, 5)
+        let result = h.empiricalAnnualGross(
+            asOf: asOf, displayCurrency: .brl, rates: Self.rates, calendar: Self.utcCal
+        )
+        #expect(result.amount == 100,
+                "1 record × R$1 × 100 shares over a full 12mo fallback window = R$100/yr")
     }
 
     @Test func empiricalAnnualGrossReturnsZeroWithNoQuantity() throws {

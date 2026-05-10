@@ -5,8 +5,6 @@ import GroveRepositories
 struct QuickStatsRow: View {
     let summary: PortfolioSummary
     let holdingCount: Int
-    @Environment(\.displayCurrency) private var displayCurrency
-    @Environment(\.rates) private var rates
 
     var body: some View {
         LazyVGrid(
@@ -17,18 +15,6 @@ struct QuickStatsRow: View {
                 label: "Total Assets",
                 value: summary.totalValue.amount.formattedCompact(),
                 prefix: "\(summary.totalValue.currency.symbol) "
-            )
-
-            statCard(
-                label: "Net Passive Income",
-                value: summary.monthlyIncomeNet.formatted(in: displayCurrency, using: rates),
-                suffix: "/month"
-            )
-
-            statCard(
-                label: "Gross Passive Income",
-                value: summary.monthlyIncomeGross.formatted(in: displayCurrency, using: rates),
-                suffix: "/month"
             )
 
             statCard(

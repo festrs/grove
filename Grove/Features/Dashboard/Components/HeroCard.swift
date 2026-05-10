@@ -20,17 +20,19 @@ struct HeroCard: View {
                     )
                     .overlay {
                         VStack(spacing: Theme.Spacing.xs) {
-                            Text("PASSIVE INCOME · MONTH")
+                            Text("AVG NET /MO (TTM)")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(.secondary)
                                 .tracking(0.6)
-                            Text(projection.currentMonthlyNet.formatted(in: displayCurrency, using: rates))
+                            Text(projection.annualizedMonthlyNet.formatted(in: displayCurrency, using: rates))
                                 .font(.system(size: 32, weight: .bold))
                                 .minimumScaleFactor(0.6)
                                 .lineLimit(1)
-                            Text("of \(projection.goalMonthly.formatted(in: displayCurrency, using: rates))")
-                                .font(.system(size: 13))
+                            Text("\(projection.paidThisMonthNet.formatted(in: displayCurrency, using: rates)) paid this month")
+                                .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
                         }
                         .padding(.horizontal, Theme.Spacing.lg)
                     }

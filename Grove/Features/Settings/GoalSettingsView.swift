@@ -45,40 +45,20 @@ struct GoalSettingsView: View {
     // MARK: - Gauge Explainer
 
     private var gaugeExplainerSection: some View {
-        let breakdown = viewModel.monthlyNetByClass(holdings: holdings)
+        let avgNet = viewModel.avgNetMonthlyTTM(holdings: holdings)
         return Section {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text("This month, net of taxes")
+                Text("Avg net /mo (TTM)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(verbatim: breakdown.totalNet.formatted(in: displayCurrency, using: rates))
+                Text(verbatim: avgNet.formatted(in: displayCurrency, using: rates))
                     .font(.system(size: Theme.FontSize.title2, weight: .bold))
                     .foregroundStyle(Color.tqAccentGreen)
-                Text("This is the number in the center of the gauge — paid plus projected dividends for the current month, after Brazilian taxes.")
+                Text("This is the number in the center of the gauge — trailing 12 months of dividends ÷ 12, after Brazilian taxes. Falls back to your stored DY × value when no payments have landed yet.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
             .padding(.vertical, Theme.Spacing.xs)
-
-            if breakdown.details.isEmpty {
-                Text("Add holdings or import dividends to see the breakdown.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(breakdown.details) { detail in
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Image(systemName: detail.assetClass.icon)
-                            .font(.callout)
-                            .foregroundStyle(detail.assetClass.color)
-                            .frame(width: 22)
-                        Text(detail.assetClass.displayName)
-                        Spacer()
-                        Text(verbatim: detail.net.formatted(in: displayCurrency, using: rates))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
 
             NavigationLink {
                 IncomeHistoryView()
@@ -88,7 +68,7 @@ struct GoalSettingsView: View {
         } header: {
             Text("Reading the gauge")
         } footer: {
-            Text("The ring fills as this monthly income approaches your Freedom Number below.")
+            Text("The ring fills as this monthly run-rate approaches your Freedom Number below.")
         }
     }
 

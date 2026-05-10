@@ -25,26 +25,23 @@ final class GoalSettingsViewModel {
         self.rates = rates
     }
 
-    /// Per-asset-class net monthly income (paid + projected, post-tax) for the
-    /// current calendar month. Powers the gauge explainer on the Goals screen
-    /// so users can see what makes up the number in the middle of the ring.
-    /// Sorted descending by net amount; classes with zero income are dropped.
-    func monthlyNetByClass(holdings: [Holding]) -> MoneyTaxBreakdown {
-        let perClass = IncomeAggregator.byClass(
-            holdings: holdings,
-            window: .month,
-            in: displayCurrency,
-            rates: rates
-        )
+    /// Trailing-12-month run-rate ÷ 12, after taxes. Same math the dashboard
+    /// gauge ring tracks (and the "AVG NET /MO (TTM)" headline inside it).
+    /// Per-holding `estimatedMonthlyIncomeMoney` falls back to `value × DY/100
+    /// /12` when there are no real records yet — kept identical to the gauge
+    /// so the explainer can never drift from the displayed number.
+    func avgNetMonthlyTTM(holdings: [Holding]) -> Money {
         var grossByClass: [AssetClassType: Money] = [:]
-        for row in perClass {
-            grossByClass[row.assetClass] = row.total
+        for h in holdings {
+            let g = h.estimatedMonthlyIncomeMoney(asOf: .now)
+                .converted(to: displayCurrency, using: rates)
+            grossByClass[h.assetClass] = (grossByClass[h.assetClass] ?? .zero(in: displayCurrency)) + g
         }
         return TaxCalculator.taxBreakdown(
             grossByClass: grossByClass,
             displayCurrency: displayCurrency,
             rates: rates
-        )
+        ).totalNet
     }
 
     /// Live Freedom Number for the current settings, expressed in display currency.
