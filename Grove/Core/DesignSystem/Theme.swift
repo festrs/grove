@@ -37,6 +37,17 @@ enum Theme {
             sizeClass == .regular ? 260 : 180
         }
 
+        /// Max width for text/content placed inside a circular gauge,
+        /// expressed as a fraction of the gauge diameter. The geometric
+        /// inscribed square of a circle is diameter/√2 ≈ 0.707; we use a
+        /// slightly tighter value to leave breathing room around descenders
+        /// and the ring stroke.
+        static func gaugeInnerContentWidth(for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
+            gaugeSize(for: sizeClass) * gaugeInnerContentRatio
+        }
+
+        private static let gaugeInnerContentRatio: CGFloat = 0.72
+
         static func chartSize(for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
             sizeClass == .regular ? 180 : 130
         }

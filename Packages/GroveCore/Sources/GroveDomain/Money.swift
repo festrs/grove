@@ -48,6 +48,33 @@ public struct Money: Equatable, Hashable, Sendable {
         converted(to: target, using: rates).formatted()
     }
 
+    /// Compact, glanceable currency string for tight UI (gauges, KPI tiles).
+    /// Uses the target currency's locale for the decimal separator and one
+    /// fractional digit at most: `R$ 4,9k`, `R$ 1,2M`, `$ 750k`. Below 1k the
+    /// full precision form is returned so small values keep their cents.
+    public func formattedCompact(in target: Currency, using rates: any ExchangeRates) -> String {
+        let value = converted(to: target, using: rates)
+        let magnitude = abs(NSDecimalNumber(decimal: value.amount).doubleValue)
+        let (scaled, suffix): (Double, String)
+        switch magnitude {
+        case 1_000_000...:
+            scaled = NSDecimalNumber(decimal: value.amount).doubleValue / 1_000_000
+            suffix = "M"
+        case 1_000...:
+            scaled = NSDecimalNumber(decimal: value.amount).doubleValue / 1_000
+            suffix = "k"
+        default:
+            return value.formatted()
+        }
+        let formatter = NumberFormatter()
+        formatter.locale = target.locale
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 1
+        formatter.minimumFractionDigits = scaled.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 1
+        let number = formatter.string(from: NSNumber(value: scaled)) ?? "0"
+        return "\(target.symbol) \(number)\(suffix)"
+    }
+
     public init(amount: Decimal, currency: Currency) {
         self.amount = amount
         self.currency = currency

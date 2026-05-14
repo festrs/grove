@@ -114,6 +114,64 @@ struct MoneyTests {
         #expect(s.contains("$"))
     }
 
+    // MARK: - Compact formatting
+
+    @Test func formattedCompactBelowThousandKeepsFullPrecision() {
+        let rates = StaticRates(brlPerUsd: 5)
+        let m = Money(amount: 999, currency: .brl)
+        let s = m.formattedCompact(in: .brl, using: rates)
+        // < 1k falls back to the full formatter, which always includes cents.
+        #expect(s.contains("R$"))
+        #expect(s.contains("999"))
+        #expect(!s.contains("k"))
+        #expect(!s.contains("M"))
+    }
+
+    @Test func formattedCompactThousandsUsesKSuffix() {
+        let rates = StaticRates(brlPerUsd: 5)
+        let m = Money(amount: 4_928.72, currency: .brl)
+        let s = m.formattedCompact(in: .brl, using: rates)
+        #expect(s.contains("R$"))
+        #expect(s.hasSuffix("k"))
+        // pt-BR uses comma as decimal separator
+        #expect(s.contains("4,9k"))
+    }
+
+    @Test func formattedCompactMillionsUsesMSuffix() {
+        let rates = StaticRates(brlPerUsd: 5)
+        let m = Money(amount: 2_400_000, currency: .brl)
+        let s = m.formattedCompact(in: .brl, using: rates)
+        #expect(s.hasSuffix("M"))
+        #expect(s.contains("2,4M"))
+    }
+
+    @Test func formattedCompactDropsTrailingZeroFraction() {
+        let rates = StaticRates(brlPerUsd: 5)
+        let m = Money(amount: 5_000, currency: .brl)
+        let s = m.formattedCompact(in: .brl, using: rates)
+        // Exactly 5k — no fractional digit should be shown.
+        #expect(s.contains("5k"))
+        #expect(!s.contains("5,0k"))
+    }
+
+    @Test func formattedCompactUsdUsesDotSeparator() {
+        let rates = StaticRates(brlPerUsd: 5)
+        let m = Money(amount: 12_345, currency: .usd)
+        let s = m.formattedCompact(in: .usd, using: rates)
+        #expect(s.hasSuffix("k"))
+        // en-US uses period as decimal separator
+        #expect(s.contains("12.3k"))
+    }
+
+    @Test func formattedCompactConvertsAcrossCurrencies() {
+        let rates = StaticRates(brlPerUsd: 5)
+        let m = Money(amount: 1_000, currency: .usd)
+        let s = m.formattedCompact(in: .brl, using: rates)
+        // 1000 USD × 5 = 5000 BRL → "R$ 5k"
+        #expect(s.contains("R$"))
+        #expect(s.contains("5k"))
+    }
+
     // MARK: - DTO
 
     @Test func dtoRoundTrip() {

@@ -60,7 +60,7 @@ struct IncomeGaugeMeter: View {
                     )
 
                     VStack(spacing: Theme.Spacing.xs) {
-                        Text("\(projection.annualizedMonthlyNet.formatted(in: displayCurrency, using: rates))/mo")
+                        Text("\(projection.annualizedMonthlyNet.formattedCompact(in: displayCurrency, using: rates))/mo")
                             .font(.system(size: Theme.FontSize.title2, weight: .bold))
                             .foregroundStyle(goalReached ? Color.tqPositive : .primary)
                             .minimumScaleFactor(0.7)
@@ -75,7 +75,7 @@ struct IncomeGaugeMeter: View {
                             .frame(width: 28)
                             .padding(.vertical, 2)
 
-                        Text(projection.paidThisMonthNet.formatted(in: displayCurrency, using: rates))
+                        Text(projection.paidThisMonthNet.formattedCompact(in: displayCurrency, using: rates))
                             .font(.system(size: Theme.FontSize.body, weight: .semibold))
                             .foregroundStyle(Color.tqSecondaryText)
                             .minimumScaleFactor(0.7)
@@ -86,7 +86,7 @@ struct IncomeGaugeMeter: View {
                             .foregroundStyle(Color.tqSecondaryText)
                             .tracking(0.4)
                     }
-                    .padding(.horizontal, Theme.Spacing.lg)
+                    .frame(maxWidth: Theme.Layout.gaugeInnerContentWidth(for: sizeClass))
                 }
                 .padding(.top, Theme.Spacing.sm)
 
