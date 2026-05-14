@@ -48,6 +48,7 @@ struct PortfolioClassRow: View {
                     .font(.system(.body, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 Text(holdingsCount == 1 ? "1 ticker" : "\(holdingsCount) tickers")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -60,8 +61,10 @@ struct PortfolioClassRow: View {
                     .font(.system(.body, weight: .semibold))
                     .monospacedDigit()
                     .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                 allocationLabel
             }
+            .layoutPriority(1)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
