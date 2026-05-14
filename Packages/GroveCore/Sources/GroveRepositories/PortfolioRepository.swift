@@ -112,7 +112,8 @@ public struct PortfolioRepository {
         holdings: [Holding],
         classAllocations: [AssetClassType: Double] = [:],
         displayCurrency: Currency,
-        rates: any ExchangeRates
+        rates: any ExchangeRates,
+        asOf: Date = .now
     ) -> PortfolioSummary {
         var grossByClass: [AssetClassType: Money] = [:]
         var valueByClass: [AssetClassType: Money] = [:]
@@ -125,7 +126,7 @@ public struct PortfolioRepository {
             totalValues.append(value)
             valueByClass[h.assetClass] = (valueByClass[h.assetClass] ?? .zero(in: h.currency)) + value
 
-            let gross = h.estimatedMonthlyIncomeMoney
+            let gross = h.estimatedMonthlyIncomeMoney(asOf: asOf)
             grossValues.append(gross)
             grossByClass[h.assetClass] = (grossByClass[h.assetClass] ?? .zero(in: h.currency)) + gross
 

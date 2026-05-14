@@ -38,8 +38,8 @@ struct HoldingStatsStrip: View {
         if holding.assetClass.hasDividends {
             groupCard(rows: [
                 ("Estimated DY", holding.dividendYield.formattedPercent(), .standard),
-                ("Gross Income", holding.estimatedMonthlyIncomeMoney.formatted(), .standard),
-                ("Net Income", holding.estimatedMonthlyIncomeNetMoney.formatted(), .accent),
+                ("Gross Income", holding.estimatedMonthlyIncomeMoney().formatted(), .standard),
+                ("Net Income", holding.estimatedMonthlyIncomeNetMoney().formatted(), .accent),
             ])
         }
     }

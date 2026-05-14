@@ -89,12 +89,18 @@ public final class Holding {
         Money(amount: currentPrice * quantity, currency: currency)
     }
 
-    public var estimatedMonthlyIncomeMoney: Money {
-        Money(amount: estimatedMonthlyIncome, currency: currency)
+    public func estimatedMonthlyIncomeMoney(
+        asOf: Date = .now,
+        calendar: Calendar = .current
+    ) -> Money {
+        Money(amount: estimatedMonthlyIncome(asOf: asOf, calendar: calendar), currency: currency)
     }
 
-    public var estimatedMonthlyIncomeNetMoney: Money {
-        Money(amount: estimatedMonthlyIncomeNet, currency: currency)
+    public func estimatedMonthlyIncomeNetMoney(
+        asOf: Date = .now,
+        calendar: Calendar = .current
+    ) -> Money {
+        Money(amount: estimatedMonthlyIncomeNet(asOf: asOf, calendar: calendar), currency: currency)
     }
 
     public var gainLoss: Decimal {
@@ -238,12 +244,32 @@ public final class Holding {
     }
 
     /// Annualized gross dividend rate projected forward from the trailing
-    /// 12 months of real `DividendPayment` records. Per-share rate × current
-    /// `quantity` so a recent quantity bump scales cleanly. When the holding
-    /// has been held for less than 12 months, the partial window is scaled
-    /// up to a full year — three months of records at R$1/share don't get
-    /// reported as a quarter-yield portfolio.
-    /// Returns zero when no records fall in the window or quantity is zero.
+    /// 12 months of real `DividendPayment` records, scoped to **received
+    /// while owned**. Per-share rate × current `quantity` so a recent
+    /// quantity bump scales cleanly. When the holding has been held for
+    /// less than 12 months, the partial window is scaled up to a full
+    /// year — three months of records at R$1/share don't get reported as
+    /// a quarter-yield portfolio.
+    ///
+    /// Backfill safety: providers like Status Invest serve full historical
+    /// dividend history (2007 → now). Counting payments from before the
+    /// user owned the asset and *then* annualizing produces a 12/monthsHeld×
+    /// inflation (e.g., 4 months held + 12 months of records → 3× too
+    /// high). The window's effective cutoff is `max(twelve-months-ago,
+    /// firstContribution)` so annualization only scales actually-received
+    /// cashflows.
+    ///
+    /// When the holding has no `Contribution` records (older positions or
+    /// import paths that never seeded one), ownership-start is unknown — we
+    /// fall back to `twelveMonthsAgo` rather than `asOf`. The earlier `asOf`
+    /// default collapsed the window to empty and silently returned 0, which
+    /// hid these holdings from `topPayers`, `concentration`, and the dashboard
+    /// run-rate even when they had real dividend records. Trading the
+    /// partial-window scale-up for a non-zero, slightly-pessimistic reading
+    /// matches what the trend chart and paid-this-month already display.
+    ///
+    /// Returns zero when no records fall in the (effective-cutoff, asOf]
+    /// window or quantity is zero.
     public func empiricalAnnualGross(
         asOf: Date = .now,
         displayCurrency: Currency,
@@ -252,17 +278,17 @@ public final class Holding {
     ) -> Money {
         guard quantity > 0 else { return .zero(in: currency) }
 
-        let cutoff = calendar.date(byAdding: .month, value: -12, to: asOf) ?? asOf
+        let twelveMonthsAgo = calendar.date(byAdding: .month, value: -12, to: asOf) ?? asOf
+        let firstContribution = contributions.map(\.date).min() ?? twelveMonthsAgo
+        let effectiveCutoff = max(twelveMonthsAgo, firstContribution)
+
         let recent = dividends.filter {
-            $0.paymentDate > cutoff && $0.paymentDate <= asOf
+            $0.paymentDate > effectiveCutoff && $0.paymentDate <= asOf
         }
         guard !recent.isEmpty else { return .zero(in: currency) }
 
         let totalPerShare = recent.map(\.amountPerShare).reduce(Decimal.zero, +)
 
-        // Annualize partial windows: a holding owned 3 months whose payments
-        // sum to R$1/share would be 4× that over 12 months at the same cadence.
-        let firstContribution = contributions.map(\.date).min() ?? asOf
         let monthsHeld = max(1, calendar.dateComponents([.month], from: firstContribution, to: asOf).month ?? 12)
         let annualizationFactor: Decimal = monthsHeld < 12
             ? Decimal(12) / Decimal(monthsHeld)
@@ -273,15 +299,34 @@ public final class Holding {
         return annualNative.converted(to: displayCurrency, using: rates)
     }
 
-    /// Estimated monthly dividend income (gross)
-    public var estimatedMonthlyIncome: Decimal {
+    /// Estimated monthly dividend income (gross), in this holding's native
+    /// currency. Sourced from trailing-12m `DividendPayment` records via
+    /// `empiricalAnnualGross` (which annualizes partial windows). Falls back
+    /// to `currentValue × dividendYield / 100 / 12` only when no records exist
+    /// (newly added, `isCustom`, or brand-new IPO).
+    public func estimatedMonthlyIncome(
+        asOf: Date = .now,
+        calendar: Calendar = .current
+    ) -> Decimal {
+        let ttmAnnual = empiricalAnnualGross(
+            asOf: asOf,
+            displayCurrency: currency,
+            rates: IdentityRates(),
+            calendar: calendar
+        )
+        if ttmAnnual.amount > 0 {
+            return ttmAnnual.amount / 12
+        }
         guard dividendYield > 0 else { return 0 }
         return (currentValue * dividendYield / 100) / 12
     }
 
-    /// Estimated monthly dividend income (net of taxes)
-    public var estimatedMonthlyIncomeNet: Decimal {
-        estimatedMonthlyIncome * assetClass.defaultTaxTreatment.netMultiplier
+    /// Estimated monthly dividend income (net of taxes), in native currency.
+    public func estimatedMonthlyIncomeNet(
+        asOf: Date = .now,
+        calendar: Calendar = .current
+    ) -> Decimal {
+        estimatedMonthlyIncome(asOf: asOf, calendar: calendar) * assetClass.defaultTaxTreatment.netMultiplier
     }
 
     public init(

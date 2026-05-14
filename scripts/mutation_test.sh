@@ -99,7 +99,9 @@ add "$T" "money breakdown: net <-> tax"      'gross.amount * multiplier'        
 
 # --- IncomeProjector: FIRE projection ---
 I="Packages/GroveCore/Sources/GroveServices/IncomeProjector.swift"
-add "$I" "skip projection loop"              'totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0'  'totalNet.amount > goalDisplay.amount && contributionDisplay.amount > 0' "IncomeProjectorTests"
+add "$I" "skip projection loop"              'annualizedMonthlyNet.amount < goalDisplay.amount && contributionDisplay.amount > 0'  'annualizedMonthlyNet.amount > goalDisplay.amount && contributionDisplay.amount > 0' "IncomeProjectorTests"
+add "$I" "progress denominator: goal -> 1"   '? (annualizedMonthlyNet.amount / goalDisplay.amount) * 100'  '? annualizedMonthlyNet.amount * 100' "IncomeProjectorTests"
+add "$I" "sim seed: run-rate -> paid-month"  'var currentIncome = annualizedMonthlyNet.amount'        'var currentIncome = paidThisMonthNet.amount'                                            "IncomeProjectorTests"
 add "$I" "monthlyYield: drop /12"            'monthlyYield = avgDY / 100 / 12'                       'monthlyYield = avgDY / 100'                                                             "IncomeProjectorTests"
 add "$I" "FIRE sim: drop tax multiplier"     'currentIncome += contributionDisplay.amount * monthlyYield * avgNetMultiplier'  'currentIncome += contributionDisplay.amount * monthlyYield'    "IncomeProjectorTests"
 add "$I" "targetYearStatus: hidden guard year > 0"  'guard let year = targetFIYear, year > 0 else { return .hidden }'  'guard let year = targetFIYear, year < 0 else { return .hidden }'                  "IncomeProjectorTests"
@@ -117,11 +119,38 @@ H="Packages/GroveCore/Sources/GroveDomain/Holding.swift"
 add "$H" "empirical: window cutoff > -> >="         '$0.paymentDate > cutoff && $0.paymentDate <= asOf'  '$0.paymentDate >= cutoff && $0.paymentDate <= asOf'                                "IncomeProjectorTests"
 add "$H" "empirical: drop × quantity"               'let annualNative = Money(amount: annualPerShare * quantity, currency: currency)'   'let annualNative = Money(amount: annualPerShare, currency: currency)'  "IncomeProjectorTests"
 add "$H" "empirical: drop partial-window scaling"   'let annualPerShare = totalPerShare * annualizationFactor'  'let annualPerShare = totalPerShare'                                                   "IncomeProjectorTests"
+add "$H" "empirical: drop firstContribution clamp"  'let effectiveCutoff = max(twelveMonthsAgo, firstContribution)'  'let effectiveCutoff = twelveMonthsAgo'                                          "HoldingMonthlyIncomeTests"
+add "$H" "empirical: clamp uses min instead of max" 'let effectiveCutoff = max(twelveMonthsAgo, firstContribution)'  'let effectiveCutoff = min(twelveMonthsAgo, firstContribution)'                  "HoldingMonthlyIncomeTests"
+
+# --- Holding.estimatedMonthlyIncome: TTM / 12 with yield fallback ---
+add "$H" "monthly: drop /12 divisor"                'return ttmAnnual.amount / 12'                       'return ttmAnnual.amount'                                                                "HoldingMonthlyIncomeTests"
+add "$H" "monthly: ttm guard > -> <"                'if ttmAnnual.amount > 0 {'                          'if ttmAnnual.amount < 0 {'                                                              "HoldingMonthlyIncomeTests"
+add "$H" "monthly fallback: drop /100 percent"      'return (currentValue * dividendYield / 100) / 12'   'return (currentValue * dividendYield) / 12'                                             "HoldingMonthlyIncomeTests"
+add "$H" "monthly fallback: drop /12"               'return (currentValue * dividendYield / 100) / 12'   'return (currentValue * dividendYield / 100)'                                            "HoldingMonthlyIncomeTests"
+add "$H" "monthly fallback: zero out"               'return (currentValue * dividendYield / 100) / 12'   'return 0'                                                                               "HoldingMonthlyIncomeTests"
+add "$H" "monthly net: drop tax multiplier"         'estimatedMonthlyIncome(asOf: asOf, calendar: calendar) * assetClass.defaultTaxTreatment.netMultiplier'  'estimatedMonthlyIncome(asOf: asOf, calendar: calendar)'  "HoldingMonthlyIncomeTests"
 
 # --- IncomeAggregator: passive-income drilldown ---
 IA="Packages/GroveCore/Sources/GroveServices/IncomeAggregator.swift"
 add "$IA" "byClass filter: nonzero -> negative" '$0.total.amount > 0'                                '$0.total.amount < 0'                                                                    "IncomeAggregatorTests"
 add "$IA" "byClass sort: descending -> ascending" '$0.total.amount > $1.total.amount'                '$0.total.amount < $1.total.amount'                                                      "IncomeAggregatorTests"
+
+# --- IncomeAggregator+Trends: monthly history, YoY, top payers, concentration ---
+IT="Packages/GroveCore/Sources/GroveServices/IncomeAggregator+Trends.swift"
+add "$IT" "monthlyHistory: drop past loop"       'let pastOffsets: [Int] = lastN > 0 ? Array((-lastN)...(-1)) : []'  'let pastOffsets: [Int] = []'                                                  "IncomeAggregatorTrendsTests"
+add "$IT" "monthlyHistory: drop future loop"     'let futureOffsets: [Int] = lookahead > 0 ? Array(0...(lookahead - 1)) : []'  'let futureOffsets: [Int] = []'                                          "IncomeAggregatorTrendsTests"
+add "$IT" "monthlyHistory: lastN guard flip"     'let pastOffsets: [Int] = lastN > 0 ? Array((-lastN)...(-1)) : []'  'let pastOffsets: [Int] = lastN < 0 ? Array((-lastN)...(-1)) : []'             "IncomeAggregatorTrendsTests"
+add "$IT" "yoy: drop priorTTM nil guard"         'priorTTM.amount > 0'                                              'priorTTM.amount >= 0'                                                          "IncomeAggregatorTrendsTests"
+add "$IT" "yoy: drop subtraction in percent"     '((currentTTM.amount - priorTTM.amount) / priorTTM.amount) * 100'   '((currentTTM.amount + priorTTM.amount) / priorTTM.amount) * 100'              "IncomeAggregatorTrendsTests"
+add "$IT" "yoy: drop ×100 to leave ratio"        '((currentTTM.amount - priorTTM.amount) / priorTTM.amount) * 100'   '((currentTTM.amount - priorTTM.amount) / priorTTM.amount)'                    "IncomeAggregatorTrendsTests"
+add "$IT" "yoy: window twelve -> zero months"    'calendar.date(byAdding: .month, value: -12, to: asOf) ?? asOf'    'calendar.date(byAdding: .month, value: 0, to: asOf) ?? asOf'                  "IncomeAggregatorTrendsTests"
+add "$IT" "yoy: prior window twentyFour"         'calendar.date(byAdding: .month, value: -24, to: asOf) ?? asOf'    'calendar.date(byAdding: .month, value: -12, to: asOf) ?? asOf'                "IncomeAggregatorTrendsTests"
+add "$IT" "topPayers: descending -> ascending"   'sorted { $0.1.amount > $1.1.amount }'                              'sorted { $0.1.amount < $1.1.amount }'                                         "IncomeAggregatorTrendsTests"
+add "$IT" "topPayers: zero filter flip"          'pairs.filter { $0.1.amount > 0 }'                                  'pairs.filter { $0.1.amount < 0 }'                                             "IncomeAggregatorTrendsTests"
+add "$IT" "topPayers: share denominator"         '(ttm.amount / total) * 100'                                        '(ttm.amount / total)'                                                         "IncomeAggregatorTrendsTests"
+add "$IT" "ttmPaid: collapse window to empty"    '.custom(start: twelveMoAgo, end: asOf)'                            '.custom(start: asOf, end: asOf)'                                              "IncomeAggregatorTrendsTests"
+add "$IT" "concentration: drop residual snap"   'shares[lastIdx] = Decimal(100) - priorSum'                         'shares[lastIdx] = priorSum'                                                   "IncomeAggregatorTrendsTests"
+add "$IT" "concentration: top fallback 100 -> 0" 'restPairs.isEmpty'                                                'restPairs.isEmpty == false'                                                   "IncomeAggregatorTrendsTests"
 
 add "$H" "flip gainLoss sign"                'currentValue - totalCost'                              'totalCost - currentValue'                                                               "TransactionTests"
 add "$H" "gainLossPercent: invert guard"     'guard totalCost > 0 else { return 0 }'                 'guard totalCost < 0 else { return 0 }'                                                  "TransactionTests"

@@ -169,4 +169,103 @@ struct PortfolioRepositoryTests {
         #expect(acoesBRAlloc != nil)
         #expect((acoesBRAlloc?.drift ?? 0) < 0, "Underweight class should have negative drift")
     }
+
+    // MARK: - monthlyIncomeGross aggregation (TTM-based with yield fallback)
+
+    private static let utcCal: Calendar = {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        return cal
+    }()
+
+    private static let summaryAsOf: Date = {
+        var c = DateComponents()
+        c.year = 2026; c.month = 4; c.day = 29; c.hour = 12
+        c.timeZone = TimeZone(identifier: "UTC")
+        return Calendar(identifier: .gregorian).date(from: c)!
+    }()
+
+    /// Build a holding with N monthly dividend payments inside the trailing-12m
+    /// window relative to `summaryAsOf`. Each payment is shifted +1 day past
+    /// the month boundary so the oldest one stays strictly inside the window.
+    private static func seedHolding(
+        in ctx: ModelContext,
+        ticker: String,
+        qty: Decimal,
+        price: Decimal,
+        currency: Currency,
+        assetClass: AssetClassType,
+        yield: Decimal,
+        ttmMonthlyDividendsPerShare: Decimal? = nil,
+        firstBuyMonthsAgo: Int = 18
+    ) -> Holding {
+        let h = Holding(
+            ticker: ticker, quantity: qty, currentPrice: price,
+            dividendYield: yield, assetClass: assetClass, currency: currency,
+            status: .aportar
+        )
+        ctx.insert(h)
+        let firstBuy = utcCal.date(byAdding: .month, value: -firstBuyMonthsAgo, to: summaryAsOf)!
+        let contrib = Contribution(date: firstBuy, amount: qty * price, shares: qty, pricePerShare: price)
+        ctx.insert(contrib); contrib.holding = h
+        if let amt = ttmMonthlyDividendsPerShare {
+            for offset in 1...12 {
+                let monthBack = utcCal.date(byAdding: .month, value: -offset, to: summaryAsOf)!
+                let payDate = utcCal.date(byAdding: .day, value: 1, to: monthBack)!
+                let exDate = utcCal.date(byAdding: .day, value: -2, to: payDate)!
+                let p = DividendPayment(exDate: exDate, paymentDate: payDate, amountPerShare: amt)
+                ctx.insert(p); p.holding = h
+            }
+        }
+        return h
+    }
+
+    @Test func summaryUsesTTMPathWhenRecordsExistAndYieldFallbackOtherwise() throws {
+        let ctx = try Self.makeContext()
+        // H1 — has 12 records of R$1/share × 100 shares → TTM monthly = R$100.
+        let h1 = Self.seedHolding(in: ctx, ticker: "FII1", qty: 100, price: 100,
+                                  currency: .brl, assetClass: .fiis, yield: 0,
+                                  ttmMonthlyDividendsPerShare: 1)
+        // H2 — no records, dy=6%, 100 × 50 = R$5000 value → fallback monthly = 5000 × 0.06 / 12 = R$25.
+        let h2 = Self.seedHolding(in: ctx, ticker: "STK2", qty: 100, price: 50,
+                                  currency: .brl, assetClass: .acoesBR, yield: 6)
+
+        let repo = PortfolioRepository(modelContext: ctx)
+        let summary = repo.computeSummary(
+            holdings: [h1, h2],
+            classAllocations: [:],
+            displayCurrency: .brl,
+            rates: Self.rates,
+            asOf: Self.summaryAsOf
+        )
+
+        // Card must equal Σ(per-holding monthly): 100 (TTM) + 25 (yield fallback) = 125.
+        #expect(summary.monthlyIncomeGross.amount == 125)
+        #expect(summary.monthlyIncomeGross.currency == .brl)
+    }
+
+    @Test func summaryFXConversionWithMixedCurrencies() throws {
+        let ctx = try Self.makeContext()
+        // BRL FII: TTM monthly = R$100 (native).
+        let brlH = Self.seedHolding(in: ctx, ticker: "FII1", qty: 100, price: 100,
+                                    currency: .brl, assetClass: .fiis, yield: 0,
+                                    ttmMonthlyDividendsPerShare: 1)
+        // USD stock: TTM monthly = $20 (10 shares × $2/share/month).
+        let usdH = Self.seedHolding(in: ctx, ticker: "AAPL", qty: 10, price: 100,
+                                    currency: .usd, assetClass: .usStocks, yield: 0,
+                                    ttmMonthlyDividendsPerShare: 2)
+
+        let repo = PortfolioRepository(modelContext: ctx)
+        let summary = repo.computeSummary(
+            holdings: [brlH, usdH],
+            classAllocations: [:],
+            displayCurrency: .brl,
+            rates: Self.rates, // brlPerUsd = 5
+            asOf: Self.summaryAsOf
+        )
+
+        // 100 BRL + ($20 × 5) = 100 + 100 = R$200.
+        #expect(summary.monthlyIncomeGross.amount == 200)
+        #expect(summary.monthlyIncomeGross.currency == .brl)
+    }
 }

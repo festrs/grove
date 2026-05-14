@@ -23,6 +23,7 @@ struct AppSidebarNavigation: View {
                 Section("Income") {
                     sidebarLink(.dividendCalendar)
                     sidebarLink(.incomeHistory)
+                    sidebarLink(.incomeTrends)
                 }
 
                 #if !os(macOS)
@@ -71,6 +72,8 @@ struct AppSidebarNavigation: View {
             DividendCalendarView()
         case .incomeHistory:
             IncomeHistoryView()
+        case .incomeTrends:
+            IncomeTrendsView()
         case .settings:
             #if os(macOS)
             DashboardView()

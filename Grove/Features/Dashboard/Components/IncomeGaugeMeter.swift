@@ -17,6 +17,23 @@ struct IncomeGaugeMeter: View {
         projection.progressPercent >= 100
     }
 
+    /// `annualizedMonthlyNet × 12` — the run-rate framed as a yearly figure
+    /// so the gauge's secondary line reads in the same units users think
+    /// about FI in ("R$ 60k/year") instead of just per-month.
+    private var annualizedYearlyNet: Money {
+        Money(
+            amount: projection.annualizedMonthlyNet.amount * 12,
+            currency: projection.annualizedMonthlyNet.currency
+        )
+    }
+
+    private var goalYearly: Money {
+        Money(
+            amount: projection.goalMonthly.amount * 12,
+            currency: projection.goalMonthly.currency
+        )
+    }
+
     var body: some View {
         TQCard {
             VStack(spacing: Theme.Spacing.lg) {
@@ -30,7 +47,10 @@ struct IncomeGaugeMeter: View {
                     .padding(.bottom, -Theme.Spacing.md)
                 }
 
-                // Progress ring with income inside
+                // Progress ring with income inside.
+                // Top number = trailing-12-month run-rate ÷ 12 (smoothed) —
+                // the FI-relevant metric the ring tracks.
+                // Bottom number = paid this calendar month (the actual paycheck).
                 ZStack {
                     TQProgressRing(
                         progress: progressValue,
@@ -40,25 +60,47 @@ struct IncomeGaugeMeter: View {
                     )
 
                     VStack(spacing: Theme.Spacing.xs) {
-                        Text(projection.currentMonthlyNet.formatted(in: displayCurrency, using: rates))
+                        Text("\(projection.annualizedMonthlyNet.formatted(in: displayCurrency, using: rates))/mo")
                             .font(.system(size: Theme.FontSize.title2, weight: .bold))
                             .foregroundStyle(goalReached ? Color.tqPositive : .primary)
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
 
-                        Text("/month")
-                            .font(.system(size: Theme.FontSize.caption))
+                        Text("AVG NET /MO (TTM)")
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Color.tqSecondaryText)
+                            .tracking(0.4)
+
+                        Divider()
+                            .frame(width: 28)
+                            .padding(.vertical, 2)
+
+                        Text(projection.paidThisMonthNet.formatted(in: displayCurrency, using: rates))
+                            .font(.system(size: Theme.FontSize.body, weight: .semibold))
+                            .foregroundStyle(Color.tqSecondaryText)
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
+
+                        Text("PAID THIS MONTH")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.tqSecondaryText)
+                            .tracking(0.4)
                     }
                     .padding(.horizontal, Theme.Spacing.lg)
                 }
                 .padding(.top, Theme.Spacing.sm)
 
-                // Progress percent and goal
+                // Progress percent and goal — framed yearly so users read
+                // the gauge in the same units they think about FI in.
                 VStack(spacing: Theme.Spacing.xs) {
-                    Text("\(projection.progressPercent.formattedPercent(decimals: 2)) of \(projection.goalMonthly.formatted(in: displayCurrency, using: rates))")
+                    Text("\(annualizedYearlyNet.formatted(in: displayCurrency, using: rates))/yr of \(goalYearly.formatted(in: displayCurrency, using: rates))/yr")
                         .font(.system(size: Theme.FontSize.body, weight: .medium))
                         .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+
+                    Text(projection.progressPercent.formattedPercent(decimals: 2))
+                        .font(.system(size: Theme.FontSize.caption, weight: .semibold))
+                        .foregroundStyle(Color.tqSecondaryText)
 
                     OnTrackPill(projection: projection)
 
@@ -86,14 +128,18 @@ struct IncomeGaugeMeter: View {
 }
 
 #Preview("Em progresso") {
+    // Spiky month: paid R$1,900 this month, but trailing-12m run-rate
+    // is only R$1,300/mo. Ring tracks the run-rate.
     IncomeGaugeMeter(
         projection: IncomeProjection(
-            currentMonthlyNet: Money(amount: 5_840, currency: .brl),
-            currentMonthlyGross: Money(amount: 7_200, currency: .brl),
+            currentMonthlyNet: Money(amount: 1_900, currency: .brl),
+            currentMonthlyGross: Money(amount: 2_100, currency: .brl),
+            paidThisMonthNet: Money(amount: 1_900, currency: .brl),
+            annualizedMonthlyNet: Money(amount: 1_300, currency: .brl),
             goalMonthly: Money(amount: 10_000, currency: .brl),
-            progressPercent: 58.4,
-            estimatedMonthsToGoal: 38,
-            estimatedYearsToGoal: 3.2
+            progressPercent: 13,
+            estimatedMonthsToGoal: 96,
+            estimatedYearsToGoal: 8
         )
     )
     .padding()
@@ -104,6 +150,8 @@ struct IncomeGaugeMeter: View {
         projection: IncomeProjection(
             currentMonthlyNet: Money(amount: 10_500, currency: .brl),
             currentMonthlyGross: Money(amount: 13_000, currency: .brl),
+            paidThisMonthNet: Money(amount: 12_300, currency: .brl),
+            annualizedMonthlyNet: Money(amount: 10_400, currency: .brl),
             goalMonthly: Money(amount: 10_000, currency: .brl),
             progressPercent: 100,
             estimatedMonthsToGoal: 0,

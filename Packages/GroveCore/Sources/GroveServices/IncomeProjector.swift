@@ -18,9 +18,23 @@ public enum OnTrackStatus: Sendable, Equatable {
 }
 
 public struct IncomeProjection: Sendable {
+    /// Paid + projected dividends for the current calendar month, net of tax.
+    /// Hybrid metric kept for callers that explicitly want "what this month
+    /// will probably total"; the gauge no longer drives off this because a
+    /// quarterly stock or one-off FII payout makes it swing month to month.
     public let currentMonthlyNet: Money
     public let currentMonthlyGross: Money
+    /// Strictly real dividends credited in the current calendar month, net of
+    /// tax. The "paycheck" view — no projections, no annualization.
+    public let paidThisMonthNet: Money
+    /// Trailing-12-month real dividends ÷ 12, net of tax. Smooths spiky
+    /// payment cadences into a stable run-rate; this is the FI-relevant
+    /// number the gauge ring tracks.
+    public let annualizedMonthlyNet: Money
     public let goalMonthly: Money
+    /// `annualizedMonthlyNet / goalMonthly`, capped at 100. Tracks the
+    /// stable run-rate, not the spiky monthly mix, so a heavy payout month
+    /// no longer shoots the ring forward.
     public let progressPercent: Decimal
     public let estimatedMonthsToGoal: Int?
     public let estimatedYearsToGoal: Decimal?
@@ -36,6 +50,8 @@ public struct IncomeProjection: Sendable {
     public init(
         currentMonthlyNet: Money,
         currentMonthlyGross: Money,
+        paidThisMonthNet: Money,
+        annualizedMonthlyNet: Money,
         goalMonthly: Money,
         progressPercent: Decimal,
         estimatedMonthsToGoal: Int?,
@@ -46,6 +62,8 @@ public struct IncomeProjection: Sendable {
     ) {
         self.currentMonthlyNet = currentMonthlyNet
         self.currentMonthlyGross = currentMonthlyGross
+        self.paidThisMonthNet = paidThisMonthNet
+        self.annualizedMonthlyNet = annualizedMonthlyNet
         self.goalMonthly = goalMonthly
         self.progressPercent = progressPercent
         self.estimatedMonthsToGoal = estimatedMonthsToGoal
@@ -122,14 +140,53 @@ public struct IncomeProjector {
         let totalGross = summary.total
         let totalNet = breakdown.totalNet
         let goalDisplay = incomeGoal.converted(to: displayCurrency, using: rates)
-        let progress: Decimal = goalDisplay.amount > 0 ? (totalNet.amount / goalDisplay.amount) * 100 : 0
+
+        // Paid this month: strictly real dividends with paymentDate inside
+        // the current calendar month. No projections — this is the user's
+        // actual paycheck.
+        var paidGrossByClass: [AssetClassType: Money] = [:]
+        for h in holdings {
+            let p = h.paidIncome(in: .month, asOf: asOf, displayCurrency: displayCurrency,
+                                 rates: rates, calendar: calendar)
+            paidGrossByClass[h.assetClass] = (paidGrossByClass[h.assetClass] ?? .zero(in: displayCurrency)) + p
+        }
+        let paidBreakdown = TaxCalculator.taxBreakdown(
+            grossByClass: paidGrossByClass,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
+        let paidThisMonthNet = paidBreakdown.totalNet
+
+        // Annualized run-rate: per-holding `estimatedMonthlyIncomeMoney`
+        // already returns trailing-12-month real dividends ÷ 12, falling back
+        // to `value × DY/100 / 12` when no records exist yet. Same math the
+        // dashboard "Avg Net /mo (TTM)" stat card displays, so the gauge
+        // and that card always agree. `empiricalAnnualGross` alone would
+        // read R$ 0 on a brand-new portfolio (no records yet) even when the
+        // user has populated DY for each holding.
+        var monthlyGrossByClass: [AssetClassType: Money] = [:]
+        for h in holdings {
+            let g = h.estimatedMonthlyIncomeMoney(asOf: asOf, calendar: calendar)
+                .converted(to: displayCurrency, using: rates)
+            monthlyGrossByClass[h.assetClass] = (monthlyGrossByClass[h.assetClass] ?? .zero(in: displayCurrency)) + g
+        }
+        let runRateBreakdown = TaxCalculator.taxBreakdown(
+            grossByClass: monthlyGrossByClass,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
+        let annualizedMonthlyNet = runRateBreakdown.totalNet
+
+        let progress: Decimal = goalDisplay.amount > 0
+            ? (annualizedMonthlyNet.amount / goalDisplay.amount) * 100
+            : 0
 
         var estimatedMonths: Int?
         var estimatedYears: Decimal?
 
         let contributionDisplay = monthlyContribution.converted(to: displayCurrency, using: rates)
 
-        if totalNet.amount < goalDisplay.amount && contributionDisplay.amount > 0 {
+        if annualizedMonthlyNet.amount < goalDisplay.amount && contributionDisplay.amount > 0 {
             // Sim parameters: stable, portfolio-composition-based.
             let totalValueDisplay = holdings.map { $0.currentValueMoney }
                 .sum(in: displayCurrency, using: rates)
@@ -146,8 +203,9 @@ public struct IncomeProjector {
                 $0.empiricalAnnualGross(asOf: asOf, displayCurrency: displayCurrency,
                                         rates: rates, calendar: calendar)
             }.sum(in: displayCurrency, using: rates)
-            let storedAnnualGross = holdings.map { $0.estimatedMonthlyIncomeMoney * 12 }
-                .sum(in: displayCurrency, using: rates)
+            let storedAnnualGross = holdings.map {
+                Money(amount: $0.currentValue * $0.dividendYield / 100, currency: $0.currency)
+            }.sum(in: displayCurrency, using: rates)
             let bestAnnualGross = max(empiricalAnnualGross.amount, storedAnnualGross.amount)
             let avgDY: Decimal
             if totalValueDisplay.amount > 0 && bestAnnualGross > 0 {
@@ -160,7 +218,7 @@ public struct IncomeProjector {
                 : 0.85
             let monthlyYield = avgDY / 100 / 12
 
-            var currentIncome = totalNet.amount
+            var currentIncome = annualizedMonthlyNet.amount
             var months = 0
             let maxMonths = 600
 
@@ -173,7 +231,7 @@ public struct IncomeProjector {
                 estimatedMonths = months
                 estimatedYears = Decimal(months) / 12
             }
-        } else if totalNet.amount >= goalDisplay.amount {
+        } else if annualizedMonthlyNet.amount >= goalDisplay.amount {
             estimatedMonths = 0
             estimatedYears = 0
         }
@@ -200,6 +258,8 @@ public struct IncomeProjector {
         return IncomeProjection(
             currentMonthlyNet: totalNet,
             currentMonthlyGross: totalGross,
+            paidThisMonthNet: paidThisMonthNet,
+            annualizedMonthlyNet: annualizedMonthlyNet,
             goalMonthly: goalDisplay,
             progressPercent: min(progress, 100),
             estimatedMonthsToGoal: estimatedMonths,

@@ -7,6 +7,7 @@ import GroveRepositories
 enum DashboardDestination: Hashable {
     case incomeHistory
     case dividendCalendar
+    case incomeTrends
 }
 
 struct DashboardView: View {
@@ -105,6 +106,13 @@ struct DashboardView: View {
             }
             .background(Color.tqBackground)
             .navigationTitle("Grove")
+            #if os(iOS)
+            // Default `.large` style on iPhone wastes ~150pt at scroll-top, so
+            // the gauge is the only card that fits without scrolling. The
+            // dashboard is the app's "at a glance" surface — everything should
+            // be visible in one viewport.
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
             .navigationDestination(for: DashboardDestination.self) { destination in
                 switch destination {
                 case .incomeHistory:
@@ -118,6 +126,8 @@ struct DashboardView: View {
                     } else {
                         DividendCalendarView()
                     }
+                case .incomeTrends:
+                    IncomeTrendsView()
                 }
             }
             .refreshable {
@@ -192,6 +202,11 @@ struct DashboardView: View {
 
         MonthlyActionCard(suggestions: viewModel.topSuggestions)
 
+        NavigationLink(value: DashboardDestination.incomeTrends) {
+            IncomeTrendsTile()
+        }
+        .buttonStyle(.plain)
+
         if let summary = viewModel.summary {
             QuickStatsRow(summary: summary, holdingCount: holdings.count)
         }
@@ -236,6 +251,10 @@ struct DashboardView: View {
                 AllocationDriftCard(allocations: summary.allocationByClass)
                 NavigationLink(value: DashboardDestination.dividendCalendar) {
                     NextDividendCard(dividends: viewModel.nextDividends)
+                }
+                .buttonStyle(.plain)
+                NavigationLink(value: DashboardDestination.incomeTrends) {
+                    IncomeTrendsTile()
                 }
                 .buttonStyle(.plain)
             }

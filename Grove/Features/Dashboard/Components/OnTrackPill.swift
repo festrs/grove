@@ -74,6 +74,8 @@ struct OnTrackPill: View {
     OnTrackPill(projection: IncomeProjection(
         currentMonthlyNet: Money(amount: 6_000, currency: .brl),
         currentMonthlyGross: Money(amount: 7_500, currency: .brl),
+        paidThisMonthNet: Money(amount: 6_000, currency: .brl),
+        annualizedMonthlyNet: Money(amount: 6_000, currency: .brl),
         goalMonthly: Money(amount: 12_000, currency: .brl),
         progressPercent: 50,
         estimatedMonthsToGoal: 24,
@@ -90,6 +92,8 @@ struct OnTrackPill: View {
     OnTrackPill(projection: IncomeProjection(
         currentMonthlyNet: Money(amount: 6_000, currency: .brl),
         currentMonthlyGross: Money(amount: 7_500, currency: .brl),
+        paidThisMonthNet: Money(amount: 6_000, currency: .brl),
+        annualizedMonthlyNet: Money(amount: 6_000, currency: .brl),
         goalMonthly: Money(amount: 12_000, currency: .brl),
         progressPercent: 50,
         estimatedMonthsToGoal: 60,
@@ -106,6 +110,8 @@ struct OnTrackPill: View {
     OnTrackPill(projection: IncomeProjection(
         currentMonthlyNet: Money(amount: 6_000, currency: .brl),
         currentMonthlyGross: Money(amount: 7_500, currency: .brl),
+        paidThisMonthNet: Money(amount: 6_000, currency: .brl),
+        annualizedMonthlyNet: Money(amount: 6_000, currency: .brl),
         goalMonthly: Money(amount: 12_000, currency: .brl),
         progressPercent: 50,
         estimatedMonthsToGoal: 240,
@@ -122,6 +128,8 @@ struct OnTrackPill: View {
     OnTrackPill(projection: IncomeProjection(
         currentMonthlyNet: Money(amount: 0, currency: .brl),
         currentMonthlyGross: Money(amount: 0, currency: .brl),
+        paidThisMonthNet: Money(amount: 0, currency: .brl),
+        annualizedMonthlyNet: Money(amount: 0, currency: .brl),
         goalMonthly: Money(amount: 30_000, currency: .brl),
         progressPercent: 0,
         estimatedMonthsToGoal: nil,

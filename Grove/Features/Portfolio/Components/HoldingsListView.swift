@@ -225,7 +225,7 @@ struct HoldingRowView: View {
                 .lineLimit(1)
                 .frame(width: HoldingsColumn.allocation.width, alignment: .trailing)
 
-            Text(row.holding.estimatedMonthlyIncomeNetMoney.formatted())
+            Text(row.holding.estimatedMonthlyIncomeNetMoney().formatted())
                 .monospacedDigit()
                 .foregroundStyle(Color.tqAccentGreen)
                 .lineLimit(1)
@@ -314,7 +314,7 @@ struct HoldingTableRow: Identifiable, Comparable {
     var quantityValue: Double { NSDecimalNumber(decimal: holding.quantity).doubleValue }
     var priceValue: Double { NSDecimalNumber(decimal: holding.currentPrice).doubleValue }
     var gainValue: Double { NSDecimalNumber(decimal: holding.gainLossPercent).doubleValue }
-    var incomeValue: Double { NSDecimalNumber(decimal: holding.estimatedMonthlyIncomeNet).doubleValue }
+    var incomeValue: Double { NSDecimalNumber(decimal: holding.estimatedMonthlyIncomeNet()).doubleValue }
     var allocationValue: Double { NSDecimalNumber(decimal: allocation).doubleValue }
 
     var allocation: Decimal {

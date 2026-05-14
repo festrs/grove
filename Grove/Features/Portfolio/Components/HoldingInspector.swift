@@ -95,10 +95,10 @@ struct HoldingInspector: View {
         TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 statRow("Estimated DY", holding.dividendYield.formattedPercent())
-                statRow("Gross / mo", holding.estimatedMonthlyIncomeMoney.formatted())
+                statRow("Gross / mo", holding.estimatedMonthlyIncomeMoney().formatted())
                 statRow(
                     "Net / mo",
-                    holding.estimatedMonthlyIncomeNetMoney.formatted(),
+                    holding.estimatedMonthlyIncomeNetMoney().formatted(),
                     color: Color.tqAccentGreen
                 )
             }
