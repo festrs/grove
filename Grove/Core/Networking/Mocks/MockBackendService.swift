@@ -84,4 +84,15 @@ actor MockBackendService: BackendServiceProtocol {
     func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] {
         []
     }
+
+    /// Recognises a single demo code so previews and ViewModel tests can
+    /// exercise both the success and failure paths without standing up a
+    /// fake URLSession.
+    func redeemCode(_ code: String) async throws -> RedeemCodeResultDTO {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "GROVE-UNLIMITED" {
+            return RedeemCodeResultDTO(valid: true, unlocks: [RedeemCodeResultDTO.unlimitedAssetsKey])
+        }
+        return RedeemCodeResultDTO(valid: false, unlocks: [])
+    }
 }

@@ -19,7 +19,7 @@ struct SettingsView: View {
                     rebalancingSection(settings: settings)
                     // TODO: Enable when push notifications are ready
                     // NotificationSettingsSection()
-                    PremiumSection()
+                    PremiumSection(settings: settings)
                     AboutSection()
                     diagnosticsSection
                     dangerSection

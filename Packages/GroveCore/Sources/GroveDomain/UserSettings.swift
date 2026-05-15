@@ -45,6 +45,13 @@ public final class UserSettings {
     /// nil = user hasn't completed the Freedom Plan flow yet.
     public var freedomPlanCompletedAt: Date? = nil
 
+    // MARK: - Entitlements
+
+    /// True once the user has redeemed a valid unlock code. Removes the
+    /// free-tier asset cap. iCloud-synced so the unlock follows the user
+    /// across devices.
+    public var unlimitedAssetsUnlocked: Bool = false
+
     public var preferredCurrency: Currency {
         get { Currency(rawValue: preferredCurrencyRaw) ?? .brl }
         set { preferredCurrencyRaw = newValue.rawValue }

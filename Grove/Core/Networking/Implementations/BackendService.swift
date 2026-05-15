@@ -331,6 +331,47 @@ actor BackendService: BackendServiceProtocol {
         return parsed.positions
     }
 
+    // MARK: - Redeem
+
+    func redeemCode(_ code: String) async throws -> RedeemCodeResultDTO {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return RedeemCodeResultDTO(valid: false, unlocks: [])
+        }
+        let url = try buildURL(path: "/mobile/redeem", queryItems: [
+            URLQueryItem(name: "code", value: trimmed)
+        ])
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        for (key, value) in apiHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let urlError as URLError {
+            throw APIError.networkError(urlError)
+        } catch {
+            throw APIError.unknown(error.localizedDescription)
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.unknown("Invalid server response.")
+        }
+        // 422 = malformed code (treat as invalid for the UI rather than
+        // throwing — user gets a clean "code not recognised" message).
+        if http.statusCode == 422 {
+            return RedeemCodeResultDTO(valid: false, unlocks: [])
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw APIError.httpError(statusCode: http.statusCode)
+        }
+        return try JSONDecoder().decode(RedeemCodeResultDTO.self, from: data)
+    }
+
     // MARK: - Private
 
     private func buildURL(path: String, queryItems: [URLQueryItem]? = nil) throws -> URL {

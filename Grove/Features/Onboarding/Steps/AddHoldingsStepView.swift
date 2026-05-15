@@ -4,6 +4,7 @@ import GroveDomain
 struct AddHoldingsStepView: View {
     @Bindable var viewModel: OnboardingViewModel
     @Environment(\.backendService) private var backendService
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var selectedTab = 0
@@ -11,6 +12,7 @@ struct AddHoldingsStepView: View {
     @State private var importViewModel = ImportViewModel()
     @State private var hoveredHoldingID: UUID?
     @State private var resultToAdd: StockSearchResultDTO?
+    @State private var showingRedeemSheet = false
 
     private var isSearching: Bool {
         !viewModel.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty
@@ -25,6 +27,7 @@ struct AddHoldingsStepView: View {
             }
         }
         .onAppear {
+            viewModel.loadUnlockState(modelContext: modelContext)
             let service = backendService
             debouncer.start { query in
                 (try? await service.searchStocks(query: query, assetClass: nil)) ?? []
@@ -32,6 +35,12 @@ struct AddHoldingsStepView: View {
         }
         .onDisappear {
             debouncer.stop()
+        }
+        .sheet(isPresented: $showingRedeemSheet) {
+            RedeemCodeSheet {
+                viewModel.unlimitedAssetsUnlocked = true
+                importViewModel.maxSelectable = viewModel.remainingHoldingSlots
+            }
         }
         .onChange(of: viewModel.searchQuery) { _, newValue in
             debouncer.send(newValue)
@@ -52,6 +61,36 @@ struct AddHoldingsStepView: View {
         }
     }
 
+    // MARK: - Plan banner (shared)
+
+    @ViewBuilder
+    private var planBanner: some View {
+        if viewModel.unlimitedAssetsUnlocked {
+            HStack(spacing: Theme.Spacing.xs) {
+                Image(systemName: "infinity.circle.fill")
+                    .foregroundStyle(Color.tqAccentGreen)
+                Text("Unlimited assets unlocked")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.tqSecondaryText)
+            }
+        } else {
+            HStack(spacing: Theme.Spacing.xs) {
+                Text("Free plan · \(viewModel.holdingCount)/\(AppConstants.freeTierMaxHoldings)")
+                    .font(.caption)
+                    .foregroundStyle(Color.tqSecondaryText)
+                Spacer(minLength: 0)
+                Button {
+                    showingRedeemSheet = true
+                } label: {
+                    Label("Redeem code", systemImage: "ticket")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.tqAccentGreen)
+            }
+        }
+    }
+
     // MARK: - Compact (iPhone)
 
     private var compactBody: some View {
@@ -63,6 +102,9 @@ struct AddHoldingsStepView: View {
                 Text("Search or paste tickers. Class is auto-detected — adjust the status and priority to match your strategy. Skip if you'd rather start fresh.")
                     .font(.system(size: Theme.FontSize.caption))
                     .foregroundStyle(Color.tqSecondaryText)
+
+                planBanner
+                    .padding(.top, Theme.Spacing.xs)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Theme.Spacing.lg)
@@ -87,7 +129,7 @@ struct AddHoldingsStepView: View {
                     }
                 }
                 .onAppear {
-                    importViewModel.maxSelectable = Holding.remainingSlots(currentCount: viewModel.pendingHoldings.count)
+                    importViewModel.maxSelectable = viewModel.remainingHoldingSlots
                 }
             }
         }
@@ -265,6 +307,8 @@ struct AddHoldingsStepView: View {
                 Text("Search or paste tickers. Class is auto-detected — adjust the status and priority to match your strategy. Skip if you'd rather start fresh.")
                     .font(.caption)
                     .foregroundStyle(Color.tqSecondaryText)
+                planBanner
+                    .padding(.top, 4)
             }
             Spacer()
             Button {

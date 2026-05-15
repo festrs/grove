@@ -37,4 +37,8 @@ protocol BackendServiceProtocol: Sendable {
 
     // Import portfolio (file → parsed positions)
     func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition]
+
+    // Redeem unlock code. Backend validates against its configured allowlist
+    // and returns the set of entitlement keys the client should activate.
+    func redeemCode(_ code: String) async throws -> RedeemCodeResultDTO
 }

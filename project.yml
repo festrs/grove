@@ -69,6 +69,68 @@ targets:
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: 1
         GENERATE_INFOPLIST_FILE: YES
+        # Partial plist merged with auto-generated keys. Holds
+        # MOBILE_API_KEY so `Secrets.swift` can read it from Bundle.main.
+        INFOPLIST_FILE: Grove/Info.plist
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+        ENABLE_PREVIEWS: YES
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
+    dependencies:
+      - package: AsyncAlgorithms
+      - package: GroveCore
+        product: GroveDomain
+      - package: GroveCore
+        product: GroveServices
+      - package: GroveCore
+        product: GroveRepositories
+
+  # Sideload-only target. Same sources/resources as Grove, but a distinct
+  # bundle ID and display name so it installs side-by-side with the TestFlight
+  # build on a physical device. Not archived for distribution.
+  GroveBeta:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    configFiles:
+      Debug: Secrets.xcconfig
+      Release: Secrets.xcconfig
+    preBuildScripts:
+      - name: SwiftLint
+        basedOnDependencyAnalysis: false
+        script: |
+          if which swiftlint >/dev/null; then
+            swiftlint --quiet
+          else
+            echo "warning: SwiftLint not installed — install via 'brew install swiftlint'"
+          fi
+    sources:
+      - Grove
+    resources:
+      - path: Grove/Assets.xcassets
+      - path: Grove/Preview Content
+        buildPhase: none
+        type: folder
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.felipepereira.Grove.beta
+        PRODUCT_NAME: "Grove Beta"
+        INFOPLIST_KEY_CFBundleDisplayName: "Grove Beta"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
+        GENERATE_INFOPLIST_FILE: YES
+        # Partial plist merged with auto-generated keys. Holds MOBILE_API_KEY
+        # (read by Secrets.swift) and the ATS exception that lets the dev
+        # build hit http://localhost:8000.
+        INFOPLIST_FILE: Grove/GroveBeta-Info.plist
+        # GROVE_BETA flips AppConstants.API.backendBaseURL to local docker.
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "GROVE_BETA $(inherited)"
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
@@ -117,6 +179,21 @@ schemes:
       config: Debug
       targets:
         - GroveTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  # Sideload-only scheme. Build + run against a personal device; do not
+  # archive for TestFlight (the Grove scheme remains the distribution path).
+  GroveBeta:
+    build:
+      targets:
+        GroveBeta: all
+    run:
+      config: Debug
     profile:
       config: Release
     analyze:
