@@ -33,9 +33,11 @@ jobs:
           xcodebuild -version
 
       - name: Create Secrets
+        # Grove/Secrets.swift is committed and reads MOBILE_API_KEY from
+        # Bundle.main; we only need to materialize the xcconfig that
+        # populates the Info.plist at build time.
         run: |
           printf 'BACKEND_BASE_URL = https://placeholder.example.com\nMOBILE_API_KEY = ci-placeholder\n' > Secrets.xcconfig
-          cp Secrets.example Grove/Secrets.swift
 
       - name: Generate project
         run: xcodegen generate
@@ -95,9 +97,11 @@ jobs:
           xcodebuild -version
 
       - name: Create Secrets
+        # Grove/Secrets.swift is committed and reads MOBILE_API_KEY from
+        # Bundle.main; we only need to materialize the xcconfig that
+        # populates the Info.plist at build time.
         run: |
           printf 'BACKEND_BASE_URL = https://placeholder.example.com\nMOBILE_API_KEY = ci-placeholder\n' > Secrets.xcconfig
-          cp Secrets.example Grove/Secrets.swift
 
       - name: Run mutation tests
         # Script does xcodegen + one cold build-for-testing, then incremental
