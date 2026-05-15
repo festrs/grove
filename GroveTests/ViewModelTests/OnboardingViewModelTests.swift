@@ -190,6 +190,46 @@ struct OnboardingViewModelTests {
         #expect(vm.errorMessage != nil)
     }
 
+    @Test func unlimitedUnlockLiftsFreeTierLimit() {
+        UserDefaults.standard.set(false, forKey: AppConstants.Debug.unlimitedHoldingsKey)
+        let vm = OnboardingViewModel()
+        for i in 0..<AppConstants.freeTierMaxHoldings {
+            vm.addHolding(ticker: "T\(i)")
+        }
+        #expect(vm.canAddMoreHoldings == false)
+
+        vm.unlimitedAssetsUnlocked = true
+        #expect(vm.canAddMoreHoldings == true)
+        #expect(vm.remainingHoldingSlots == .max)
+
+        vm.errorMessage = nil
+        vm.addHolding(ticker: "EXTRA")
+        #expect(vm.pendingHoldings.count == AppConstants.freeTierMaxHoldings + 1)
+        #expect(vm.errorMessage == nil)
+    }
+
+    @MainActor
+    @Test func loadUnlockStateHydratesFromUserSettings() throws {
+        let ctx = try makeTestContext()
+        let settings = UserSettings()
+        settings.unlimitedAssetsUnlocked = true
+        ctx.insert(settings)
+        try ctx.save()
+
+        let vm = OnboardingViewModel()
+        #expect(vm.unlimitedAssetsUnlocked == false)
+        vm.loadUnlockState(modelContext: ctx)
+        #expect(vm.unlimitedAssetsUnlocked == true)
+    }
+
+    @MainActor
+    @Test func loadUnlockStateNoOpsWhenSettingsMissing() throws {
+        let ctx = try makeTestContext()
+        let vm = OnboardingViewModel()
+        vm.loadUnlockState(modelContext: ctx)
+        #expect(vm.unlimitedAssetsUnlocked == false)
+    }
+
     @Test func addHoldingFromSearchRespectsFreeTierLimit() {
         UserDefaults.standard.set(false, forKey: AppConstants.Debug.unlimitedHoldingsKey)
         let vm = OnboardingViewModel()

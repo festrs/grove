@@ -345,3 +345,24 @@ public nonisolated struct ImportedPosition: Codable, Sendable, Identifiable {
         return String(format: "%g", quantity)
     }
 }
+
+// MARK: - Redeem Code
+
+/// Response from `POST /api/mobile/redeem`. `valid=true` means the submitted
+/// code matched one of the backend's configured codes; `unlocks` lists the
+/// entitlement keys the client should activate (e.g. `"unlimited_assets"`).
+public nonisolated struct RedeemCodeResultDTO: Codable, Sendable, Equatable {
+    public let valid: Bool
+    public let unlocks: [String]
+
+    public init(valid: Bool, unlocks: [String]) {
+        self.valid = valid
+        self.unlocks = unlocks
+    }
+
+    public static let unlimitedAssetsKey = "unlimited_assets"
+
+    public var unlocksUnlimitedAssets: Bool {
+        unlocks.contains(Self.unlimitedAssetsKey)
+    }
+}

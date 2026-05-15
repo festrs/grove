@@ -18,6 +18,14 @@ extension Holding {
         #endif
     }
 
+    /// True when the user has redeemed an unlock code that lifts the asset cap.
+    /// Reads from the singleton UserSettings row, if present.
+    static func isUnlimited(modelContext: ModelContext) -> Bool {
+        if isFreeTierBypassed { return true }
+        let settings = (try? modelContext.fetch(FetchDescriptor<UserSettings>()))?.first
+        return settings?.unlimitedAssetsUnlocked ?? false
+    }
+
     static func canAddMore(currentCount: Int) -> Bool {
         if isFreeTierBypassed { return true }
         return currentCount < AppConstants.freeTierMaxHoldings
@@ -29,11 +37,13 @@ extension Holding {
     }
 
     static func canAddMore(modelContext: ModelContext) -> Bool {
+        if isUnlimited(modelContext: modelContext) { return true }
         let count = (try? modelContext.fetchCount(FetchDescriptor<Holding>())) ?? 0
         return canAddMore(currentCount: count)
     }
 
     static func remainingSlots(modelContext: ModelContext) -> Int {
+        if isUnlimited(modelContext: modelContext) { return .max }
         let count = (try? modelContext.fetchCount(FetchDescriptor<Holding>())) ?? 0
         return remainingSlots(currentCount: count)
     }

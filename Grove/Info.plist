@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Partial Info.plist for the Grove target. Xcode merges this with the
+  auto-generated keys (GENERATE_INFOPLIST_FILE=YES). The only purpose is
+  to flow `MOBILE_API_KEY` from `Secrets.xcconfig` into the runtime
+  Info.plist so `Secrets.swift` can read it via `Bundle.main`.
+-->
+<plist version="1.0">
+<dict>
+    <key>MOBILE_API_KEY</key>
+    <string>$(MOBILE_API_KEY)</string>
+</dict>
+</plist>

@@ -106,4 +106,7 @@ private actor SyncStubBackend: BackendServiceProtocol {
         )
     }
     func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] { [] }
+    func redeemCode(_ code: String) async throws -> RedeemCodeResultDTO {
+        RedeemCodeResultDTO(valid: false, unlocks: [])
+    }
 }

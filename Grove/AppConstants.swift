@@ -7,7 +7,15 @@ enum AppConstants {
     static let freeTierMaxPortfolios = 1
 
     enum API {
+        #if GROVE_BETA
+        // GroveBeta target — points at the Docker backend on this Mac. Works
+        // out of the box in the simulator (NSExceptionDomains/localhost ATS
+        // exception is in GroveBeta-Info.plist). On a physical device,
+        // replace `localhost` with the Mac's LAN IP or use `just tunnel`.
+        static let backendBaseURL = "http://localhost:8000/api"
+        #else
         static let backendBaseURL = "https://grove-invest-api.fly.dev/api"
+        #endif
     }
 
     enum Defaults {

@@ -27,9 +27,11 @@ build/
 *.xcresult
 .coverage.xcresult/
 
-# Secrets - NEVER commit
+# Secrets — Secrets.xcconfig holds the actual key values and never goes
+# to git. Grove/Secrets.swift is committed and reads from Info.plist at
+# runtime, so the build can produce a working binary on CI from xcconfig
+# alone.
 Secrets.xcconfig
-**/Secrets.swift
 
 # macOS
 .DS_Store

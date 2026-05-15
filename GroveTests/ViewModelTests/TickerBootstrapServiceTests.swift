@@ -201,6 +201,9 @@ private actor StubBackend: BackendServiceProtocol {
         )
     }
     func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] { [] }
+    func redeemCode(_ code: String) async throws -> RedeemCodeResultDTO {
+        RedeemCodeResultDTO(valid: false, unlocks: [])
+    }
 }
 
 private actor ThrowingBackend: BackendServiceProtocol {
@@ -217,4 +220,5 @@ private actor ThrowingBackend: BackendServiceProtocol {
     func fetchPriceHistory(symbol: String, period: String) async throws -> [PriceHistoryPointDTO] { throw E.nope }
     func fetchFundamentals(symbol: String) async throws -> FundamentalsDTO { throw E.nope }
     func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] { throw E.nope }
+    func redeemCode(_ code: String) async throws -> RedeemCodeResultDTO { throw E.nope }
 }

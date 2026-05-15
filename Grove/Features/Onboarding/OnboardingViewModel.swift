@@ -99,7 +99,34 @@ final class OnboardingViewModel {
     // MARK: - Computed
 
     var holdingCount: Int { pendingHoldings.count }
-    var canAddMoreHoldings: Bool { Holding.canAddMore(currentCount: pendingHoldings.count) }
+
+    /// Mirrors `UserSettings.unlimitedAssetsUnlocked` for the duration of
+    /// onboarding. Pre-onboarding there is usually no `UserSettings` row
+    /// yet, so the redeem flow writes one and we update this flag from its
+    /// completion callback. When true, the 10-asset cap is lifted for the
+    /// rest of the onboarding pipeline.
+    var unlimitedAssetsUnlocked: Bool = false
+
+    var canAddMoreHoldings: Bool {
+        if unlimitedAssetsUnlocked { return true }
+        return Holding.canAddMore(currentCount: pendingHoldings.count)
+    }
+
+    var remainingHoldingSlots: Int {
+        if unlimitedAssetsUnlocked { return .max }
+        return Holding.remainingSlots(currentCount: pendingHoldings.count)
+    }
+
+    /// Hydrate `unlimitedAssetsUnlocked` from the persisted `UserSettings`
+    /// row, if one exists. Safe to call multiple times — the redeem sheet
+    /// also writes back into the same row, so this stays consistent across
+    /// re-entries to the holdings step.
+    func loadUnlockState(modelContext: ModelContext) {
+        var descriptor = FetchDescriptor<UserSettings>()
+        descriptor.fetchLimit = 1
+        guard let settings = try? modelContext.fetch(descriptor).first else { return }
+        unlimitedAssetsUnlocked = settings.unlimitedAssetsUnlocked
+    }
 
     var assetClassesInUse: [AssetClassType] {
         let used = Set(pendingHoldings.map(\.assetClass))

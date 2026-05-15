@@ -146,6 +146,9 @@ private actor RecordingBackend: BackendServiceProtocol {
         )
     }
     func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] { [] }
+    func redeemCode(_ code: String) async throws -> RedeemCodeResultDTO {
+        RedeemCodeResultDTO(valid: false, unlocks: [])
+    }
 }
 
 private actor FailingBackend: BackendServiceProtocol {
@@ -181,4 +184,7 @@ private actor FailingBackend: BackendServiceProtocol {
         )
     }
     func importPortfolio(fileData: Data, filename: String) async throws -> [ImportedPosition] { [] }
+    func redeemCode(_ code: String) async throws -> RedeemCodeResultDTO {
+        RedeemCodeResultDTO(valid: false, unlocks: [])
+    }
 }

@@ -200,9 +200,13 @@ private struct RebalancingSettingsTab: View {
 // MARK: - About (plan + version + credits)
 
 private struct AboutSettingsTab: View {
+    @Query private var settings: [UserSettings]
+
     var body: some View {
         Form {
-            PremiumSection()
+            if let s = settings.first {
+                PremiumSection(settings: s)
+            }
             AboutSection()
         }
         .formStyle(.grouped)
