@@ -9,13 +9,42 @@ struct IncomeHistoryView: View {
     @Environment(\.backendService) private var backendService
     @Environment(\.displayCurrency) private var displayCurrency
     @Environment(\.rates) private var rates
-    @State private var viewModel = IncomeHistoryViewModel()
+    @Query private var holdings: [Holding]
+    @State private var selectedWindow: IncomeWindow = .year
+
+    private static let displayedWindows: [IncomeWindow] = [.day, .week, .month, .year]
+
+    private var summaries: [IncomeWindowSummary] {
+        Self.displayedWindows.map { window in
+            IncomeAggregator.summary(
+                holdings: holdings, window: window,
+                in: displayCurrency, rates: rates
+            )
+        }
+    }
+
+    private var byClass: [PassiveIncomeByClass] {
+        IncomeAggregator.byClass(
+            holdings: holdings, window: selectedWindow,
+            in: displayCurrency, rates: rates
+        )
+    }
+
+    private var taxBreakdown: MoneyTaxBreakdown? {
+        let grossByClass = Dictionary(uniqueKeysWithValues: byClass.map { ($0.assetClass, $0.total) })
+        guard !grossByClass.isEmpty else { return nil }
+        return TaxCalculator.taxBreakdown(
+            grossByClass: grossByClass,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.md) {
                 windowGrid
-                if let breakdown = viewModel.taxBreakdown {
+                if let breakdown = taxBreakdown {
                     LazyVGrid(
                         columns: [GridItem(.adaptive(minimum: 280), spacing: Theme.Spacing.md)],
                         spacing: Theme.Spacing.md
@@ -37,12 +66,6 @@ struct IncomeHistoryView: View {
             #else
             ToolbarItem(placement: .topBarTrailing) { refreshToolbarButton }
             #endif
-        }
-        .task {
-            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-        }
-        .onChange(of: syncService.isSyncing) { _, syncing in
-            if !syncing { viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates) }
         }
     }
 
@@ -68,7 +91,6 @@ struct IncomeHistoryView: View {
         // the background sync already ran today.
         try? await syncService.syncDividends(modelContext: modelContext, backendService: backendService)
         try? modelContext.save()
-        viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
     }
 
     /// Day / Week / Month / Year cards. Tapping selects the window for the
@@ -78,17 +100,16 @@ struct IncomeHistoryView: View {
             columns: [GridItem(.adaptive(minimum: 160), spacing: Theme.Spacing.sm)],
             spacing: Theme.Spacing.sm
         ) {
-            ForEach(viewModel.summaries, id: \.window) { summary in
+            ForEach(summaries, id: \.window) { summary in
                 windowCard(summary)
             }
         }
     }
 
     private func windowCard(_ summary: IncomeWindowSummary) -> some View {
-        let isSelected = summary.window == viewModel.selectedWindow
+        let isSelected = summary.window == selectedWindow
         return Button {
-            viewModel.selectWindow(summary.window, modelContext: modelContext,
-                                   displayCurrency: displayCurrency, rates: rates)
+            selectedWindow = summary.window
         } label: {
             TQCard {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
@@ -132,7 +153,7 @@ struct IncomeHistoryView: View {
 
     private func assetClassCard(_ detail: MoneyTaxBreakdownDetail) -> some View {
         NavigationLink {
-            AssetClassDividendsView(assetClass: detail.assetClass, window: viewModel.selectedWindow)
+            AssetClassDividendsView(assetClass: detail.assetClass, window: selectedWindow)
         } label: {
             TQCard {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
