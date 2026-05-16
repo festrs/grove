@@ -33,10 +33,7 @@ struct MacSettingsView: View {
 
 private struct GeneralSettingsTab: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.displayCurrency) private var displayCurrency
-    @Environment(\.rates) private var rates
     @Query private var settings: [UserSettings]
-    @State private var viewModel = SettingsViewModel()
     @State private var showingResetAlert = false
 
     var body: some View {
@@ -69,13 +66,11 @@ private struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .task {
-            viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-        }
         .alert("Restart Onboarding?", isPresented: $showingResetAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Restart", role: .destructive) {
-                viewModel.resetOnboarding()
+                settings.first?.hasCompletedOnboarding = false
+                try? modelContext.save()
             }
         } message: {
             Text("You will be taken to the initial flow. Your data will be preserved.")

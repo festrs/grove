@@ -1,18 +1,31 @@
 import SwiftUI
 import SwiftData
 import GroveDomain
+import GroveRepositories
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.displayCurrency) private var displayCurrency
     @Environment(\.rates) private var rates
-    @State private var viewModel = SettingsViewModel()
+    @Query private var allSettings: [UserSettings]
+    @Query private var holdings: [Holding]
     @State private var showingResetAlert = false
+
+    private var settings: UserSettings? { allSettings.first }
+
+    private var portfolioValue: Money {
+        let repo = PortfolioRepository(modelContext: modelContext)
+        return repo.computeSummary(
+            holdings: holdings,
+            displayCurrency: displayCurrency,
+            rates: rates
+        ).totalValue
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                if let settings = viewModel.settings {
+                if let settings {
                     portfolioInfoSection
                     displayCurrencySection(settings: settings)
                     goalsSection(settings: settings)
@@ -25,9 +38,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .task {
-                viewModel.loadData(modelContext: modelContext, displayCurrency: displayCurrency, rates: rates)
-            }
+            .task { ensureSettings() }
         }
     }
 
@@ -62,11 +73,8 @@ struct SettingsView: View {
                     Spacer()
                 }
             }
-            LabeledContent("Assets", value: "\(viewModel.holdingCount)")
-            LabeledContent(
-                "Total Value",
-                value: viewModel.portfolioValue.formatted()
-            )
+            LabeledContent("Assets", value: "\(holdings.count)")
+            LabeledContent("Total Value", value: portfolioValue.formatted())
         }
     }
 
@@ -98,7 +106,8 @@ struct SettingsView: View {
             .alert("Restart Onboarding?", isPresented: $showingResetAlert) {
                 Button("Cancel", role: .cancel) {}
                 Button("Restart", role: .destructive) {
-                    viewModel.resetOnboarding()
+                    settings?.hasCompletedOnboarding = false
+                    try? modelContext.save()
                 }
             } message: {
                 Text("You will be taken to the initial flow. Your data will be preserved.")
@@ -106,6 +115,14 @@ struct SettingsView: View {
         }
     }
 
+    /// Bootstrap a UserSettings record if onboarding never ran (defensive —
+    /// the onboarding flow normally seeds it). Without this, Settings would
+    /// render an empty Form on a fresh install.
+    private func ensureSettings() {
+        guard allSettings.isEmpty else { return }
+        modelContext.insert(UserSettings())
+        try? modelContext.save()
+    }
 }
 
 #Preview {
