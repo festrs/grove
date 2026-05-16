@@ -257,27 +257,46 @@ struct HoldingDetailView: View {
                         .font(.subheadline).foregroundStyle(.secondary)
                         .padding(.vertical, Theme.Spacing.sm)
                 } else {
-                    ForEach(transactions, id: \.date) { c in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(c.isBuy ? "Buy" : "Sell")
-                                    .font(.caption).fontWeight(.medium)
-                                    .foregroundStyle(c.isBuy ? Color.tqAccentGreen : Color.orange)
-                                Text(c.date, style: .date)
-                                    .font(.caption2).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("\(c.isBuy ? "+" : "")\(c.shares) shares")
-                                    .font(.subheadline).fontWeight(.medium)
-                                Text(c.pricePerShare.formatted(as: holding.currency) + "/share")
-                                    .font(.caption2).foregroundStyle(.secondary)
-                            }
+                    // List + swipeActions is the only native way to get
+                    // edge-swipe delete. We strip List chrome so it matches
+                    // the surrounding TQCard.
+                    List {
+                        ForEach(transactions, id: \.persistentModelID) { t in
+                            TransactionHistoryRow(transaction: t, currency: holding.currency)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: Theme.Spacing.xs, leading: 0, bottom: Theme.Spacing.xs, trailing: 0))
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        viewModel.requestDeleteTransaction(t)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                         }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .scrollDisabled(true)
+                    .frame(height: CGFloat(transactions.count) * 56)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .confirmationDialog(
+            "Delete this transaction?",
+            isPresented: Binding(
+                get: { viewModel.pendingDeletion != nil },
+                set: { if !$0 { viewModel.cancelDeleteTransaction() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete transaction", role: .destructive) {
+                viewModel.confirmDeleteTransaction(modelContext: modelContext)
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelDeleteTransaction()
+            }
         }
     }
 
@@ -313,6 +332,30 @@ struct HoldingDetailView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct TransactionHistoryRow: View {
+    let transaction: GroveDomain.Transaction
+    let currency: Currency
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(transaction.isBuy ? "Buy" : "Sell")
+                    .font(.caption).fontWeight(.medium)
+                    .foregroundStyle(transaction.isBuy ? Color.tqAccentGreen : Color.orange)
+                Text(transaction.date, style: .date)
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(verbatim: "\(transaction.isBuy ? "+" : "")\(transaction.shares) shares")
+                    .font(.subheadline).fontWeight(.medium)
+                Text(verbatim: transaction.pricePerShare.formatted(as: currency) + "/share")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
         }
     }
 }

@@ -4533,6 +4533,38 @@
         }
       }
     },
+    "Delete this transaction?" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta transacción?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir esta transação?"
+          }
+        }
+      }
+    },
+    "Delete transaction" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar transacción"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir transação"
+          }
+        }
+      }
+    },
     "Try Again" : {
       "localizations" : {
         "es" : {

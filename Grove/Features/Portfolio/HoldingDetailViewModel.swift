@@ -22,6 +22,10 @@ final class HoldingDetailViewModel {
     var showingBuy = false
     var showingSell = false
 
+    /// Set when the user swipes Delete on a Transaction row. Drives the
+    /// confirmation dialog. Nil means no pending deletion.
+    var pendingDeletion: Transaction?
+
     /// Flipped synchronously the moment the user confirms removal. Drives
     /// `resolvedHolding(...)` to nil so the view stops touching the model
     /// before the delete commits — SwiftData re-materializes a deleted
@@ -123,6 +127,30 @@ final class HoldingDetailViewModel {
         }
         // On error, keep the previously-loaded fundamentals — better than
         // wiping the user's view because of a transient hiccup.
+    }
+
+    // MARK: - Transaction deletion (history prune)
+
+    /// Stash the row the user just swiped. The view binds a confirmation
+    /// dialog to `pendingDeletion`; cancel/confirm clear it.
+    func requestDeleteTransaction(_ t: Transaction) {
+        pendingDeletion = t
+    }
+
+    func cancelDeleteTransaction() {
+        pendingDeletion = nil
+    }
+
+    /// Delete the pending Transaction from the context. Intentionally does
+    /// NOT call `recalculateFromTransactions()` — per product decision,
+    /// deletion is a log prune and must not mutate the holding's cached
+    /// quantity/averagePrice/status. The ledger and the cached numbers
+    /// reconcile on the next buy/sell. See CLAUDE.md.
+    func confirmDeleteTransaction(modelContext: ModelContext) {
+        guard let target = pendingDeletion else { return }
+        pendingDeletion = nil
+        modelContext.delete(target)
+        try? modelContext.save()
     }
 
     /// Remove the holding from the portfolio. If it still has shares, write

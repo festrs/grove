@@ -127,6 +127,78 @@ struct HoldingDetailViewModelTests {
         #expect(vm.resolvedHolding(id: id, modelContext: ctx) == nil)
     }
 
+    // MARK: - deleteTransaction
+
+    @MainActor
+    @Test func confirmDeleteTransactionRemovesIt() throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+        let h = holdings.first { $0.ticker == "ITUB3" }!
+        let target = Transaction(date: .now, amount: 320, shares: 10, pricePerShare: 32)
+        target.holding = h
+        ctx.insert(target)
+        try ctx.save()
+        let targetID = target.persistentModelID
+
+        let vm = HoldingDetailViewModel()
+        vm.loadHolding(id: h.persistentModelID, modelContext: ctx)
+        vm.requestDeleteTransaction(target)
+        vm.confirmDeleteTransaction(modelContext: ctx)
+
+        let leftover = try ctx.fetch(FetchDescriptor<Transaction>()).filter { $0.persistentModelID == targetID }
+        #expect(leftover.isEmpty)
+        #expect(vm.pendingDeletion == nil)
+    }
+
+    /// Per product decision: deleting a transaction is a log-prune. Holding's
+    /// cached `quantity` and `averagePrice` are left as-is until the next
+    /// buy/sell triggers `recalculateFromTransactions()`. See CLAUDE.md.
+    @MainActor
+    @Test func confirmDeleteTransactionDoesNotChangeQuantityOrAverage() throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+        let h = holdings.first { $0.ticker == "ITUB3" }!
+        let qBefore = h.quantity
+        let avgBefore = h.averagePrice
+        let statusBefore = h.status
+
+        let target = Transaction(date: .now, amount: 320, shares: 10, pricePerShare: 32)
+        target.holding = h
+        ctx.insert(target)
+        try ctx.save()
+
+        let vm = HoldingDetailViewModel()
+        vm.loadHolding(id: h.persistentModelID, modelContext: ctx)
+        vm.requestDeleteTransaction(target)
+        vm.confirmDeleteTransaction(modelContext: ctx)
+
+        #expect(h.quantity == qBefore, "Delete must not recalculate quantity")
+        #expect(h.averagePrice == avgBefore, "Delete must not recalculate averagePrice")
+        #expect(h.status == statusBefore, "Delete must not change status")
+    }
+
+    @MainActor
+    @Test func cancelDeleteTransactionClearsPendingState() throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+        let h = holdings.first { $0.ticker == "ITUB3" }!
+        let target = Transaction(date: .now, amount: 320, shares: 10, pricePerShare: 32)
+        target.holding = h
+        ctx.insert(target)
+        try ctx.save()
+        let targetID = target.persistentModelID
+
+        let vm = HoldingDetailViewModel()
+        vm.loadHolding(id: h.persistentModelID, modelContext: ctx)
+        vm.requestDeleteTransaction(target)
+        #expect(vm.pendingDeletion != nil)
+        vm.cancelDeleteTransaction()
+
+        #expect(vm.pendingDeletion == nil)
+        let stillThere = try ctx.fetch(FetchDescriptor<Transaction>()).filter { $0.persistentModelID == targetID }
+        #expect(stillThere.count == 1, "Cancel must not delete the transaction")
+    }
+
     // MARK: - onAppear / refreshIfNeeded
 
     @MainActor
