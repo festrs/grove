@@ -150,53 +150,65 @@ struct HoldingDetailViewModelTests {
         #expect(vm.pendingDeletion == nil)
     }
 
-    /// Per product decision: deleting a transaction is a log-prune. Holding's
-    /// cached `quantity` and `averagePrice` are left as-is until the next
-    /// buy/sell triggers `recalculateFromTransactions()`. See CLAUDE.md.
+    /// Deleting a transaction re-derives quantity/averagePrice from the
+    /// remaining ledger so the top-of-detail numbers stay consistent. See
+    /// CLAUDE.md.
     @MainActor
-    @Test func confirmDeleteTransactionDoesNotChangeQuantityOrAverage() throws {
+    @Test func confirmDeleteTransactionRecalculatesQuantityAndAverage() throws {
         let ctx = try makeTestContext()
-        let (_, holdings) = seedTestData(ctx)
-        let h = holdings.first { $0.ticker == "ITUB3" }!
-        let qBefore = h.quantity
-        let avgBefore = h.averagePrice
-        let statusBefore = h.status
-
-        let target = Transaction(date: .now, amount: 320, shares: 10, pricePerShare: 32)
-        target.holding = h
-        ctx.insert(target)
+        // Build a clean two-transaction ledger so the expected post-delete
+        // state is unambiguous, instead of relying on the seed's cached
+        // (quantity, averagePrice) which weren't derived from transactions.
+        let portfolio = Portfolio(name: "T")
+        ctx.insert(portfolio)
+        let h = Holding(ticker: "WEGE3", assetClass: .acoesBR, status: .aportar)
+        ctx.insert(h)
+        h.portfolio = portfolio
+        let firstBuy = Transaction(date: Date(timeIntervalSinceNow: -86400), amount: 1000, shares: 100, pricePerShare: 10)
+        firstBuy.holding = h
+        ctx.insert(firstBuy)
+        let secondBuy = Transaction(date: .now, amount: 600, shares: 30, pricePerShare: 20)
+        secondBuy.holding = h
+        ctx.insert(secondBuy)
+        h.recalculateFromTransactions()
         try ctx.save()
+        #expect(h.quantity == 130, "Sanity: ledger sums to 130 before delete")
 
         let vm = HoldingDetailViewModel()
         vm.loadHolding(id: h.persistentModelID, modelContext: ctx)
-        vm.requestDeleteTransaction(target)
+        vm.requestDeleteTransaction(secondBuy)
         vm.confirmDeleteTransaction(modelContext: ctx)
 
-        #expect(h.quantity == qBefore, "Delete must not recalculate quantity")
-        #expect(h.averagePrice == avgBefore, "Delete must not recalculate averagePrice")
-        #expect(h.status == statusBefore, "Delete must not change status")
+        #expect(h.quantity == 100, "Delete must re-derive quantity from the remaining ledger")
+        #expect(h.averagePrice == 10, "Delete must re-derive averagePrice from the remaining ledger")
     }
 
     @MainActor
-    @Test func deleteTransactionImmediatelyRemovesWithoutPending() throws {
+    @Test func deleteTransactionImmediatelyRecalculatesQuantity() throws {
         let ctx = try makeTestContext()
-        let (_, holdings) = seedTestData(ctx)
-        let h = holdings.first { $0.ticker == "ITUB3" }!
-        let qBefore = h.quantity
-        let target = Transaction(date: .now, amount: 320, shares: 10, pricePerShare: 32)
-        target.holding = h
-        ctx.insert(target)
+        let portfolio = Portfolio(name: "T")
+        ctx.insert(portfolio)
+        let h = Holding(ticker: "WEGE3", assetClass: .acoesBR, status: .aportar)
+        ctx.insert(h)
+        h.portfolio = portfolio
+        let firstBuy = Transaction(date: Date(timeIntervalSinceNow: -86400), amount: 1000, shares: 100, pricePerShare: 10)
+        firstBuy.holding = h
+        ctx.insert(firstBuy)
+        let secondBuy = Transaction(date: .now, amount: 600, shares: 30, pricePerShare: 20)
+        secondBuy.holding = h
+        ctx.insert(secondBuy)
+        h.recalculateFromTransactions()
         try ctx.save()
-        let targetID = target.persistentModelID
+        let targetID = secondBuy.persistentModelID
 
         let vm = HoldingDetailViewModel()
         vm.loadHolding(id: h.persistentModelID, modelContext: ctx)
-        vm.deleteTransactionImmediately(target, modelContext: ctx)
+        vm.deleteTransactionImmediately(secondBuy, modelContext: ctx)
 
         let leftover = try ctx.fetch(FetchDescriptor<Transaction>()).filter { $0.persistentModelID == targetID }
         #expect(leftover.isEmpty)
         #expect(vm.pendingDeletion == nil, "Immediate path must not set pendingDeletion")
-        #expect(h.quantity == qBefore, "Immediate delete also must not recalculate")
+        #expect(h.quantity == 100, "Immediate delete must re-derive quantity")
     }
 
     @MainActor

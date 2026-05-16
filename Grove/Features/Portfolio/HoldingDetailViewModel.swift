@@ -141,15 +141,23 @@ final class HoldingDetailViewModel {
         pendingDeletion = nil
     }
 
-    /// Delete the pending Transaction from the context. Intentionally does
-    /// NOT call `recalculateFromTransactions()` — per product decision,
-    /// deletion is a log prune and must not mutate the holding's cached
-    /// quantity/averagePrice/status. The ledger and the cached numbers
-    /// reconcile on the next buy/sell. See CLAUDE.md.
+    /// Delete the pending Transaction from the context and re-derive
+    /// quantity/averagePrice from the remaining ledger so the top-of-detail
+    /// numbers stay consistent. `recalculateFromTransactions()` clamps
+    /// quantity at 0 if the deletion would make a later sell go underwater.
+    ///
+    /// `save()` runs before `recalculateFromTransactions()` because
+    /// SwiftData's inverse-relationship array (`holding.transactions`)
+    /// doesn't drop the deleted row until the save commits — recalculating
+    /// first would re-include the doomed transaction and produce stale
+    /// quantity.
     func confirmDeleteTransaction(modelContext: ModelContext) {
         guard let target = pendingDeletion else { return }
+        let owner = target.holding
         pendingDeletion = nil
         modelContext.delete(target)
+        try? modelContext.save()
+        owner?.recalculateFromTransactions()
         try? modelContext.save()
     }
 
@@ -157,10 +165,13 @@ final class HoldingDetailViewModel {
     /// EditMode `.onDelete`, which requires the data source to shrink
     /// the same tick the closure returns. Edit-mode users already pass
     /// through Edit → minus → red Delete (3 deliberate taps), so the
-    /// extra confirmation would be friction. Same pruning semantics as
-    /// `confirmDeleteTransaction` — no recalc.
+    /// extra confirmation would be friction. Same recalculate semantics as
+    /// `confirmDeleteTransaction`.
     func deleteTransactionImmediately(_ target: Transaction, modelContext: ModelContext) {
+        let owner = target.holding
         modelContext.delete(target)
+        try? modelContext.save()
+        owner?.recalculateFromTransactions()
         try? modelContext.save()
     }
 
