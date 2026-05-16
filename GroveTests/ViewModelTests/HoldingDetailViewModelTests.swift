@@ -178,6 +178,28 @@ struct HoldingDetailViewModelTests {
     }
 
     @MainActor
+    @Test func deleteTransactionImmediatelyRemovesWithoutPending() throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+        let h = holdings.first { $0.ticker == "ITUB3" }!
+        let qBefore = h.quantity
+        let target = Transaction(date: .now, amount: 320, shares: 10, pricePerShare: 32)
+        target.holding = h
+        ctx.insert(target)
+        try ctx.save()
+        let targetID = target.persistentModelID
+
+        let vm = HoldingDetailViewModel()
+        vm.loadHolding(id: h.persistentModelID, modelContext: ctx)
+        vm.deleteTransactionImmediately(target, modelContext: ctx)
+
+        let leftover = try ctx.fetch(FetchDescriptor<Transaction>()).filter { $0.persistentModelID == targetID }
+        #expect(leftover.isEmpty)
+        #expect(vm.pendingDeletion == nil, "Immediate path must not set pendingDeletion")
+        #expect(h.quantity == qBefore, "Immediate delete also must not recalculate")
+    }
+
+    @MainActor
     @Test func cancelDeleteTransactionClearsPendingState() throws {
         let ctx = try makeTestContext()
         let (_, holdings) = seedTestData(ctx)

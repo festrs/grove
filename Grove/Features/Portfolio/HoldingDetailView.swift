@@ -10,6 +10,7 @@ struct HoldingDetailView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var viewModel = HoldingDetailViewModel()
+    @State private var transactionEditMode: EditMode = .inactive
 
     private var holding: Holding? {
         viewModel.resolvedHolding(id: holdingID, modelContext: modelContext)
@@ -247,19 +248,29 @@ struct HoldingDetailView: View {
     }
 
     private func transactionHistorySection(_ holding: Holding) -> some View {
-        TQCard {
+        let transactions = holding.recentTransactions
+        return TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Transaction History").font(.headline)
+                HStack {
+                    Text("Transaction History").font(.headline)
+                    Spacer()
+                    if !transactions.isEmpty {
+                        Button(transactionEditMode.isEditing ? "Done" : "Edit") {
+                            withAnimation {
+                                transactionEditMode = transactionEditMode.isEditing ? .inactive : .active
+                            }
+                        }
+                        .font(.subheadline)
+                    }
+                }
 
-                let transactions = holding.recentTransactions
                 if transactions.isEmpty {
                     Text("No transactions recorded.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .padding(.vertical, Theme.Spacing.sm)
                 } else {
-                    // List + swipeActions is the only native way to get
-                    // edge-swipe delete. We strip List chrome so it matches
-                    // the surrounding TQCard.
+                    // List is required for native EditMode + swipe + onDelete.
+                    // Chrome is stripped so it matches the surrounding TQCard.
                     List {
                         ForEach(transactions, id: \.persistentModelID) { t in
                             TransactionHistoryRow(transaction: t, currency: holding.currency)
@@ -273,12 +284,31 @@ struct HoldingDetailView: View {
                                         Label("Delete", systemImage: "trash")
                                     }
                                 }
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        viewModel.requestDeleteTransaction(t)
+                                    } label: {
+                                        Label("Delete transaction", systemImage: "trash")
+                                    }
+                                }
+                        }
+                        .onDelete { offsets in
+                            // `.onDelete` requires the data to shrink
+                            // synchronously when the closure returns —
+                            // otherwise UICollectionView asserts. Edit-mode
+                            // already takes 3 taps (Edit → minus → red
+                            // Delete), so skip the confirmation dialog here.
+                            // Swipe and long-press still confirm.
+                            for index in offsets {
+                                viewModel.deleteTransactionImmediately(transactions[index], modelContext: modelContext)
+                            }
                         }
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                     .scrollDisabled(true)
                     .frame(height: CGFloat(transactions.count) * 56)
+                    .environment(\.editMode, $transactionEditMode)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

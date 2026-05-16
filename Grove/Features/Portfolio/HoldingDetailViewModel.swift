@@ -153,6 +153,17 @@ final class HoldingDetailViewModel {
         try? modelContext.save()
     }
 
+    /// Synchronous delete with no confirmation — used by SwiftUI's
+    /// EditMode `.onDelete`, which requires the data source to shrink
+    /// the same tick the closure returns. Edit-mode users already pass
+    /// through Edit → minus → red Delete (3 deliberate taps), so the
+    /// extra confirmation would be friction. Same pruning semantics as
+    /// `confirmDeleteTransaction` — no recalc.
+    func deleteTransactionImmediately(_ target: Transaction, modelContext: ModelContext) {
+        modelContext.delete(target)
+        try? modelContext.save()
+    }
+
     /// Remove the holding from the portfolio. If it still has shares, write
     /// a zeroing-out Transaction first so historical reports don't lose
     /// the position outright. Flips `didRemove` synchronously *before*
