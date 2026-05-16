@@ -90,7 +90,17 @@ private struct PortfolioSettingsTab: View {
     @Environment(\.displayCurrency) private var displayCurrency
     @Environment(\.rates) private var rates
     @Query private var holdings: [Holding]
-    @State private var allocationVM = AllocationSettingsViewModel()
+    @Query private var allSettings: [UserSettings]
+
+    @State private var weights: [AssetClassType: Double] = .defaultAssetClassZeros
+    @State private var loaded = false
+
+    private var settings: UserSettings? { allSettings.first }
+
+    private var hasChanges: Bool {
+        guard let stored = settings?.classAllocations.withMissingAssetClassZeros else { return false }
+        return weights != stored
+    }
 
     private var totalValue: Money {
         let repo = PortfolioRepository(modelContext: modelContext)
@@ -113,13 +123,13 @@ private struct PortfolioSettingsTab: View {
                             .frame(width: 10, height: 10)
                         Text(cls.displayName)
                         Spacer()
-                        Text("\(Int(allocationVM.weights[cls] ?? 0))%")
+                        Text("\(Int(weights[cls] ?? 0))%")
                             .monospacedDigit()
-                            .foregroundStyle((allocationVM.weights[cls] ?? 0) > 0 ? .primary : .secondary)
+                            .foregroundStyle((weights[cls] ?? 0) > 0 ? .primary : .secondary)
                             .frame(width: 44, alignment: .trailing)
                         Stepper("", value: Binding(
-                            get: { allocationVM.weights[cls] ?? 0 },
-                            set: { allocationVM.setWeight($0, for: cls) }
+                            get: { weights[cls] ?? 0 },
+                            set: { weights[cls] = $0 }
                         ), in: 0...100, step: 1)
                         .labelsHidden()
                     }
@@ -128,21 +138,19 @@ private struct PortfolioSettingsTab: View {
                 HStack {
                     Text("Total").fontWeight(.semibold)
                     Spacer()
-                    Text("\(Int(allocationVM.total))%")
+                    Text("\(Int(weights.allocationTotal))%")
                         .monospacedDigit()
                         .fontWeight(.bold)
-                        .foregroundStyle(allocationVM.isValid ? Color.tqAccentGreen : Color.tqNegative)
+                        .foregroundStyle(weights.isValidAllocation ? Color.tqAccentGreen : Color.tqNegative)
                 }
             } header: {
                 HStack {
                     Text("Allocation by Class")
                     Spacer()
-                    if allocationVM.hasChanges {
-                        Button("Save") {
-                            allocationVM.save(modelContext: modelContext)
-                        }
-                        .controlSize(.small)
-                        .disabled(!allocationVM.isValid)
+                    if hasChanges {
+                        Button("Save", action: save)
+                            .controlSize(.small)
+                            .disabled(!weights.isValidAllocation)
                     }
                 }
             } footer: {
@@ -152,7 +160,17 @@ private struct PortfolioSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { allocationVM.load(modelContext: modelContext) }
+        .task {
+            guard !loaded else { return }
+            weights = settings?.classAllocations.withMissingAssetClassZeros ?? .defaultAssetClassZeros
+            loaded = true
+        }
+    }
+
+    private func save() {
+        guard weights.isValidAllocation, let settings else { return }
+        settings.classAllocations = weights
+        try? modelContext.save()
     }
 }
 

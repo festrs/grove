@@ -4,28 +4,29 @@ import GroveDomain
 
 struct AllocationSettingsView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var viewModel = AllocationSettingsViewModel()
+    @Query private var allSettings: [UserSettings]
+
+    @State private var weights: [AssetClassType: Double] = .defaultAssetClassZeros
+    @State private var loaded = false
+
+    private var settings: UserSettings? { allSettings.first }
+
+    private var hasChanges: Bool {
+        guard let stored = settings?.classAllocations.withMissingAssetClassZeros else { return false }
+        return weights != stored
+    }
 
     var body: some View {
         Form {
             Section {
-                TQAssetClassWeightsEditor(
-                    weights: Binding(
-                        get: { viewModel.weights },
-                        set: { newValue in
-                            for (cls, value) in newValue where viewModel.weights[cls] != value {
-                                viewModel.setWeight(value, for: cls)
-                            }
-                        }
-                    )
-                )
+                TQAssetClassWeightsEditor(weights: $weights)
             } header: {
                 Text("Allocation by Class")
             } footer: {
                 Text("Define how much of your total assets each class should represent. Must sum to 100%.")
             }
 
-            if !viewModel.isValid {
+            if !weights.isValidAllocation {
                 Section {
                     Text("Allocation must sum to 100%.")
                         .font(.caption)
@@ -38,15 +39,23 @@ struct AllocationSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            if viewModel.hasChanges {
+            if hasChanges {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        viewModel.save(modelContext: modelContext)
-                    }
-                    .disabled(!viewModel.isValid)
+                    Button("Save", action: save)
+                        .disabled(!weights.isValidAllocation)
                 }
             }
         }
-        .onAppear { viewModel.load(modelContext: modelContext) }
+        .task {
+            guard !loaded else { return }
+            weights = settings?.classAllocations.withMissingAssetClassZeros ?? .defaultAssetClassZeros
+            loaded = true
+        }
+    }
+
+    private func save() {
+        guard weights.isValidAllocation, let settings else { return }
+        settings.classAllocations = weights
+        try? modelContext.save()
     }
 }
