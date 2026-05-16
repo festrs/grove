@@ -34,8 +34,8 @@ public final class Holding {
     @Relationship(deleteRule: .cascade, inverse: \DividendPayment.holding)
     public var dividends: [DividendPayment]
 
-    @Relationship(deleteRule: .cascade, inverse: \Contribution.holding)
-    public var contributions: [Contribution]
+    @Relationship(deleteRule: .cascade, inverse: \Transaction.holding)
+    public var transactions: [Transaction]
 
     // MARK: - Computed Properties
 
@@ -67,6 +67,27 @@ public final class Holding {
 
     public var hasCompanyInfo: Bool {
         sector != nil || marketCap != nil || logoURL != nil
+    }
+
+    /// Custom holdings have no backend record, so the chart, fundamentals,
+    /// company-info, and dividend-history sections of detail screens have
+    /// nothing to show. Three flags so callers don't have to repeat the
+    /// `!isCustom && ...` chain at every site.
+    public var hasBackendEnrichment: Bool { !isCustom }
+
+    public var hasPriceChartContent: Bool {
+        !isCustom && assetClass.hasPriceHistory
+    }
+
+    public var hasDividendHistoryContent: Bool {
+        !isCustom && assetClass.hasDividends
+    }
+
+    /// Most-recent transactions, newest first, capped to a UI-friendly
+    /// page size. The cap matches the original detail-view slice; bump it
+    /// if a future screen wants more history.
+    public var recentTransactions: [Transaction] {
+        Array(transactions.sorted { $0.date > $1.date }.prefix(15))
     }
 
     public var currentValue: Decimal {
@@ -135,7 +156,7 @@ public final class Holding {
     }
 
     /// Past dividends — every record with `exDate <= asOf`. No
-    /// contribution-date gating: Passive Income shows all recorded
+    /// transaction-date gating: Passive Income shows all recorded
     /// dividends, totals scale by current `quantity` (study-mode
     /// holdings naturally contribute zero).
     public func paidDividends(asOf: Date) -> [DividendPayment] {
@@ -212,7 +233,7 @@ public final class Holding {
     // payment. Tracking historical share count at ex-date is a follow-up.
 
     /// Sum of dividends with `paymentDate` inside `window` AND classified as
-    /// paid (ex-date past `asOf` and on/after first contribution).
+    /// paid (ex-date past `asOf` and on/after first transaction).
     public func paidIncome(
         in window: IncomeWindow,
         asOf: Date = .now,
@@ -256,10 +277,10 @@ public final class Holding {
     /// user owned the asset and *then* annualizing produces a 12/monthsHeld×
     /// inflation (e.g., 4 months held + 12 months of records → 3× too
     /// high). The window's effective cutoff is `max(twelve-months-ago,
-    /// firstContribution)` so annualization only scales actually-received
+    /// firstTransaction)` so annualization only scales actually-received
     /// cashflows.
     ///
-    /// When the holding has no `Contribution` records (older positions or
+    /// When the holding has no `Transaction` records (older positions or
     /// import paths that never seeded one), ownership-start is unknown — we
     /// fall back to `twelveMonthsAgo` rather than `asOf`. The earlier `asOf`
     /// default collapsed the window to empty and silently returned 0, which
@@ -279,8 +300,8 @@ public final class Holding {
         guard quantity > 0 else { return .zero(in: currency) }
 
         let twelveMonthsAgo = calendar.date(byAdding: .month, value: -12, to: asOf) ?? asOf
-        let firstContribution = contributions.map(\.date).min() ?? twelveMonthsAgo
-        let effectiveCutoff = max(twelveMonthsAgo, firstContribution)
+        let firstTransaction = transactions.map(\.date).min() ?? twelveMonthsAgo
+        let effectiveCutoff = max(twelveMonthsAgo, firstTransaction)
 
         let recent = dividends.filter {
             $0.paymentDate > effectiveCutoff && $0.paymentDate <= asOf
@@ -289,7 +310,7 @@ public final class Holding {
 
         let totalPerShare = recent.map(\.amountPerShare).reduce(Decimal.zero, +)
 
-        let monthsHeld = max(1, calendar.dateComponents([.month], from: firstContribution, to: asOf).month ?? 12)
+        let monthsHeld = max(1, calendar.dateComponents([.month], from: firstTransaction, to: asOf).month ?? 12)
         let annualizationFactor: Decimal = monthsHeld < 12
             ? Decimal(12) / Decimal(monthsHeld)
             : 1
@@ -355,18 +376,18 @@ public final class Holding {
         self.targetPercent = targetPercent
         self.isCustom = isCustom
         self.dividends = []
-        self.contributions = []
+        self.transactions = []
     }
 
-    // MARK: - Contribution-Based Recalculation
+    // MARK: - Transaction-Based Recalculation
 
-    /// Recomputes quantity and averagePrice from the contributions ledger.
-    /// Call this after inserting a new Contribution.
-    public func recalculateFromContributions() {
+    /// Recomputes quantity and averagePrice from the transactions ledger.
+    /// Call this after inserting a new Transaction.
+    public func recalculateFromTransactions() {
         var totalShares: Decimal = 0
         var totalCost: Decimal = 0
 
-        for c in contributions.sorted(by: { $0.date < $1.date }) {
+        for c in transactions.sorted(by: { $0.date < $1.date }) {
             if c.shares > 0 {
                 // Buy: add to cost basis
                 totalCost += c.shares * c.pricePerShare

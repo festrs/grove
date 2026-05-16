@@ -99,32 +99,32 @@ struct TransactionTests {
         #expect(!isValid, "Should not allow selling more shares than owned")
     }
 
-    // MARK: - Contribution Ledger
+    // MARK: - Transaction Ledger
 
     @Test func buyContributionHasPositiveShares() {
-        let contribution = Contribution(
+        let transaction = Transaction(
             date: .now,
             amount: 500 * 30, // 15000
             shares: 500,
             pricePerShare: 30
         )
 
-        #expect(contribution.shares > 0)
-        #expect(contribution.amount > 0)
-        #expect(contribution.pricePerShare == 30)
+        #expect(transaction.shares > 0)
+        #expect(transaction.amount > 0)
+        #expect(transaction.pricePerShare == 30)
     }
 
     @Test func sellContributionHasNegativeShares() {
-        let contribution = Contribution(
+        let transaction = Transaction(
             date: .now,
             amount: -(200 * 28),
             shares: -200,
             pricePerShare: 28
         )
 
-        #expect(contribution.shares < 0)
-        #expect(contribution.amount < 0)
-        #expect(contribution.pricePerShare == 28)
+        #expect(transaction.shares < 0)
+        #expect(transaction.amount < 0)
+        #expect(transaction.pricePerShare == 28)
     }
 
     @Test func removeContributionRecordsFullPosition() {
@@ -136,17 +136,17 @@ struct TransactionTests {
             assetClass: .fiis
         )
 
-        // Simulate remove: create contribution for full position
-        let contribution = Contribution(
+        // Simulate remove: create transaction for full position
+        let transaction = Transaction(
             date: .now,
             amount: -(holding.quantity * holding.currentPrice),
             shares: -holding.quantity,
             pricePerShare: holding.currentPrice
         )
 
-        #expect(contribution.shares == -50)
-        #expect(contribution.amount == -5250)
-        #expect(contribution.pricePerShare == 105)
+        #expect(transaction.shares == -50)
+        #expect(transaction.amount == -5250)
+        #expect(transaction.pricePerShare == 105)
     }
 
     // MARK: - Weighted Average Price
@@ -231,15 +231,15 @@ struct TransactionTests {
         #expect(holding.gainLossPercent == 20, "Gain % stays the same")
     }
 
-    // MARK: - recalculateFromContributions
+    // MARK: - recalculateFromTransactions
 
     @Test func recalculateFromBuyOnly() {
         let holding = Holding(ticker: "TEST", assetClass: .acoesBR)
-        let c1 = Contribution(date: .now, amount: 1000, shares: 100, pricePerShare: 10)
+        let c1 = Transaction(date: .now, amount: 1000, shares: 100, pricePerShare: 10)
         c1.holding = holding
-        holding.contributions = [c1]
+        holding.transactions = [c1]
 
-        holding.recalculateFromContributions()
+        holding.recalculateFromTransactions()
 
         #expect(holding.quantity == 100)
         #expect(holding.averagePrice == 10)
@@ -247,16 +247,16 @@ struct TransactionTests {
 
     @Test func recalculateFromBuyAndSell() {
         let holding = Holding(ticker: "TEST", assetClass: .acoesBR)
-        let buy = Contribution(date: .now, amount: 1000, shares: 100, pricePerShare: 10)
+        let buy = Transaction(date: .now, amount: 1000, shares: 100, pricePerShare: 10)
         buy.holding = holding
-        let sell = Contribution(
+        let sell = Transaction(
             date: Date.now.addingTimeInterval(3600),
             amount: -500, shares: -50, pricePerShare: 10
         )
         sell.holding = holding
-        holding.contributions = [buy, sell]
+        holding.transactions = [buy, sell]
 
-        holding.recalculateFromContributions()
+        holding.recalculateFromTransactions()
 
         #expect(holding.quantity == 50)
         #expect(holding.averagePrice == 10, "Avg price unchanged after sell at same price")
@@ -265,17 +265,17 @@ struct TransactionTests {
     @Test func recalculateWithMultipleBuysAndSell() {
         let holding = Holding(ticker: "TEST", assetClass: .acoesBR)
         // Buy 100 @ 10 = 1000
-        let buy1 = Contribution(date: Date(timeIntervalSince1970: 1000), amount: 1000, shares: 100, pricePerShare: 10)
+        let buy1 = Transaction(date: Date(timeIntervalSince1970: 1000), amount: 1000, shares: 100, pricePerShare: 10)
         buy1.holding = holding
         // Buy 100 @ 20 = 2000 → total 200 shares, avg 15
-        let buy2 = Contribution(date: Date(timeIntervalSince1970: 2000), amount: 2000, shares: 100, pricePerShare: 20)
+        let buy2 = Transaction(date: Date(timeIntervalSince1970: 2000), amount: 2000, shares: 100, pricePerShare: 20)
         buy2.holding = holding
         // Sell 50 → 150 shares remain, avg still 15
-        let sell = Contribution(date: Date(timeIntervalSince1970: 3000), amount: -750, shares: -50, pricePerShare: 15)
+        let sell = Transaction(date: Date(timeIntervalSince1970: 3000), amount: -750, shares: -50, pricePerShare: 15)
         sell.holding = holding
-        holding.contributions = [buy1, buy2, sell]
+        holding.transactions = [buy1, buy2, sell]
 
-        holding.recalculateFromContributions()
+        holding.recalculateFromTransactions()
 
         #expect(holding.quantity == 150)
         #expect(holding.averagePrice == 15)
@@ -285,15 +285,15 @@ struct TransactionTests {
         let holding = Holding(ticker: "TEST", assetClass: .acoesBR)
         // Sells exceed buys (e.g., legacy data with mismatched corporate-action records).
         // Quantity must clamp to 0, not go negative.
-        let buy = Contribution(date: Date(timeIntervalSince1970: 1000),
+        let buy = Transaction(date: Date(timeIntervalSince1970: 1000),
                                amount: 100, shares: 10, pricePerShare: 10)
         buy.holding = holding
-        let sell = Contribution(date: Date(timeIntervalSince1970: 2000),
+        let sell = Transaction(date: Date(timeIntervalSince1970: 2000),
                                 amount: -200, shares: -20, pricePerShare: 10)
         sell.holding = holding
-        holding.contributions = [buy, sell]
+        holding.transactions = [buy, sell]
 
-        holding.recalculateFromContributions()
+        holding.recalculateFromTransactions()
 
         #expect(holding.quantity == 0,
                 "Quantity must clamp at 0 — dropping max() would yield -10")

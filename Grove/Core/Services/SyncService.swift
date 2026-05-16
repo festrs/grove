@@ -90,7 +90,7 @@ final class SyncService {
     /// cron only refreshes upstream dividend records on tue/fri, so re-pulling
     /// more than daily just no-ops the dedup loop. Silent on failure — the
     /// manual refresh button on `AssetClassDividendsView` is the recovery
-    /// path, and the on-Contribution scrape covers brand-new tickers.
+    /// path, and the on-Transaction scrape covers brand-new tickers.
     func syncDividendsIfStale(modelContext: ModelContext, backendService: any BackendServiceProtocol) async {
         let defaults = UserDefaults.standard
         if let last = defaults.object(forKey: Self.lastDividendSyncKey) as? Date,

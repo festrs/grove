@@ -165,9 +165,9 @@ extension IncomeAggregator {
     ///
     /// Used by `topPayers` and `concentration`. Switched away from
     /// `empiricalAnnualGross` because that helper gates by the holding's
-    /// first `Contribution`.date, which silently dropped users whose
-    /// holdings were added with the default `Contribution.date = .now`
-    /// (every backfilled dividend predates the contribution → return 0).
+    /// first `Transaction`.date, which silently dropped users whose
+    /// holdings were added with the default `Transaction.date = .now`
+    /// (every backfilled dividend predates the transaction → return 0).
     /// The trend chart never applied that gate, so the two views drifted
     /// apart and these widgets reported "No paying holdings yet" while
     /// the chart clearly showed bars.

@@ -13,7 +13,7 @@ struct GoalSettingsViewModelTests {
     private static func makeContext() throws -> ModelContext {
         let schema = Schema([
             Portfolio.self, Holding.self, UserSettings.self,
-            DividendPayment.self, Contribution.self
+            DividendPayment.self, Transaction.self
         ])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])

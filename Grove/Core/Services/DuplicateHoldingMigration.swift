@@ -9,9 +9,9 @@ import GroveDomain
 ///
 /// Rule: per Portfolio, group by canonical `ticker` (already normalized at
 /// `Holding.init`). Where a group has >1, keep the row with the richest
-/// history (most contributions, tiebreak: most dividends, then identifier
+/// history (most transactions, tiebreak: most dividends, then identifier
 /// ordering). Reassign the duplicates' Contributions and DividendPayments to
-/// the primary, recalculate from contributions, then delete the duplicates.
+/// the primary, recalculate from transactions, then delete the duplicates.
 /// Promote `.estudo` → `.aportar` on the primary if quantity ends up > 0.
 ///
 /// Runs after `TickerCanonicalizationMigration` so rows that only became
@@ -53,8 +53,8 @@ enum DuplicateHoldingMigration {
             let duplicates = group.filter { $0 !== primary }
 
             for dup in duplicates {
-                for contribution in dup.contributions {
-                    contribution.holding = primary
+                for transaction in dup.transactions {
+                    transaction.holding = primary
                 }
                 for dividend in dup.dividends {
                     dividend.holding = primary
@@ -63,7 +63,7 @@ enum DuplicateHoldingMigration {
                 deleted += 1
             }
 
-            primary.recalculateFromContributions()
+            primary.recalculateFromTransactions()
             if primary.quantity > 0 && primary.status == .estudo {
                 primary.status = .aportar
             }
@@ -77,8 +77,8 @@ enum DuplicateHoldingMigration {
     /// tiebreaker so repeated runs pick the same primary.
     private static func pickPrimary(from group: [Holding]) -> Holding {
         group.max { lhs, rhs in
-            if lhs.contributions.count != rhs.contributions.count {
-                return lhs.contributions.count < rhs.contributions.count
+            if lhs.transactions.count != rhs.transactions.count {
+                return lhs.transactions.count < rhs.transactions.count
             }
             if lhs.dividends.count != rhs.dividends.count {
                 return lhs.dividends.count < rhs.dividends.count

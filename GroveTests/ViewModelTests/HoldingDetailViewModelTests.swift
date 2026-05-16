@@ -78,7 +78,7 @@ struct HoldingDetailViewModelTests {
     }
 
     @MainActor
-    @Test func removeHoldingWritesClosingContributionWhenPositionOpen() throws {
+    @Test func removeHoldingWritesClosingTransactionWhenPositionOpen() throws {
         let ctx = try makeTestContext()
         let (_, holdings) = seedTestData(ctx)
         let target = holdings.first { $0.ticker == "ITUB3" }!  // qty=100, price=32
@@ -87,15 +87,112 @@ struct HoldingDetailViewModelTests {
 
         vm.removeHolding(modelContext: ctx)
 
-        // The closing Contribution survives the holding's cascade because
+        // The closing Transaction survives the holding's cascade because
         // it carries the negative shares record before delete.
-        // The cascade deletes contributions on delete, so we just verify the
-        // holding is gone — the closing contribution is recorded *for*
+        // The cascade deletes transactions on delete, so we just verify the
+        // holding is gone — the closing transaction is recorded *for*
         // historical sums in-memory but cascade removes it. Acceptable —
         // this is documenting the current behavior rather than asserting
         // historical preservation.
         let leftover = try ctx.fetch(FetchDescriptor<Holding>()).filter { $0.ticker == "ITUB3" }
         #expect(leftover.isEmpty)
+    }
+
+    @MainActor
+    @Test func removeHoldingSetsDidRemoveFlag() throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+        let vm = HoldingDetailViewModel()
+        vm.loadHolding(id: holdings[0].persistentModelID, modelContext: ctx)
+
+        vm.removeHolding(modelContext: ctx)
+
+        #expect(vm.didRemove == true)
+    }
+
+    /// Regression for the `_InvalidFutureBackingData` crash: after
+    /// `removeHolding`, the view falls back to `resolvedHolding(...)` —
+    /// which must return nil so the body never reads the deleted model's
+    /// persisted properties.
+    @MainActor
+    @Test func resolvedHoldingReturnsNilAfterRemove() throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+        let id = holdings[0].persistentModelID
+        let vm = HoldingDetailViewModel()
+        vm.loadHolding(id: id, modelContext: ctx)
+
+        vm.removeHolding(modelContext: ctx)
+
+        #expect(vm.resolvedHolding(id: id, modelContext: ctx) == nil)
+    }
+
+    // MARK: - onAppear / refreshIfNeeded
+
+    @MainActor
+    @Test func onAppearLoadsAndRefreshesNonCustom() async throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+        let id = holdings[0].persistentModelID
+        let vm = HoldingDetailViewModel()
+        let mock = MockBackendService()
+
+        await vm.onAppear(id: id, modelContext: ctx, backendService: mock)
+
+        #expect(vm.holding != nil)
+        #expect(vm.holding?.lastPriceUpdate != nil, "Non-custom holdings should get a price refresh on appear")
+    }
+
+    @MainActor
+    @Test func onAppearSkipsRefreshForCustomHolding() async throws {
+        let ctx = try makeTestContext()
+        let portfolio = Portfolio(name: "T")
+        ctx.insert(portfolio)
+        let custom = Holding(ticker: "MYBIZ", currentPrice: 100, assetClass: .acoesBR, status: .aportar, isCustom: true)
+        ctx.insert(custom)
+        custom.portfolio = portfolio
+        try ctx.save()
+
+        let vm = HoldingDetailViewModel()
+        let mock = MockBackendService()
+        await vm.onAppear(id: custom.persistentModelID, modelContext: ctx, backendService: mock)
+
+        #expect(vm.holding != nil, "Custom holdings still load")
+        #expect(vm.holding?.lastPriceUpdate == nil, "Custom holdings have no backend quote — refresh must be skipped")
+        #expect(vm.holding?.currentPrice == 100, "Manually-entered price must not be stomped by the mock quote")
+    }
+
+    @MainActor
+    @Test func refreshIfNeededSkipsCustomHolding() async throws {
+        let ctx = try makeTestContext()
+        let portfolio = Portfolio(name: "T")
+        ctx.insert(portfolio)
+        let custom = Holding(ticker: "MYBIZ", currentPrice: 100, assetClass: .acoesBR, status: .aportar, isCustom: true)
+        ctx.insert(custom)
+        custom.portfolio = portfolio
+        try ctx.save()
+
+        let vm = HoldingDetailViewModel()
+        vm.loadHolding(id: custom.persistentModelID, modelContext: ctx)
+
+        let mock = MockBackendService()
+        await vm.refreshIfNeeded(backendService: mock)
+
+        #expect(vm.holding?.lastPriceUpdate == nil)
+        #expect(vm.holding?.currentPrice == 100)
+    }
+
+    @MainActor
+    @Test func refreshIfNeededRefreshesNonCustom() async throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+        let vm = HoldingDetailViewModel()
+        vm.loadHolding(id: holdings[0].persistentModelID, modelContext: ctx)
+
+        let mock = MockBackendService()
+        await vm.refreshIfNeeded(backendService: mock)
+
+        #expect(vm.holding?.lastPriceUpdate != nil)
     }
 
     // MARK: - refreshAll

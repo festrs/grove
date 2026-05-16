@@ -176,5 +176,5 @@ struct DividendCalendarView: View {
 
 #Preview {
     DividendCalendarView()
-        .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, Contribution.self, UserSettings.self], inMemory: true)
+        .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, GroveDomain.Transaction.self, UserSettings.self], inMemory: true)
 }

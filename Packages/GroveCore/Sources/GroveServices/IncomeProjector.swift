@@ -14,7 +14,7 @@ public enum OnTrackStatus: Sendable, Equatable {
     /// Behind by more than 36 months.
     case far(year: Int, yearsShort: Int)
     /// Sim hit the 50-year cap — the user needs to bump contribution capacity.
-    case needContribution(year: Int)
+    case needTransaction(year: Int)
 }
 
 public struct IncomeProjection: Sendable {
@@ -80,7 +80,7 @@ public struct IncomeProjection: Sendable {
         if progressPercent >= 100 { return .hidden }
 
         if estimatedMonthsToGoal == nil {
-            return .needContribution(year: year)
+            return .needTransaction(year: year)
         }
         guard let onTrack = onTrackForTargetYear else { return .hidden }
         if onTrack { return .onTrack(year: year) }

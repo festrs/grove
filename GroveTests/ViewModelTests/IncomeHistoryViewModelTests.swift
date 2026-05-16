@@ -19,7 +19,7 @@ struct IncomeHistoryViewModelTests {
         let exDate = Calendar.current.date(byAdding: .day, value: -2, to: .now) ?? .now
 
         for h in holdings where h.status != .estudo {
-            let c = Contribution(date: firstBuy, amount: 1, shares: h.quantity, pricePerShare: h.averagePrice)
+            let c = Transaction(date: firstBuy, amount: 1, shares: h.quantity, pricePerShare: h.averagePrice)
             ctx.insert(c); c.holding = h
             let p = DividendPayment(exDate: exDate, paymentDate: payDate, amountPerShare: 1)
             ctx.insert(p); p.holding = h

@@ -81,8 +81,8 @@ struct NewTransactionViewModelTests {
         let ok = vm.submit(modelContext: ctx, backendService: backend)
         #expect(ok == true)
         #expect(study.status == .aportar, "First buy on a study holding promotes to aportar")
-        let contributions = try ctx.fetch(FetchDescriptor<Contribution>())
-        #expect(contributions.contains { $0.holding?.ticker == "WEGE3" })
+        let transactions = try ctx.fetch(FetchDescriptor<Transaction>())
+        #expect(transactions.contains { $0.holding?.ticker == "WEGE3" })
     }
 
     // MARK: - submit (buy with new asset)
@@ -119,10 +119,10 @@ struct NewTransactionViewModelTests {
         let h = Holding(ticker: "X", quantity: 10, currentPrice: 5, assetClass: .acoesBR, status: .aportar)
         ctx.insert(h)
         h.portfolio = portfolio
-        let opening = Contribution(date: .now, amount: 50, shares: 10, pricePerShare: 5)
+        let opening = Transaction(date: .now, amount: 50, shares: 10, pricePerShare: 5)
         ctx.insert(opening)
         opening.holding = h
-        h.recalculateFromContributions()
+        h.recalculateFromTransactions()
         try ctx.save()
 
         let backend = MockBackendService()

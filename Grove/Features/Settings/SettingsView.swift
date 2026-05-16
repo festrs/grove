@@ -21,7 +21,6 @@ struct SettingsView: View {
                     // NotificationSettingsSection()
                     PremiumSection(settings: settings)
                     AboutSection()
-                    diagnosticsSection
                     dangerSection
                 }
             }
@@ -91,16 +90,6 @@ struct SettingsView: View {
         }
     }
 
-    private var diagnosticsSection: some View {
-        Section("Diagnostics") {
-            NavigationLink {
-                NetworkInspectorView()
-            } label: {
-                Label("Network Inspector", systemImage: "antenna.radiowaves.left.and.right")
-            }
-        }
-    }
-
     private var dangerSection: some View {
         Section {
             Button("Restart Onboarding", role: .destructive) {
@@ -121,5 +110,5 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
-        .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, Contribution.self, UserSettings.self], inMemory: true)
+        .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, GroveDomain.Transaction.self, UserSettings.self], inMemory: true)
 }

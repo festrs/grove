@@ -24,13 +24,13 @@ struct HoldingIncomeWindowTests {
     }()
 
     private static func makeContext() throws -> ModelContext {
-        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Contribution.self])
+        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Transaction.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         return ModelContext(container)
     }
 
-    /// Helper: build a holding with a contribution at Jan 1 2026 (so all
+    /// Helper: build a holding with a transaction at Jan 1 2026 (so all
     /// 2026 dividends are post-purchase).
     private static func makeHoldingWithContrib(in ctx: ModelContext, qty: Decimal = 10) -> Holding {
         let h = Holding(ticker: "HGLG11", quantity: qty, currentPrice: 100, assetClass: .fiis, status: .aportar)
@@ -39,7 +39,7 @@ struct HoldingIncomeWindowTests {
         c.year = 2026; c.month = 1; c.day = 1
         c.timeZone = TimeZone(identifier: "UTC")
         let firstBuy = Calendar(identifier: .gregorian).date(from: c)!
-        let contrib = Contribution(date: firstBuy, amount: 1000, shares: 10, pricePerShare: 100)
+        let contrib = Transaction(date: firstBuy, amount: 1000, shares: 10, pricePerShare: 100)
         ctx.insert(contrib)
         contrib.holding = h
         return h

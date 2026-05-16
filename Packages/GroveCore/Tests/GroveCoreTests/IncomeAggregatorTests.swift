@@ -25,7 +25,7 @@ struct IncomeAggregatorTests {
     }()
 
     private static func makeContext() throws -> ModelContext {
-        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Contribution.self])
+        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Transaction.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         return ModelContext(container)
@@ -47,7 +47,7 @@ struct IncomeAggregatorTests {
     ) -> Holding {
         let h = Holding(ticker: ticker, quantity: qty, currentPrice: 100, assetClass: assetClass, status: .aportar)
         ctx.insert(h)
-        let c = Contribution(date: firstBuy, amount: 1000, shares: qty, pricePerShare: 100)
+        let c = Transaction(date: firstBuy, amount: 1000, shares: qty, pricePerShare: 100)
         ctx.insert(c)
         c.holding = h
         return h
@@ -121,7 +121,7 @@ struct IncomeAggregatorTests {
         let h = Holding(ticker: "AAPL", quantity: 10, currentPrice: 100,
                         assetClass: .usStocks, currency: .usd, status: .aportar)
         ctx.insert(h)
-        let c = Contribution(date: Self.date(year: 2026, month: 1, day: 1), amount: 1000, shares: 10, pricePerShare: 100)
+        let c = Transaction(date: Self.date(year: 2026, month: 1, day: 1), amount: 1000, shares: 10, pricePerShare: 100)
         ctx.insert(c); c.holding = h
         Self.attach(DividendPayment(exDate: Self.date(year: 2026, month: 3, day: 1),
                                     paymentDate: Self.date(year: 2026, month: 3, day: 5),

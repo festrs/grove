@@ -15,8 +15,55 @@ final class HoldingDetailViewModel {
     var fundamentals: FundamentalsDTO?
     var isFundamentalsLoading = false
 
+    // UI sheet/alert state — lives on the VM so the view stays layout-only
+    // and the orchestration (e.g. flipping `showRemoveAlert` off after a
+    // confirmation) is testable.
+    var showRemoveAlert = false
+    var showingBuy = false
+    var showingSell = false
+
+    /// Flipped synchronously the moment the user confirms removal. Drives
+    /// `resolvedHolding(...)` to nil so the view stops touching the model
+    /// before the delete commits — SwiftData re-materializes a deleted
+    /// persistent ID as `_InvalidFutureBackingData`, and reading any
+    /// persisted property on that placeholder traps. There's no working
+    /// `isDeleted` flag in SwiftData to guard on instead.
+    private(set) var didRemove = false
+
     func loadHolding(id: PersistentIdentifier, modelContext: ModelContext) {
         holding = modelContext.model(for: id) as? Holding
+    }
+
+    /// `.task` entry point: load the holding, then kick off a price +
+    /// fundamentals refresh — but only for backend-tracked holdings.
+    /// Custom holdings have no quote/fundamentals source, so refreshing
+    /// would be a no-op at best and stomp manual values at worst.
+    func onAppear(
+        id: PersistentIdentifier,
+        modelContext: ModelContext,
+        backendService: any BackendServiceProtocol
+    ) async {
+        loadHolding(id: id, modelContext: modelContext)
+        guard let holding, holding.hasBackendEnrichment else { return }
+        await refreshAll(backendService: backendService)
+    }
+
+    /// `.refreshable` entry point: same gate as `onAppear` but without
+    /// the load step (pull-to-refresh runs while the view already has a
+    /// loaded holding).
+    func refreshIfNeeded(backendService: any BackendServiceProtocol) async {
+        guard let holding, holding.hasBackendEnrichment else { return }
+        await refreshAll(backendService: backendService)
+    }
+
+    /// Source of truth the view should read for "what holding to render."
+    /// Falls back to a context lookup so the first frame after navigation
+    /// has data without waiting on `.task`, but short-circuits once
+    /// removal has begun so the body never reads a soon-to-be-invalid
+    /// SwiftData object.
+    func resolvedHolding(id: PersistentIdentifier, modelContext: ModelContext) -> Holding? {
+        guard !didRemove else { return nil }
+        return holding ?? (modelContext.model(for: id) as? Holding)
     }
 
     /// Refresh price + fundamentals concurrently. Each branch swallows its
@@ -79,19 +126,23 @@ final class HoldingDetailViewModel {
     }
 
     /// Remove the holding from the portfolio. If it still has shares, write
-    /// a zeroing-out Contribution first so historical reports don't lose
-    /// the position outright. View is responsible for dismissing.
+    /// a zeroing-out Transaction first so historical reports don't lose
+    /// the position outright. Flips `didRemove` synchronously *before*
+    /// touching the context so any concurrent body render reads through
+    /// `resolvedHolding(...)` and gets nil instead of a doomed SwiftData
+    /// object. View is responsible for dismissing.
     func removeHolding(modelContext: ModelContext) {
         guard let holding else { return }
+        didRemove = true
         if holding.hasPosition {
-            let contribution = Contribution(
+            let transaction = Transaction(
                 date: .now,
                 amount: -(holding.quantity * holding.currentPrice),
                 shares: -holding.quantity,
                 pricePerShare: holding.currentPrice
             )
-            contribution.holding = holding
-            modelContext.insert(contribution)
+            transaction.holding = holding
+            modelContext.insert(transaction)
         }
         modelContext.delete(holding)
         try? modelContext.save()

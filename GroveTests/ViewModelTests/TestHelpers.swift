@@ -10,7 +10,7 @@ import GroveDomain
 let sharedTestContainer: ModelContainer = {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     return try! ModelContainer(
-        for: Portfolio.self, Holding.self, DividendPayment.self, Contribution.self, UserSettings.self,
+        for: Portfolio.self, Holding.self, DividendPayment.self, Transaction.self, UserSettings.self,
         configurations: config
     )
 }()
@@ -23,8 +23,8 @@ func makeTestContext() throws -> ModelContext {
     // Fetch-then-delete to respect cascade rules (batch delete doesn't).
     let dividends = try ctx.fetch(FetchDescriptor<DividendPayment>())
     dividends.forEach { ctx.delete($0) }
-    let contributions = try ctx.fetch(FetchDescriptor<Contribution>())
-    contributions.forEach { ctx.delete($0) }
+    let transactions = try ctx.fetch(FetchDescriptor<Transaction>())
+    transactions.forEach { ctx.delete($0) }
     let holdings = try ctx.fetch(FetchDescriptor<Holding>())
     holdings.forEach { ctx.delete($0) }
     let portfolios = try ctx.fetch(FetchDescriptor<Portfolio>())

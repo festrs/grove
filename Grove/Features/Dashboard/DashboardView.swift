@@ -20,13 +20,13 @@ struct DashboardView: View {
 
     @Query(sort: \Holding.ticker) private var holdings: [Holding]
     @Query private var settingsList: [UserSettings]
-    // Observe the dividend + contribution stores so the gauge refreshes when
+    // Observe the dividend + transaction stores so the gauge refreshes when
     // iCloud fans new payments in after launch or a buy/sell updates a
     // holding's share count. Without these, `loadData` only re-runs when the
-    // holdings *count* changes — which it doesn't on a dividend or contribution
+    // holdings *count* changes — which it doesn't on a dividend or transaction
     // arrival — and the projection sticks at whatever it computed at launch.
     @Query private var dividends: [DividendPayment]
-    @Query private var contributions: [Contribution]
+    @Query private var transactions: [GroveDomain.Transaction]
 
     @State private var viewModel = DashboardViewModel()
     @State private var isLandscape: Bool = false
@@ -154,7 +154,7 @@ struct DashboardView: View {
         }
         .onChange(of: holdings.count) { reloader.send() }
         .onChange(of: dividends.count) { reloader.send() }
-        .onChange(of: contributions.count) { reloader.send() }
+        .onChange(of: transactions.count) { reloader.send() }
         .onChange(of: syncService.isSyncing) { _, syncing in
             if !syncing { reloader.send() }
         }
@@ -265,7 +265,7 @@ struct DashboardView: View {
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(
-        for: Holding.self, UserSettings.self, DividendPayment.self, Portfolio.self, Contribution.self,
+        for: Holding.self, UserSettings.self, DividendPayment.self, Portfolio.self, GroveDomain.Transaction.self,
         configurations: config
     )
 

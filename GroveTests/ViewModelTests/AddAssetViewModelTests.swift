@@ -57,7 +57,7 @@ struct AddAssetViewModelTests {
     // MARK: - addAsset (with position)
 
     @MainActor
-    @Test func addAssetWithPositionPersistsHoldingAndContribution() async throws {
+    @Test func addAssetWithPositionPersistsHoldingAndTransaction() async throws {
         let ctx = try makeTestContext()
         let backend = MockBackendService()
         let vm = AddAssetViewModel(searchResult: Self.sampleSearch)
@@ -74,9 +74,9 @@ struct AddAssetViewModelTests {
         #expect(holdings.count == 1)
         #expect(holdings.first?.ticker == "HGLG11.SA")
         #expect(holdings.first?.status == .aportar)
-        let contributions = try ctx.fetch(FetchDescriptor<Contribution>())
-        #expect(contributions.count == 1)
-        #expect(contributions.first?.shares == 10)
+        let transactions = try ctx.fetch(FetchDescriptor<Transaction>())
+        #expect(transactions.count == 1)
+        #expect(transactions.first?.shares == 10)
     }
 
     @MainActor
@@ -94,7 +94,7 @@ struct AddAssetViewModelTests {
     // MARK: - addAsset (track only)
 
     @MainActor
-    @Test func addAssetTrackOnlyPersistsStudyHoldingWithoutContribution() async throws {
+    @Test func addAssetTrackOnlyPersistsStudyHoldingWithoutTransaction() async throws {
         let ctx = try makeTestContext()
         let backend = MockBackendService()
         let vm = AddAssetViewModel(searchResult: Self.sampleSearch)
@@ -105,8 +105,8 @@ struct AddAssetViewModelTests {
         let holdings = try ctx.fetch(FetchDescriptor<Holding>())
         #expect(holdings.count == 1)
         #expect(holdings.first?.status == .estudo)
-        let contributions = try ctx.fetch(FetchDescriptor<Contribution>())
-        #expect(contributions.isEmpty, "Track-only mode must not create a Contribution")
+        let transactions = try ctx.fetch(FetchDescriptor<Transaction>())
+        #expect(transactions.isEmpty, "Track-only mode must not create a Transaction")
     }
 
     @MainActor
@@ -194,7 +194,7 @@ struct AddAssetViewModelTests {
     }
 
     @MainActor
-    @Test func customAddWithPositionRecordsContribution() async throws {
+    @Test func customAddWithPositionRecordsTransaction() async throws {
         let ctx = try makeTestContext()
         let backend = MockBackendService()
         let vm = AddAssetViewModel.custom(symbol: "MYCOIN")
@@ -209,9 +209,9 @@ struct AddAssetViewModelTests {
         let holding = try #require(try ctx.fetch(FetchDescriptor<Holding>()).first)
         #expect(holding.isCustom == true)
         #expect(holding.status == .aportar)
-        let contributions = try ctx.fetch(FetchDescriptor<Contribution>())
-        #expect(contributions.count == 1)
-        #expect(contributions.first?.shares == 2)
+        let transactions = try ctx.fetch(FetchDescriptor<Transaction>())
+        #expect(transactions.count == 1)
+        #expect(transactions.first?.shares == 2)
     }
 
     @MainActor

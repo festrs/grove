@@ -148,21 +148,21 @@ final class NewTransactionViewModel {
             isFreshAsset = true
         }
 
-        let contribution = Contribution(date: date, amount: quantity * price, shares: quantity, pricePerShare: price)
-        contribution.holding = holding
-        modelContext.insert(contribution)
+        let transaction = Transaction(date: date, amount: quantity * price, shares: quantity, pricePerShare: price)
+        transaction.holding = holding
+        modelContext.insert(transaction)
 
         // First buy on a study holding promotes it to .aportar.
         if holding.status == .estudo {
             holding.status = .aportar
         }
 
-        holding.recalculateFromContributions()
+        holding.recalculateFromTransactions()
 
         // Auto-fetch market data: bootstrap (price + DY) for brand-new
         // assets, and trigger a since-scoped on-demand dividend scrape for
         // any buy so the user's earned-payments view picks up the new
-        // contribution window.
+        // transaction window.
         let bootstrap = TickerBootstrapService()
         Task { @MainActor in
             if isFreshAsset {
@@ -190,11 +190,11 @@ final class NewTransactionViewModel {
     ) -> Bool {
         guard let holding = selectedHolding else { return false }
 
-        let contribution = Contribution(date: date, amount: -(quantity * price), shares: -quantity, pricePerShare: price)
-        contribution.holding = holding
-        modelContext.insert(contribution)
+        let transaction = Transaction(date: date, amount: -(quantity * price), shares: -quantity, pricePerShare: price)
+        transaction.holding = holding
+        modelContext.insert(transaction)
 
-        holding.recalculateFromContributions()
+        holding.recalculateFromTransactions()
 
         if holding.quantity <= 0 {
             modelContext.delete(holding)

@@ -53,6 +53,7 @@ struct DebugMenuView: View {
         NavigationStack {
             List {
                 limitsSection
+                diagnosticsSection
                 notificationsSection
                 dataSection
                 infoSection
@@ -83,6 +84,18 @@ struct DebugMenuView: View {
             Text("Free-tier limits")
         } footer: {
             Text("Bypasses the \(AppConstants.freeTierMaxHoldings)-asset cap. DEBUG builds only.")
+        }
+    }
+
+    // MARK: - Diagnostics
+
+    private var diagnosticsSection: some View {
+        Section("Diagnostics") {
+            NavigationLink {
+                NetworkInspectorView()
+            } label: {
+                Label("Network Inspector", systemImage: "antenna.radiowaves.left.and.right")
+            }
         }
     }
 
@@ -194,7 +207,7 @@ struct DebugMenuView: View {
             modelContext.insert(holding)
             holding.portfolio = portfolio
             seedTransactions(for: holding, seedIndex: i)
-            holding.recalculateFromContributions()
+            holding.recalculateFromTransactions()
         }
 
         let settingsDesc = FetchDescriptor<UserSettings>()
@@ -232,7 +245,7 @@ struct DebugMenuView: View {
             let shares = (totalShares * shareSplits[idx]).rounded(decimals: 4)
             let price = (avg * priceJitter[idx]).rounded(decimals: 2)
             let date = calendar.date(byAdding: .month, value: monthOffsets[idx], to: .now) ?? .now
-            let buy = Contribution(
+            let buy = Transaction(
                 date: date,
                 amount: shares * price,
                 shares: shares,
@@ -246,7 +259,7 @@ struct DebugMenuView: View {
             let sellShares = (totalShares * 0.2).rounded(decimals: 4)
             let sellPrice = (avg * 0.95).rounded(decimals: 2)
             let sellDate = calendar.date(byAdding: .month, value: -1, to: .now) ?? .now
-            let sell = Contribution(
+            let sell = Transaction(
                 date: sellDate,
                 amount: -(sellShares * sellPrice),
                 shares: -sellShares,

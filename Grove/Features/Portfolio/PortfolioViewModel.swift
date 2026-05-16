@@ -45,14 +45,14 @@ final class PortfolioViewModel {
 
     func deleteHolding(_ holding: Holding, modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
         if holding.hasPosition {
-            let contribution = Contribution(
+            let transaction = Transaction(
                 date: .now,
                 amount: -(holding.quantity * holding.currentPrice),
                 shares: -holding.quantity,
                 pricePerShare: holding.currentPrice
             )
-            contribution.holding = holding
-            modelContext.insert(contribution)
+            transaction.holding = holding
+            modelContext.insert(transaction)
         }
         modelContext.delete(holding)
         holdings.removeAll { $0.ticker == holding.ticker }

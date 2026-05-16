@@ -27,7 +27,7 @@ struct IncomeProjectorTests {
     }()
 
     private static func makeContext() throws -> ModelContext {
-        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Contribution.self])
+        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Transaction.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         return ModelContext(container)
@@ -64,7 +64,7 @@ struct IncomeProjectorTests {
                         dividendYield: dy, assetClass: assetClass, currency: currency,
                         status: .aportar, targetPercent: targetPercent)
         ctx.insert(h)
-        let contrib = Contribution(date: janFirst(), amount: 1, shares: qty, pricePerShare: price)
+        let contrib = Transaction(date: janFirst(), amount: 1, shares: qty, pricePerShare: price)
         ctx.insert(contrib); contrib.holding = h
         if let amt = aprilDividendPerShare {
             // ex-date past asOf so it counts as paid; payment-date in April so it's in month window.
@@ -400,10 +400,10 @@ struct IncomeProjectorTests {
         #expect(p.targetYearStatus == .far(year: 2030, yearsShort: 15))
     }
 
-    @Test func statusNeedContributionWhenSimCappedOut() {
+    @Test func statusNeedTransactionWhenSimCappedOut() {
         // estimatedMonthsToGoal = nil → sim hit the 600-month cap
         let p = Self.projection(targetFIYear: 2046, monthsRemaining: 240, estMonths: nil, onTrack: nil)
-        #expect(p.targetYearStatus == .needContribution(year: 2046))
+        #expect(p.targetYearStatus == .needTransaction(year: 2046))
     }
 
     @Test func statusTightAtExactly36MonthGapBoundary() {
@@ -452,7 +452,7 @@ struct IncomeProjectorTests {
                         dividendYield: dy, assetClass: assetClass,
                         status: .aportar, targetPercent: 100)
         ctx.insert(h)
-        let contrib = Contribution(date: firstContribDate, amount: 1, shares: qty, pricePerShare: price)
+        let contrib = Transaction(date: firstContribDate, amount: 1, shares: qty, pricePerShare: price)
         ctx.insert(contrib); contrib.holding = h
         for r in records {
             let p = DividendPayment(exDate: r.ex, paymentDate: r.payment, amountPerShare: r.perShare)
@@ -504,7 +504,7 @@ struct IncomeProjectorTests {
                         dividendYield: 12, assetClass: .fiis,
                         status: .aportar, targetPercent: 100)
         ctx.insert(h)
-        let contrib = Contribution(date: Self.calDate(2025, 12, 1), amount: 1, shares: 100, pricePerShare: 100)
+        let contrib = Transaction(date: Self.calDate(2025, 12, 1), amount: 1, shares: 100, pricePerShare: 100)
         ctx.insert(contrib); contrib.holding = h
         let asOf = Self.calDate(2026, 1, 5)
         let projection = IncomeProjector.project(
@@ -595,9 +595,9 @@ struct IncomeProjectorTests {
                 "3 months of R$300 must annualize to R$1200 (drop scaling -> 300).")
     }
 
-    @Test func empiricalAnnualGrossUsesTrailingWindowWhenNoContributions() throws {
-        // Imported holding: dividend records exist but no Contribution row
-        // was seeded. Earlier behaviour defaulted firstContribution to asOf,
+    @Test func empiricalAnnualGrossUsesTrailingWindowWhenNoTransactions() throws {
+        // Imported holding: dividend records exist but no Transaction row
+        // was seeded. Earlier behaviour defaulted firstTransaction to asOf,
         // collapsing the window to empty and silently returning 0 — which is
         // why "Top dividend payers" and "Income concentration" were empty
         // for users with real records but no contribution history.

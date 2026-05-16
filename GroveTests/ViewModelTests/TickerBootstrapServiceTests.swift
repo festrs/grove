@@ -68,10 +68,10 @@ struct TickerBootstrapServiceTests {
         #expect(holding.currentPrice == 0, "Throwing backend leaves the price at 0")
     }
 
-    // MARK: - refreshDividendsAfterTransaction (only for .aportar holdings with a Contribution)
+    // MARK: - refreshDividendsAfterTransaction (only for .aportar holdings with a Transaction)
 
     @MainActor
-    @Test func refreshAfterTransactionPassesSinceFromFirstContribution() async throws {
+    @Test func refreshAfterTransactionPassesSinceFromFirstTransaction() async throws {
         let ctx = try makeTestContext()
         let portfolio = Portfolio(name: "Test")
         ctx.insert(portfolio)
@@ -84,13 +84,13 @@ struct TickerBootstrapServiceTests {
 
         let firstDate = Date(timeIntervalSince1970: 1_700_000_000) // a stable past date
         let secondDate = firstDate.addingTimeInterval(86_400 * 30)
-        let c1 = Contribution(date: firstDate, amount: 1000, shares: 10, pricePerShare: 100)
+        let c1 = Transaction(date: firstDate, amount: 1000, shares: 10, pricePerShare: 100)
         c1.holding = holding
-        let c2 = Contribution(date: secondDate, amount: 1000, shares: 10, pricePerShare: 100)
+        let c2 = Transaction(date: secondDate, amount: 1000, shares: 10, pricePerShare: 100)
         c2.holding = holding
         ctx.insert(c1)
         ctx.insert(c2)
-        holding.recalculateFromContributions()
+        holding.recalculateFromTransactions()
         try ctx.save()
 
         let backend = StubBackend()
@@ -105,11 +105,11 @@ struct TickerBootstrapServiceTests {
         #expect(refreshCalls.count == 1)
         #expect(refreshCalls.first?.symbols == ["HGLG11"])
         #expect(refreshCalls.first?.assetClass == "fiis")
-        #expect(refreshCalls.first?.since == firstDate, "Must scope by the FIRST contribution, not the latest")
+        #expect(refreshCalls.first?.since == firstDate, "Must scope by the FIRST transaction, not the latest")
     }
 
     @MainActor
-    @Test func refreshAfterTransactionSkipsWhenNoContributions() async throws {
+    @Test func refreshAfterTransactionSkipsWhenNoTransactions() async throws {
         let ctx = try makeTestContext()
         let portfolio = Portfolio(name: "Test")
         ctx.insert(portfolio)

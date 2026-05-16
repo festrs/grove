@@ -74,7 +74,7 @@ struct DomainCoverageTests {
     // MARK: - DividendPayment derived properties
 
     private static func makeContext() throws -> ModelContext {
-        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Contribution.self])
+        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Transaction.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         return ModelContext(container)
@@ -334,7 +334,7 @@ struct DomainCoverageTests {
         #expect(s.monthlyCostOfLivingMoney.currency == .brl)
     }
 
-    @Test func userSettingsExposesMonthlyContributionCapacityMoney() throws {
+    @Test func userSettingsExposesMonthlyTransactionCapacityMoney() throws {
         let ctx = try Self.makeContext()
         let s = UserSettings()
         ctx.insert(s)
@@ -344,11 +344,11 @@ struct DomainCoverageTests {
         #expect(s.monthlyContributionCapacityMoney.currency == .usd)
     }
 
-    // MARK: - Contribution
+    // MARK: - Transaction
 
-    @Test func contributionStoresShareCountAndAmount() throws {
+    @Test func transactionStoresShareCountAndAmount() throws {
         let ctx = try Self.makeContext()
-        let c = Contribution(date: Self.asOf, amount: 1_000, shares: 10, pricePerShare: 100)
+        let c = Transaction(date: Self.asOf, amount: 1_000, shares: 10, pricePerShare: 100)
         ctx.insert(c)
         #expect(c.shares == 10)
         #expect(c.amount == 1_000)

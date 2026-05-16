@@ -9,7 +9,7 @@ struct HoldingDividendsTests {
     private static let rates: any ExchangeRates = StaticRates(brlPerUsd: 5)
 
     private static func makeContext() throws -> ModelContext {
-        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Contribution.self])
+        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Transaction.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         return ModelContext(container)
@@ -24,7 +24,7 @@ struct HoldingDividendsTests {
 
     @Test func paidDividendsIncludesEveryPastDatedRecord() throws {
         let ctx = try Self.makeContext()
-        // Study-mode holding (no contributions, qty = 0) — still surfaces past dividends.
+        // Study-mode holding (no transactions, qty = 0) — still surfaces past dividends.
         let h = Holding(ticker: "HGLG11", quantity: 0, currentPrice: 100, assetClass: .fiis, status: .estudo)
         ctx.insert(h)
         let asOf = Date(timeIntervalSince1970: 1_780_000_000)
@@ -42,7 +42,7 @@ struct HoldingDividendsTests {
         )
 
         let paid = h.paidDividends(asOf: asOf)
-        #expect(paid.count == 1, "Past-dated record surfaces regardless of contributions")
+        #expect(paid.count == 1, "Past-dated record surfaces regardless of transactions")
         #expect(paid.first?.amountPerShare == 1)
     }
 

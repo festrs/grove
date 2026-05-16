@@ -15,7 +15,7 @@ struct IncomeTrendsViewModelTests {
         let cal = Calendar.current
         let firstBuy = cal.date(byAdding: .month, value: -24, to: .now) ?? .now
         for h in holdings where h.status != .estudo {
-            let c = Contribution(date: firstBuy, amount: 1, shares: h.quantity, pricePerShare: h.averagePrice)
+            let c = Transaction(date: firstBuy, amount: 1, shares: h.quantity, pricePerShare: h.averagePrice)
             ctx.insert(c); c.holding = h
             for offset in 1...12 {
                 let monthBack = cal.date(byAdding: .month, value: -offset, to: .now) ?? .now
@@ -116,7 +116,7 @@ struct IncomeTrendsViewModelTests {
         let cal = Calendar.current
         let firstBuy = cal.date(byAdding: .month, value: -3, to: .now) ?? .now
         for h in holdings where h.status != .estudo {
-            let c = Contribution(date: firstBuy, amount: 1, shares: h.quantity, pricePerShare: h.averagePrice)
+            let c = Transaction(date: firstBuy, amount: 1, shares: h.quantity, pricePerShare: h.averagePrice)
             ctx.insert(c); c.holding = h
             let payDate = cal.date(byAdding: .day, value: -1, to: .now) ?? .now
             let exDate = cal.date(byAdding: .day, value: -2, to: .now) ?? .now
