@@ -6,7 +6,7 @@ import GroveDomain
 /// inserts the chosen positions, writes opening Contributions for ones with
 /// quantity, registers the symbols with the backend, and kicks off the
 /// price/yield bootstrap. Skips per-holding dividend backfill on purpose —
-/// imported contributions are dated `.now`, so a since-scoped scrape would
+/// imported transactions are dated `.now`, so a since-scoped scrape would
 /// be a no-op, and per-symbol fan-out blows through the backend's 4/min
 /// rate limit on `/refresh`. Mirrors `OnboardingViewModel`'s reasoning;
 /// users can backfill via the per-class manual refresh on the income
@@ -50,15 +50,15 @@ final class ImportPortfolioViewModel {
             if position.quantity > 0 {
                 let pricePerShare = Decimal(position.currentPrice)
                 let shares = Decimal(position.quantity)
-                let contribution = Contribution(
+                let transaction = Transaction(
                     date: .now,
                     amount: shares * pricePerShare,
                     shares: shares,
                     pricePerShare: pricePerShare
                 )
-                contribution.holding = target
-                modelContext.insert(contribution)
-                target.recalculateFromContributions()
+                transaction.holding = target
+                modelContext.insert(transaction)
+                target.recalculateFromTransactions()
                 if target.status == .estudo {
                     target.status = .aportar
                 }

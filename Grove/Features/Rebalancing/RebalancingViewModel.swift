@@ -85,16 +85,16 @@ final class RebalancingViewModel {
             )
             guard let holding = try? modelContext.fetch(descriptor).first else { continue }
 
-            let contribution = Contribution(
+            let transaction = Transaction(
                 date: .now,
                 amount: suggestion.amount.amount,
                 shares: Decimal(suggestion.sharesToBuy),
                 pricePerShare: holding.currentPrice
             )
-            contribution.holding = holding
-            modelContext.insert(contribution)
+            transaction.holding = holding
+            modelContext.insert(transaction)
 
-            holding.recalculateFromContributions()
+            holding.recalculateFromTransactions()
         }
 
         suggestions = []

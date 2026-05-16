@@ -19,7 +19,7 @@ protocol BackendServiceProtocol: Sendable {
     // On-demand dividend scrape: ask the backend to fetch fresh dividend
     // history for these symbols inline (vs waiting for the next cron tick).
     // Caller should refetch `fetchDividendsForSymbols` afterwards. Pass
-    // `since` (the holding's first-Contribution date) on the auto-bootstrap
+    // `since` (the holding's first-Transaction date) on the auto-bootstrap
     // path so we don't pull payments from before the user owned the asset;
     // omit it for the manual refresh button to allow full backfills.
     func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO

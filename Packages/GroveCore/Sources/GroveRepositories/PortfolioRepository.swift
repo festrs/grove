@@ -250,7 +250,7 @@ public struct PortfolioRepository {
             if pending.quantity > 0 {
                 let buyPrice = pending.averagePrice ?? pending.currentPrice
                 let date = pending.purchaseDate ?? .now
-                let contribution = Contribution(
+                let contribution = Transaction(
                     date: date,
                     amount: pending.quantity * buyPrice,
                     shares: pending.quantity,
@@ -258,7 +258,7 @@ public struct PortfolioRepository {
                 )
                 contribution.holding = holding
                 modelContext.insert(contribution)
-                holding.recalculateFromContributions()
+                holding.recalculateFromTransactions()
             }
         }
 

@@ -42,9 +42,11 @@ just --list             # show all available recipes
 
 ## Architecture
 
-**Pattern:** MVVM with `@Observable` (not ObservableObject/Combine). ViewModels are `@State private var viewModel = XViewModel()` in views.
+**Pattern:** Apple-style SwiftUI by default — `@State`, `@Query`, `.task`, computed properties on the view, services via `@Environment`. Reach for an `@Observable @MainActor` ViewModel only when the screen has real orchestration to encapsulate: a multi-step state machine (e.g. `HoldingDetailViewModel`'s deletion + remove flow), an async chain with cancellation/re-entrance guards (`refreshAll`), a form with cross-field validation or currency-aware fetches (`AddAssetViewModel`, `NewTransactionViewModel`), or anything you'd want to unit-test in isolation without spinning up SwiftUI. VMs are mounted as `@State private var viewModel = XViewModel()` in the view that owns them.
 
-**Persistence:** SwiftData with iCloud sync. Models: `Portfolio`, `Holding`, `DividendPayment`, `Contribution`, `UserSettings`. Enums stored as raw strings (`assetClassRaw`, `statusRaw`, `currencyRaw`) with computed getters/setters.
+The bar for adding a new VM: "Would I want tests on this orchestration that don't require a running view?" If no, put the logic on a value type, model extension, or computed property on the view and skip the VM. See `feedback_viewmodels.md` (auto-memory) for the full convertible/keeper inventory.
+
+**Persistence:** SwiftData with iCloud sync. Models: `Portfolio`, `Holding`, `DividendPayment`, `Transaction`, `UserSettings`. Enums stored as raw strings (`assetClassRaw`, `statusRaw`, `currencyRaw`) with computed getters/setters. `Transaction` collides with `SwiftUI.Transaction` — qualify as `GroveDomain.Transaction` in any SwiftUI file that references the type (e.g. `[GroveDomain.Transaction]`, `GroveDomain.Transaction.self` in `Schema([...])`).
 
 **Navigation:** 4-tab `TabView` (Dashboard, Portfolio, Aportar, Ajustes). DividendCalendar and IncomeHistory are pushed from Dashboard via `NavigationLink`. Portfolio uses `.navigationDestination(for: PersistentIdentifier.self)` for holding detail.
 
@@ -55,8 +57,8 @@ just --list             # show all available recipes
 ## Key Domain Concepts
 
 - **Two-tier rebalancing:** Class allocations (Portfolio level, must sum to 100%) determine budget per class. Holding weight (per-Holding, relative number like 5) distributes within class. `RebalancingEngine.suggestions(modelContext:investmentAmount:)` is the single entry point used by both Dashboard and Aportar.
-- **Holding status (Bastter pipeline):** `.estudo` (studying, no position yet), `.aportar` (good company, receives monthly contributions), `.quarentena` (first stage of exit — counts toward allocation but receives no money), `.vender` (decision made to exit — excluded from allocation math entirely, sell gradually). A Holding without Contributions is in estudo; first buy promotes to aportar.
-- **Contributions as source of truth:** `Holding.quantity` and `averagePrice` are cached but derived from `Contribution` records via `recalculateFromContributions()`. Always create a Contribution then call recalculate — never write quantity/averagePrice directly.
+- **Holding status (Bastter pipeline):** `.estudo` (studying, no position yet), `.aportar` (good company, receives monthly contributions), `.quarentena` (first stage of exit — counts toward allocation but receives no money), `.vender` (decision made to exit — excluded from allocation math entirely, sell gradually). A Holding without Transactions is in estudo; first buy promotes to aportar.
+- **Transactions as source of truth:** `Holding.quantity` and `averagePrice` are cached but derived from `Transaction` records via `recalculateFromTransactions()`. Always create a Transaction then call recalculate — never write quantity/averagePrice directly. **Exception:** deleting a Transaction from the history list is a log-prune and intentionally does NOT call recalculate — quantity/averagePrice are left as-is until the next buy/sell triggers `recalculateFromTransactions()` and reconciles the ledger.
 - **Asset class detection:** `AssetClassType.detect(from:apiType:)` uses the Brapi API `type` field (`"fund"` → FII, `"stock"` → Ações BR, `"bdr"` → US Stocks) as primary source, falls back to ticker heuristics. Always strip `.SA` suffix before display.
 - **Add-ticker flow (single entry point):** A `+` toolbar button on the Portfolio root (and on each `AssetClassHoldingsView`) opens `AddTickerSheet` — unfiltered backend search plus an "Add custom ticker" row at the bottom. Both paths route to the same `AddAssetDetailSheet`; class is decided by `detect(...)` for real results and by the user picker for custom. Never gate search by the screen's class — that lies to the user about routing. New holdings persist via `AddAssetViewModel.addAsset(...)`.
 - **Custom holdings (`Holding.isCustom`):** Local-only — no backend quote, dividends, fundamentals, or symbol record. `SyncService` and `TickerBootstrapService` skip them; `AddAssetViewModel` skips `trackSymbol`/`bootstrap` when `isCustom`; `HoldingDetailView` hides `PriceChartView`, `HoldingStatsStrip`, `CompanyInfoCard`, dividend history, and the `refreshAll` call. Buy/sell/transactions still work locally.
@@ -89,20 +91,22 @@ cd backend && .venv312/bin/python -m pytest tests/ -v
 
 **SOLID patterns are mandatory.** Apply single responsibility, open/closed, and dependency inversion throughout:
 
-- **Views are thin.** A view only handles layout and user interaction. All business logic, formatting, computed display properties, and data transformation live on models, DTOs, or ViewModels — never in views.
-- **Extract components.** Prefer small, reusable SwiftUI components over large monolithic views. When a view body grows beyond ~50 lines or contains repeated patterns, extract sub-views into their own structs. Shared UI patterns go in `Core/DesignSystem/Components/`.
-- **Logic on models.** Computed properties like `displayTicker`, `displayDescription`, `formattedPrice` belong on the model/DTO struct. If you're writing a helper function in a view that reads model data, move it to the model instead.
+- **Views are thin, but not empty.** Layout, user interaction, view-local `@State` (sheet flags, selection, drafts), `.task` for one-shot async, and computed properties for derived display all belong on the view — that's the Apple pattern, not a violation. What does NOT belong on the view: non-trivial business logic, multi-step orchestration, async chains with cancellation, cross-field form validation, money/text formatting that's reused — those go on models, value-type extensions, or VMs.
+- **Logic on models first.** Computed properties like `displayTicker`, `formattedPrice`, `allocationGap` belong on the model/DTO. Pure functions (filter, sum, format) belong on value-type extensions. A VM is only justified when the orchestration itself needs isolation.
+- **Extract components.** Prefer small, reusable SwiftUI components over monolithic views. When a view body grows beyond ~50 lines or contains repeated patterns, extract sub-views. Shared UI patterns go in `Core/DesignSystem/Components/`.
 - **Protocol-based services.** All services use protocols (`BackendServiceProtocol`, etc.) with mock implementations for previews and tests.
 
 ## Testing
 
-**Target: 80% unit test coverage on ViewModels.** Use TDD when implementing new features — write the test first, then the implementation.
+**Target: 80% unit test coverage on orchestration code (VMs, services, model methods, value-type extensions).** Use TDD when implementing new features — write the test first, then the implementation.
 
 - Use Swift Testing framework (`import Testing`, `@Test`, `#expect`), not XCTest.
-- Test ViewModels by testing their public methods and verifying state changes.
+- Test VMs by exercising their public methods and asserting state changes.
+- Test value-type extensions and model methods (now the home for logic that used to live on smaller VMs) as pure functions / round-trips against an in-memory `ModelContainer`.
 - Services like `RebalancingEngine`, `TaxCalculator`, `IncomeProjector` must have comprehensive test coverage.
 - DTO decoding tests verify backend contract compatibility.
-- When adding a new ViewModel method, write the test before the implementation.
+- Behaviors that exist only as view bindings (button disabled state, navigation triggers) are acceptable to verify in the running app rather than by unit test, provided the underlying predicate (`isValid`, `hasChanges`, etc.) is tested in isolation.
+- When adding a new VM method or extracting orchestration into a model extension, write the test before the implementation.
 
 ## Code Conventions
 

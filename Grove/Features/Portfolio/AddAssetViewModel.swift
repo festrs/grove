@@ -7,9 +7,9 @@ import GroveDomain
 ///
 /// Two add modes are supported:
 /// - `ownsPosition == false` (default): the holding is added as `.estudo`
-///   with no opening contribution — the user is just tracking it.
+///   with no opening transaction — the user is just tracking it.
 /// - `ownsPosition == true`: requires positive quantity and price; creates
-///   the holding as `.aportar` plus a bootstrap `Contribution` so the
+///   the holding as `.aportar` plus a bootstrap `Transaction` so the
 ///   portfolio reflects the existing position.
 @Observable
 @MainActor
@@ -132,7 +132,7 @@ final class AddAssetViewModel {
         }
     }
 
-    /// Persist the new holding (and an opening contribution when
+    /// Persist the new holding (and an opening transaction when
     /// `ownsPosition == true`) and kick off the bootstrap flow. Returns true
     /// on success so the view can dismiss; false if validation or the
     /// free-tier cap blocks the add.
@@ -200,15 +200,15 @@ final class AddAssetViewModel {
         }
 
         if ownsPosition, let qty = quantity, let prc = price, qty > 0, prc > 0 {
-            let contribution = Contribution(
+            let transaction = Transaction(
                 date: date,
                 amount: qty * prc,
                 shares: qty,
                 pricePerShare: prc
             )
-            contribution.holding = target
-            modelContext.insert(contribution)
-            target.recalculateFromContributions()
+            transaction.holding = target
+            modelContext.insert(transaction)
+            target.recalculateFromTransactions()
             if target.status == .estudo {
                 target.status = .aportar
             }

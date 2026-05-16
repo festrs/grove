@@ -21,13 +21,13 @@ struct HoldingMonthlyIncomeTests {
     }()
 
     private static func makeContext() throws -> ModelContext {
-        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Contribution.self])
+        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Transaction.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         return ModelContext(container)
     }
 
-    /// Build a holding whose first contribution is `monthsAgo` before `asOf`,
+    /// Build a holding whose first transaction is `monthsAgo` before `asOf`,
     /// so the empirical-window annualization sees the right number of months.
     private static func makeHolding(
         in ctx: ModelContext,
@@ -50,7 +50,7 @@ struct HoldingMonthlyIncomeTests {
         )
         ctx.insert(h)
         let firstBuy = utcCal.date(byAdding: .month, value: -firstBuyMonthsAgo, to: asOf)!
-        let contrib = Contribution(date: firstBuy, amount: qty * price, shares: qty, pricePerShare: price)
+        let contrib = Transaction(date: firstBuy, amount: qty * price, shares: qty, pricePerShare: price)
         ctx.insert(contrib)
         contrib.holding = h
         return h
@@ -138,7 +138,7 @@ struct HoldingMonthlyIncomeTests {
 
     // MARK: - Money wrapper stays in native currency
 
-    @Test func ttmExcludesPaymentsBeforeFirstContribution() throws {
+    @Test func ttmExcludesPaymentsBeforeFirstTransaction() throws {
         // User just bought 4 months ago, but the backend (Status Invest)
         // backfilled 12 months of dividend history. Only the 4 payments
         // received WHILE OWNED should count. The 8 pre-ownership payments

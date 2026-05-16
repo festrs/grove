@@ -154,7 +154,7 @@ struct WidePortfolioView: View {
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(
-        for: Portfolio.self, Holding.self, DividendPayment.self, Contribution.self, UserSettings.self,
+        for: Portfolio.self, Holding.self, DividendPayment.self, GroveDomain.Transaction.self, UserSettings.self,
         configurations: config
     )
     let ctx = container.mainContext

@@ -24,7 +24,7 @@ struct IncomeAggregatorTrendsTests {
     }()
 
     private static func makeContext() throws -> ModelContext {
-        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Contribution.self])
+        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Transaction.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         return ModelContext(container)
@@ -49,7 +49,7 @@ struct IncomeAggregatorTrendsTests {
         )
         ctx.insert(h)
         let firstBuy = utcCal.date(byAdding: .month, value: -firstBuyMonthsAgo, to: asOf)!
-        let contrib = Contribution(date: firstBuy, amount: qty * price, shares: qty, pricePerShare: price)
+        let contrib = Transaction(date: firstBuy, amount: qty * price, shares: qty, pricePerShare: price)
         ctx.insert(contrib)
         contrib.holding = h
         return h
@@ -239,12 +239,12 @@ struct IncomeAggregatorTrendsTests {
     @Test func topPayersIncludesHoldingsWithContributionAfterDividends() throws {
         // Reproduces the user's report: "Top dividend payers" empty even
         // though the trend chart shows R$ paid this month.
-        // Scenario: holding added via the default flow with Contribution.date
+        // Scenario: holding added via the default flow with Transaction.date
         // = today, but the backend backfilled dividend records for past
-        // months. `paidIncome` (no contribution gating) shows them in the
+        // months. `paidIncome` (no transaction gating) shows them in the
         // trend chart, but `empiricalAnnualGross`'s `paymentDate >
         // firstContribution` filter drops every record because they all
-        // predate the contribution → topPayers returns [].
+        // predate the transaction → topPayers returns [].
         let ctx = try Self.makeContext()
         let h = Self.makeHolding(in: ctx, ticker: "ITUB3", qty: 100, firstBuyMonthsAgo: 0)
         Self.attachMonthly(on: h, in: ctx, amountPerShare: 1, count: 12)

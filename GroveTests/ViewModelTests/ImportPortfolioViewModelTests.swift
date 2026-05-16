@@ -67,7 +67,7 @@ struct ImportPortfolioViewModelTests {
 
         let h = try ctx.fetch(FetchDescriptor<Holding>()).first { $0.ticker == "ITUB3" }!
         #expect(h.status == .aportar)
-        #expect(h.quantity == 100, "Opening contribution recalculates quantity")
+        #expect(h.quantity == 100, "Opening transaction recalculates quantity")
     }
 
     @MainActor
@@ -89,7 +89,7 @@ struct ImportPortfolioViewModelTests {
 
         let h = try ctx.fetch(FetchDescriptor<Holding>()).first { $0.ticker == "STUDY" }!
         #expect(h.status == .estudo)
-        #expect(h.contributions.isEmpty, "No quantity → no opening contribution")
+        #expect(h.transactions.isEmpty, "No quantity → no opening transaction")
     }
 
     @MainActor

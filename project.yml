@@ -57,7 +57,14 @@ targets:
             echo "warning: SwiftLint not installed — install via 'brew install swiftlint'"
           fi
     sources:
-      - Grove
+      - path: Grove
+        excludes:
+          # Both partial plists live under Grove/ but each is wired in
+          # via INFOPLIST_FILE on its target. Walking them as sources
+          # also copies them as resources, colliding with the generated
+          # {App}.app/Info.plist.
+          - "Info.plist"
+          - "GroveBeta-Info.plist"
     resources:
       - path: Grove/Assets.xcassets
       - path: Grove/Preview Content
@@ -111,7 +118,10 @@ targets:
             echo "warning: SwiftLint not installed — install via 'brew install swiftlint'"
           fi
     sources:
-      - Grove
+      - path: Grove
+        excludes:
+          - "Info.plist"
+          - "GroveBeta-Info.plist"
     resources:
       - path: Grove/Assets.xcassets
       - path: Grove/Preview Content

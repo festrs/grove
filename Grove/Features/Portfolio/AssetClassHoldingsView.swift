@@ -167,10 +167,10 @@ struct AssetClassHoldingsView: View {
             }
         } message: {
             if let h = viewModel.holdingToRemove {
-                if h.contributions.isEmpty {
+                if h.transactions.isEmpty {
                     Text("Remove \(h.ticker) from portfolio?")
                 } else {
-                    Text("Remove \(h.ticker) from portfolio? All \(h.contributions.count) transaction(s) will also be deleted. This action cannot be undone.")
+                    Text("Remove \(h.ticker) from portfolio? All \(h.transactions.count) transaction(s) will also be deleted. This action cannot be undone.")
                 }
             }
         }

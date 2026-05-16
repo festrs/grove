@@ -15,8 +15,8 @@ import GroveDomain
 ///
 /// - **`refreshDividendsAfterTransaction(holding:)`** triggers the on-demand
 ///   provider scrape via `BackendServiceProtocol.refreshDividends`, scoped to
-///   the first-Contribution date so we don't pull payments from before the
-///   user owned the asset. Only call this once a Contribution has landed on
+///   the first-Transaction date so we don't pull payments from before the
+///   user owned the asset. Only call this once a Transaction has landed on
 ///   the holding — study tickers don't need historical dividends and
 ///   shouldn't burn provider quota.
 ///
@@ -55,17 +55,17 @@ struct TickerBootstrapService {
     }
 
     /// Trigger an on-demand dividend scrape for the holding's ticker, scoped
-    /// to its first-Contribution date so the store doesn't accumulate
-    /// pre-purchase payments. No-op when the holding has no contributions
+    /// to its first-Transaction date so the store doesn't accumulate
+    /// pre-purchase payments. No-op when the holding has no transactions
     /// yet — callers should invoke this *after* writing the new
-    /// `Contribution` and calling `holding.recalculateFromContributions()`.
+    /// `Transaction` and calling `holding.recalculateFromTransactions()`.
     func refreshDividendsAfterTransaction(
         holding: Holding,
         modelContext: ModelContext,
         backendService: any BackendServiceProtocol
     ) async {
         guard !holding.isCustom else { return }
-        guard let firstDate = holding.contributions.map(\.date).min() else { return }
+        guard let firstDate = holding.transactions.map(\.date).min() else { return }
         let symbol = holding.ticker
         let assetClassRaw = holding.assetClass.rawValue
 

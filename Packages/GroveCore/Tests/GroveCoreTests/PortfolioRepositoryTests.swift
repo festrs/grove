@@ -10,7 +10,7 @@ struct PortfolioRepositoryTests {
     private static let rates: any ExchangeRates = StaticRates(brlPerUsd: 5)
 
     private static func makeContext() throws -> ModelContext {
-        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Contribution.self])
+        let schema = Schema([Portfolio.self, Holding.self, UserSettings.self, DividendPayment.self, Transaction.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         return ModelContext(container)
@@ -206,7 +206,7 @@ struct PortfolioRepositoryTests {
         )
         ctx.insert(h)
         let firstBuy = utcCal.date(byAdding: .month, value: -firstBuyMonthsAgo, to: summaryAsOf)!
-        let contrib = Contribution(date: firstBuy, amount: qty * price, shares: qty, pricePerShare: price)
+        let contrib = Transaction(date: firstBuy, amount: qty * price, shares: qty, pricePerShare: price)
         ctx.insert(contrib); contrib.holding = h
         if let amt = ttmMonthlyDividendsPerShare {
             for offset in 1...12 {

@@ -4,7 +4,7 @@ import GroveDomain
 
 /// Sheet shown after selecting a search result. Adds the asset to the
 /// portfolio in one of two modes — track-only (no transaction) or with an
-/// opening position (creates a `Contribution`). Used by both the live
+/// opening position (creates a `Transaction`). Used by both the live
 /// portfolio search and the onboarding search flow.
 struct AddAssetDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
@@ -16,7 +16,7 @@ struct AddAssetDetailSheet: View {
     let mode: Mode
 
     enum Mode {
-        /// Commit the holding (and optional contribution) directly to
+        /// Commit the holding (and optional transaction) directly to
         /// SwiftData via `AddAssetViewModel.addAsset`.
         case portfolio
         /// Buffer the form into the onboarding wizard's pending list. The
@@ -261,5 +261,5 @@ struct AddAssetDetailSheet: View {
             logo: nil
         )
     )
-        .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, Contribution.self, UserSettings.self], inMemory: true)
+        .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, GroveDomain.Transaction.self, UserSettings.self], inMemory: true)
 }

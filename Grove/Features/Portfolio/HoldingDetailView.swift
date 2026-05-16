@@ -10,16 +10,10 @@ struct HoldingDetailView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var viewModel = HoldingDetailViewModel()
-    @State private var showRemoveAlert = false
-    @State private var showingBuy = false
-    @State private var showingSell = false
+    @State private var transactionEditMode: EditMode = .inactive
 
-    /// Synchronous in-memory lookup so the first render has the holding —
-    /// avoids a `TQLoadingView()` flash on every navigation. The viewModel
-    /// still owns the reference for `refreshAll` / `removeHolding`, but
-    /// rendering doesn't wait on the async `.task` to populate it.
     private var holding: Holding? {
-        viewModel.holding ?? (modelContext.model(for: holdingID) as? Holding)
+        viewModel.resolvedHolding(id: holdingID, modelContext: modelContext)
     }
 
     var body: some View {
@@ -30,15 +24,11 @@ struct HoldingDetailView: View {
                         VStack(spacing: Theme.Spacing.md) {
                             headerCard(holding)
 
-                            // Custom (user-created) holdings have no backend
-                            // record — chart, fundamentals, company info, and
-                            // dividend history are all backend-sourced and
-                            // would be empty/incorrect, so we skip them.
-                            if !holding.isCustom, holding.assetClass.hasPriceHistory {
+                            if holding.hasPriceChartContent {
                                 PriceChartView(ticker: holding.ticker, currency: holding.currency, backendService: backendService)
                             }
 
-                            if !holding.isCustom {
+                            if holding.hasBackendEnrichment {
                                 HoldingStatsStrip(
                                     holding: holding,
                                     fundamentals: viewModel.fundamentals,
@@ -48,7 +38,6 @@ struct HoldingDetailView: View {
                                 CompanyInfoCard(holding: holding)
                             }
 
-                            let showDividends = !holding.isCustom && holding.assetClass.hasDividends
                             if sizeClass == .regular {
                                 LazyVGrid(
                                     columns: [GridItem(.adaptive(minimum: Theme.Layout.regularCardMin), spacing: Theme.Spacing.md)],
@@ -56,14 +45,14 @@ struct HoldingDetailView: View {
                                 ) {
                                     targetSection(holding)
                                     transactionHistorySection(holding)
-                                    if showDividends {
+                                    if holding.hasDividendHistoryContent {
                                         dividendHistorySection(holding)
                                     }
                                 }
                             } else {
                                 targetSection(holding)
                                 transactionHistorySection(holding)
-                                if showDividends {
+                                if holding.hasDividendHistoryContent {
                                     dividendHistorySection(holding)
                                 }
                             }
@@ -83,7 +72,7 @@ struct HoldingDetailView: View {
                     if sizeClass == .regular {
                         ToolbarItemGroup(placement: .primaryAction) {
                             Button {
-                                showingSell = true
+                                viewModel.showingSell = true
                             } label: {
                                 Label("Sell", systemImage: "minus.circle.fill")
                             }
@@ -92,7 +81,7 @@ struct HoldingDetailView: View {
                             .help("Sell (⌘S)")
 
                             Button {
-                                showingBuy = true
+                                viewModel.showingBuy = true
                             } label: {
                                 Label("Buy", systemImage: "plus.circle.fill")
                             }
@@ -102,20 +91,20 @@ struct HoldingDetailView: View {
                     }
                     ToolbarItem(placement: .primaryAction) {
                         Button(role: .destructive) {
-                            showRemoveAlert = true
+                            viewModel.showRemoveAlert = true
                         } label: {
                             Label("Remove Asset", systemImage: "trash")
                         }
                         .help("Remove Asset")
                     }
                 }
-                .sheet(isPresented: $showingBuy, onDismiss: reload) {
+                .sheet(isPresented: $viewModel.showingBuy, onDismiss: reload) {
                     NewTransactionView(transactionType: .buy, preselectedHolding: holding)
                 }
-                .sheet(isPresented: $showingSell, onDismiss: reload) {
+                .sheet(isPresented: $viewModel.showingSell, onDismiss: reload) {
                     NewTransactionView(transactionType: .sell, preselectedHolding: holding)
                 }
-                .alert("Remove Asset", isPresented: $showRemoveAlert) {
+                .alert("Remove Asset", isPresented: $viewModel.showRemoveAlert) {
                     Button("Cancel", role: .cancel) {}
                     Button("Remove", role: .destructive) {
                         viewModel.removeHolding(modelContext: modelContext)
@@ -125,19 +114,14 @@ struct HoldingDetailView: View {
                     Text("Are you sure you want to remove \(holding.ticker) from your portfolio? This action cannot be undone.")
                 }
                 .refreshable {
-                    if !holding.isCustom {
-                        await viewModel.refreshAll(backendService: backendService)
-                    }
+                    await viewModel.refreshIfNeeded(backendService: backendService)
                 }
             } else {
                 TQLoadingView()
             }
         }
         .task {
-            viewModel.loadHolding(id: holdingID, modelContext: modelContext)
-            if let holding = viewModel.holding, !holding.isCustom {
-                await viewModel.refreshAll(backendService: backendService)
-            }
+            await viewModel.onAppear(id: holdingID, modelContext: modelContext, backendService: backendService)
         }
     }
 
@@ -148,7 +132,7 @@ struct HoldingDetailView: View {
     private func actionBar(_ holding: Holding) -> some View {
         HStack(spacing: Theme.Spacing.sm) {
             Button {
-                showingSell = true
+                viewModel.showingSell = true
             } label: {
                 Label("Sell", systemImage: "minus.circle.fill")
                     .font(.subheadline.weight(.semibold))
@@ -159,7 +143,7 @@ struct HoldingDetailView: View {
             .disabled(!holding.hasPosition)
 
             Button {
-                showingBuy = true
+                viewModel.showingBuy = true
             } label: {
                 Label("Buy", systemImage: "plus.circle.fill")
                     .font(.subheadline.weight(.semibold))
@@ -264,37 +248,85 @@ struct HoldingDetailView: View {
     }
 
     private func transactionHistorySection(_ holding: Holding) -> some View {
-        TQCard {
+        let transactions = holding.recentTransactions
+        return TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Transaction History").font(.headline)
+                HStack {
+                    Text("Transaction History").font(.headline)
+                    Spacer()
+                    if !transactions.isEmpty {
+                        Button(transactionEditMode.isEditing ? "Done" : "Edit") {
+                            withAnimation {
+                                transactionEditMode = transactionEditMode.isEditing ? .inactive : .active
+                            }
+                        }
+                        .font(.subheadline)
+                    }
+                }
 
-                let contributions = holding.contributions.sorted(by: { $0.date > $1.date })
-                if contributions.isEmpty {
+                if transactions.isEmpty {
                     Text("No transactions recorded.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .padding(.vertical, Theme.Spacing.sm)
                 } else {
-                    ForEach(contributions.prefix(15), id: \.date) { c in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(c.shares > 0 ? "Buy" : "Sell")
-                                    .font(.caption).fontWeight(.medium)
-                                    .foregroundStyle(c.shares > 0 ? Color.tqAccentGreen : Color.orange)
-                                Text(c.date, style: .date)
-                                    .font(.caption2).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("\(c.shares > 0 ? "+" : "")\(c.shares) shares")
-                                    .font(.subheadline).fontWeight(.medium)
-                                Text(c.pricePerShare.formatted(as: holding.currency) + "/share")
-                                    .font(.caption2).foregroundStyle(.secondary)
+                    // List is required for native EditMode + swipe + onDelete.
+                    // Chrome is stripped so it matches the surrounding TQCard.
+                    List {
+                        ForEach(transactions, id: \.persistentModelID) { t in
+                            TransactionHistoryRow(transaction: t, currency: holding.currency)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: Theme.Spacing.xs, leading: 0, bottom: Theme.Spacing.xs, trailing: 0))
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        viewModel.requestDeleteTransaction(t)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        viewModel.requestDeleteTransaction(t)
+                                    } label: {
+                                        Label("Delete transaction", systemImage: "trash")
+                                    }
+                                }
+                        }
+                        .onDelete { offsets in
+                            // `.onDelete` requires the data to shrink
+                            // synchronously when the closure returns —
+                            // otherwise UICollectionView asserts. Edit-mode
+                            // already takes 3 taps (Edit → minus → red
+                            // Delete), so skip the confirmation dialog here.
+                            // Swipe and long-press still confirm.
+                            for index in offsets {
+                                viewModel.deleteTransactionImmediately(transactions[index], modelContext: modelContext)
                             }
                         }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .scrollDisabled(true)
+                    .frame(height: CGFloat(transactions.count) * 56)
+                    .environment(\.editMode, $transactionEditMode)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .confirmationDialog(
+            "Delete this transaction?",
+            isPresented: Binding(
+                get: { viewModel.pendingDeletion != nil },
+                set: { if !$0 { viewModel.cancelDeleteTransaction() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete transaction", role: .destructive) {
+                viewModel.confirmDeleteTransaction(modelContext: modelContext)
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelDeleteTransaction()
+            }
         }
     }
 
@@ -330,6 +362,30 @@ struct HoldingDetailView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct TransactionHistoryRow: View {
+    let transaction: GroveDomain.Transaction
+    let currency: Currency
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(transaction.isBuy ? "Buy" : "Sell")
+                    .font(.caption).fontWeight(.medium)
+                    .foregroundStyle(transaction.isBuy ? Color.tqAccentGreen : Color.orange)
+                Text(transaction.date, style: .date)
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(verbatim: "\(transaction.isBuy ? "+" : "")\(transaction.shares) shares")
+                    .font(.subheadline).fontWeight(.medium)
+                Text(verbatim: transaction.pricePerShare.formatted(as: currency) + "/share")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
         }
     }
 }

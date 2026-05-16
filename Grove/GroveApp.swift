@@ -18,7 +18,7 @@ struct GroveApp: App {
             Portfolio.self,
             Holding.self,
             DividendPayment.self,
-            Contribution.self,
+            GroveDomain.Transaction.self,
             UserSettings.self,
         ])
         let modelConfiguration = ModelConfiguration(

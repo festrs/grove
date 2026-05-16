@@ -32,7 +32,7 @@ struct OnTrackPill: View {
                 icon: "clock.badge.exclamationmark.fill",
                 text: Text("\(year) looks far — ~\(yearsShort) years short")
             )
-        case .needContribution(let year):
+        case .needTransaction(let year):
             pill(
                 tone: .neutral,
                 icon: "arrow.up.circle.fill",

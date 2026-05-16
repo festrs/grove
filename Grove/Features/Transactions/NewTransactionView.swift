@@ -230,5 +230,5 @@ struct NewTransactionView: View {
 
 #Preview {
     NewTransactionView(transactionType: .buy)
-        .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, Contribution.self, UserSettings.self], inMemory: true)
+        .modelContainer(for: [Portfolio.self, Holding.self, DividendPayment.self, Transaction.self, UserSettings.self], inMemory: true)
 }

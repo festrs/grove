@@ -15,7 +15,7 @@ public struct PendingHolding: Identifiable, Sendable {
     /// "Common Stock"). Preserved across auto-classify so we don't lose the
     /// stronger signal in favor of ticker-only heuristics.
     public var apiType: String?
-    /// User-entered buy price for the bootstrap contribution. When nil, the
+    /// User-entered buy price for the bootstrap transaction. When nil, the
     /// repository falls back to `currentPrice` at completion time.
     public var averagePrice: Decimal?
     /// User-entered purchase date. When nil, the repository uses `.now`.

@@ -3,7 +3,10 @@ import Foundation
 import GroveDomain
 @testable import Grove
 
-struct DividendCalendarViewModelTests {
+/// Pure-function tests for the calendar's filtering helpers (extracted from
+/// the now-deleted DividendCalendarViewModel). Month navigation and
+/// selected-day state are SwiftUI bindings on the view and verified visually.
+struct CalendarDividendFilterTests {
 
     private func makeDividend(symbol: String, amount: Decimal, date: Date) -> CalendarDividend {
         CalendarDividend(symbol: symbol, type: "Dividend", amount: Money(amount: amount, currency: .brl), date: date)
@@ -13,121 +16,51 @@ struct DividendCalendarViewModelTests {
         Calendar.current.date(from: DateComponents(year: year, month: month, day: day))!
     }
 
-    // MARK: - Filtering
-
-    @Test func filterForMonthFiltersCorrectly() {
-        let vm = DividendCalendarViewModel()
-        vm.selectedMonth = date(year: 2026, month: 4, day: 1)
-        vm.allDividends = [
+    @Test func inMonthKeepsOnlyMatchingYearMonth() {
+        let all = [
             makeDividend(symbol: "A", amount: 10, date: date(year: 2026, month: 4, day: 5)),
             makeDividend(symbol: "B", amount: 20, date: date(year: 2026, month: 4, day: 15)),
             makeDividend(symbol: "C", amount: 30, date: date(year: 2026, month: 3, day: 10)),
             makeDividend(symbol: "D", amount: 40, date: date(year: 2026, month: 5, day: 1)),
         ]
-        vm.filterForMonth()
 
-        #expect(vm.dividendsForMonth.count == 2)
-        #expect(vm.monthlyTotal.amount == 30)
+        let april = all.inMonth(date(year: 2026, month: 4, day: 1))
+        #expect(april.count == 2)
+        #expect(april.map(\.symbol).sorted() == ["A", "B"])
     }
 
-    @Test func filterForMonthResetsSelection() {
-        let vm = DividendCalendarViewModel()
-        vm.selectedDay = .now
-        vm.dividendsForDay = [makeDividend(symbol: "X", amount: 5, date: .now)]
-
-        vm.selectedMonth = date(year: 2026, month: 4, day: 1)
-        vm.allDividends = []
-        vm.filterForMonth()
-
-        #expect(vm.selectedDay == nil)
-        #expect(vm.dividendsForDay.isEmpty)
-    }
-
-    @Test func filterForMonthWithNoDividends() {
-        let vm = DividendCalendarViewModel()
-        vm.selectedMonth = date(year: 2026, month: 6, day: 1)
-        vm.allDividends = [
+    @Test func inMonthReturnsEmptyWhenNoneMatch() {
+        let all = [
             makeDividend(symbol: "A", amount: 10, date: date(year: 2026, month: 4, day: 5)),
         ]
-        vm.filterForMonth()
-
-        #expect(vm.dividendsForMonth.isEmpty)
-        #expect(vm.monthlyTotal.amount == 0)
+        let june = all.inMonth(date(year: 2026, month: 6, day: 1))
+        #expect(june.isEmpty)
     }
 
-    // MARK: - Day Selection
-
-    @Test func selectDayFiltersDividends() {
-        let vm = DividendCalendarViewModel()
-        vm.selectedMonth = date(year: 2026, month: 4, day: 1)
-        vm.allDividends = [
+    @Test func onDayFiltersWithinMonth() {
+        let april = [
             makeDividend(symbol: "A", amount: 10, date: date(year: 2026, month: 4, day: 5)),
             makeDividend(symbol: "B", amount: 20, date: date(year: 2026, month: 4, day: 5)),
             makeDividend(symbol: "C", amount: 30, date: date(year: 2026, month: 4, day: 15)),
         ]
-        vm.filterForMonth()
-        vm.selectDay(5)
-
-        #expect(vm.dividendsForDay.count == 2)
-        #expect(vm.selectedDay != nil)
-        #expect(Calendar.current.component(.day, from: vm.selectedDay!) == 5)
+        let day5 = april.onDay(5)
+        #expect(day5.count == 2)
+        #expect(day5.map(\.symbol).sorted() == ["A", "B"])
     }
 
-    @Test func selectDayWithNoDividends() {
-        let vm = DividendCalendarViewModel()
-        vm.selectedMonth = date(year: 2026, month: 4, day: 1)
-        vm.allDividends = []
-        vm.filterForMonth()
-        vm.selectDay(10)
-
-        #expect(vm.dividendsForDay.isEmpty)
-    }
-
-    // MARK: - Month Navigation
-
-    @Test func previousMonthGoesBack() {
-        let vm = DividendCalendarViewModel()
-        vm.selectedMonth = date(year: 2026, month: 4, day: 1)
-        vm.allDividends = []
-        vm.previousMonth()
-
-        #expect(Calendar.current.component(.month, from: vm.selectedMonth) == 3)
-    }
-
-    @Test func nextMonthGoesForward() {
-        let vm = DividendCalendarViewModel()
-        vm.selectedMonth = date(year: 2026, month: 4, day: 1)
-        vm.allDividends = []
-        vm.nextMonth()
-
-        #expect(Calendar.current.component(.month, from: vm.selectedMonth) == 5)
-    }
-
-    @Test func monthNavigationRefilters() {
-        let vm = DividendCalendarViewModel()
-        vm.selectedMonth = date(year: 2026, month: 4, day: 1)
-        vm.allDividends = [
-            makeDividend(symbol: "A", amount: 10, date: date(year: 2026, month: 5, day: 5)),
+    @Test func onDayReturnsEmptyWhenNoMatch() {
+        let april = [
+            makeDividend(symbol: "A", amount: 10, date: date(year: 2026, month: 4, day: 5)),
         ]
-        vm.filterForMonth()
-        #expect(vm.dividendsForMonth.isEmpty)
-
-        vm.nextMonth()
-        #expect(vm.dividendsForMonth.count == 1)
+        #expect(april.onDay(10).isEmpty)
     }
 
-    // MARK: - daysWithDividends
-
-    @Test func daysWithDividendsComputed() {
-        let vm = DividendCalendarViewModel()
-        vm.selectedMonth = date(year: 2026, month: 4, day: 1)
-        vm.allDividends = [
+    @Test func daysWithDividendsReturnsUniqueDayNumbers() {
+        let april = [
             makeDividend(symbol: "A", amount: 10, date: date(year: 2026, month: 4, day: 5)),
             makeDividend(symbol: "B", amount: 20, date: date(year: 2026, month: 4, day: 5)),
             makeDividend(symbol: "C", amount: 30, date: date(year: 2026, month: 4, day: 15)),
         ]
-        vm.filterForMonth()
-
-        #expect(vm.daysWithDividends == [5, 15])
+        #expect(april.daysWithDividends() == [5, 15])
     }
 }

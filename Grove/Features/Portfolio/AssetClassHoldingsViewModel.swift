@@ -78,14 +78,14 @@ final class AssetClassHoldingsViewModel {
         rates: any ExchangeRates
     ) {
         if holding.hasPosition {
-            let contribution = Contribution(
+            let transaction = Transaction(
                 date: .now,
                 amount: -(holding.quantity * holding.currentPrice),
                 shares: -holding.quantity,
                 pricePerShare: holding.currentPrice
             )
-            contribution.holding = holding
-            modelContext.insert(contribution)
+            transaction.holding = holding
+            modelContext.insert(transaction)
         }
         modelContext.delete(holding)
         // Persist the delete so subsequent re-reads (incl. the reactive
