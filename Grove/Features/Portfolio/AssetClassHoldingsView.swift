@@ -29,6 +29,9 @@ struct AssetClassHoldingsView: View {
     @State private var showingAddTicker = false
     @State private var pendingAdd: AddTickerSelection?
     @State private var sortOrder: [KeyPathComparator<HoldingTableRow>] = [KeyPathComparator(\HoldingTableRow.ticker)]
+    @State private var isEditing = false
+    @State private var selection: Set<PersistentIdentifier> = []
+    @State private var showingBulkDeleteConfirm = false
 
     init(
         assetClass: AssetClassType,
@@ -51,7 +54,7 @@ struct AssetClassHoldingsView: View {
                         TQEmptyState(
                             icon: assetClass.icon,
                             title: "No \(assetClass.displayName) yet",
-                            message: "Tap + above to search for a ticker or add a custom one.",
+                            message: "Add a ticker to start tracking this class.",
                             actionTitle: "Add Ticker",
                             action: { showingAddTicker = true }
                         )
@@ -67,6 +70,8 @@ struct AssetClassHoldingsView: View {
                             onBuy: { viewModel.holdingToBuy = $0 },
                             onSell: { viewModel.holdingToSell = $0 },
                             onRemove: { viewModel.holdingToRemove = $0 },
+                            isEditing: isEditing,
+                            selection: $selection,
                             sortOrder: $sortOrder
                         )
                     } else {
@@ -80,6 +85,8 @@ struct AssetClassHoldingsView: View {
                             onBuy: { viewModel.holdingToBuy = $0 },
                             onSell: { viewModel.holdingToSell = $0 },
                             onRemove: { viewModel.holdingToRemove = $0 },
+                            isEditing: isEditing,
+                            selection: $selection,
                             sortOrder: $sortOrder
                         )
                     }
@@ -92,18 +99,88 @@ struct AssetClassHoldingsView: View {
             }
         }
         .background(Color.tqBackground)
-        .navigationTitle(assetClass.displayName)
+        .navigationTitle(navigationTitleKey)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingAddTicker = true
-                } label: {
-                    Label("Add Ticker", systemImage: "plus")
+            if isEditing {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { exitEditMode() }
                 }
             }
+            if !viewModel.holdings.isEmpty, !isEditing {
+                ToolbarItem(placement: .topBarTrailing) {
+                    sortMenu
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                if !viewModel.holdings.isEmpty {
+                    if isEditing {
+                        Button("Done") { exitEditMode() }
+                    } else {
+                        Button("Edit") { isEditing = true }
+                    }
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if isEditing {
+                BulkEditBar(
+                    selectionCount: selection.count,
+                    allSelected: allSelected,
+                    currentAssetClass: assetClass,
+                    onToggleSelectAll: {
+                        if allSelected {
+                            selection.removeAll()
+                        } else {
+                            selection = Set(viewModel.holdings.map(\.persistentModelID))
+                        }
+                    },
+                    onApplyStatus: { status in
+                        viewModel.applyBulkStatus(
+                            status,
+                            to: selection,
+                            modelContext: modelContext,
+                            portfolio: portfolio,
+                            displayCurrency: displayCurrency,
+                            rates: rates
+                        )
+                        selection.removeAll()
+                    },
+                    onApplyAssetClass: { cls in
+                        viewModel.applyBulkAssetClass(
+                            cls,
+                            to: selection,
+                            modelContext: modelContext,
+                            portfolio: portfolio,
+                            displayCurrency: displayCurrency,
+                            rates: rates
+                        )
+                        selection.removeAll()
+                    },
+                    onDelete: {
+                        showingBulkDeleteConfirm = true
+                    }
+                )
+            }
+        }
+        .confirmationDialog(
+            "Remove \(selection.count) holding(s)? This cannot be undone.",
+            isPresented: $showingBulkDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                viewModel.applyBulkDelete(
+                    ids: selection,
+                    modelContext: modelContext,
+                    portfolio: portfolio,
+                    displayCurrency: displayCurrency,
+                    rates: rates
+                )
+                selection.removeAll()
+            }
+            Button("Cancel", role: .cancel) { }
         }
         .sheet(isPresented: $showingAddTicker) {
             AddTickerSheet { selection in
@@ -182,6 +259,13 @@ struct AssetClassHoldingsView: View {
                 rates: rates
             )
         }
+        .onChange(of: viewModel.holdings.map(\.persistentModelID)) { _, ids in
+            let valid = Set(ids)
+            selection = selection.intersection(valid)
+            if viewModel.holdings.isEmpty {
+                isEditing = false
+            }
+        }
         .onChange(of: syncService.isSyncing) { _, syncing in
             if !syncing {
                 viewModel.loadData(
@@ -204,6 +288,81 @@ struct AssetClassHoldingsView: View {
     }
 
     // MARK: - Pieces
+
+    private var allSelected: Bool {
+        !viewModel.holdings.isEmpty && selection.count == viewModel.holdings.count
+    }
+
+    /// Nav title morphs while editing — empty selection shows "Select Items"
+    /// (Apple Photos pattern), any selection shows "%lld Selected".
+    /// `LocalizedStringKey` so plural rules resolve in `.xcstrings`.
+    private var navigationTitleKey: LocalizedStringKey {
+        if isEditing {
+            return selection.isEmpty ? "Select Items" : "\(selection.count) Selected"
+        }
+        return LocalizedStringKey(assetClass.displayName)
+    }
+
+    private func exitEditMode() {
+        selection.removeAll()
+        isEditing = false
+    }
+
+    // MARK: - Sort
+
+    private enum SortOption: String, CaseIterable, Identifiable {
+        case name, position, status
+        var id: String { rawValue }
+        var label: LocalizedStringKey {
+            switch self {
+            case .name: "Name"
+            case .position: "Position"
+            case .status: "Status"
+            }
+        }
+        var icon: String {
+            switch self {
+            case .name: "textformat"
+            case .position: "chart.bar.fill"
+            case .status: "tag"
+            }
+        }
+    }
+
+    private var activeSortOption: SortOption {
+        guard let key = sortOrder.first?.keyPath else { return .name }
+        if key == \HoldingTableRow.allocationValue { return .position }
+        if key == \HoldingTableRow.statusRank { return .status }
+        return .name
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort by", selection: Binding(
+                get: { activeSortOption },
+                set: { applySort($0) }
+            )) {
+                ForEach(SortOption.allCases) { option in
+                    Label(option.label, systemImage: option.icon).tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.subheadline)
+                .accessibilityLabel(Text("Sort"))
+        }
+    }
+
+    private func applySort(_ option: SortOption) {
+        switch option {
+        case .name:
+            sortOrder = [KeyPathComparator(\HoldingTableRow.ticker, order: .forward)]
+        case .position:
+            sortOrder = [KeyPathComparator(\HoldingTableRow.allocationValue, order: .reverse)]
+        case .status:
+            sortOrder = [KeyPathComparator(\HoldingTableRow.statusRank, order: .forward)]
+        }
+    }
 
     private var useCardLayout: Bool {
         #if os(iOS)
@@ -250,5 +409,4 @@ struct AssetClassHoldingsView: View {
             .padding(.top, Theme.Spacing.sm)
         }
     }
-
 }

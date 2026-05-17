@@ -15,6 +15,8 @@ struct HoldingCardsView: View {
     var onBuy: (Holding) -> Void = { _ in }
     var onSell: (Holding) -> Void = { _ in }
     var onRemove: (Holding) -> Void = { _ in }
+    var isEditing: Bool = false
+    var selection: Binding<Set<PersistentIdentifier>> = .constant([])
 
     @Environment(\.rates) private var rates
     @Binding var sortOrder: [KeyPathComparator<HoldingTableRow>]
@@ -32,14 +34,31 @@ struct HoldingCardsView: View {
         // visible gaps between rows that don't exist on the root.
         LazyVStack(spacing: 0) {
             ForEach(Array(sortedRows.enumerated()), id: \.element.id) { index, row in
-                HoldingCardView(row: row)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        onSelect(row.holding.persistentModelID)
+                let id = row.holding.persistentModelID
+                let isSelected = selection.wrappedValue.contains(id)
+                HStack(spacing: Theme.Spacing.sm) {
+                    if isEditing {
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                            .padding(.leading, Theme.Spacing.md)
                     }
-                    .contextMenu {
+                    HoldingCardView(row: row, showsChevron: !isEditing)
+                }
+                .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if isEditing {
+                        toggle(id)
+                    } else {
+                        onSelect(id)
+                    }
+                }
+                .contextMenu {
+                    if !isEditing {
                         holdingContextMenu(row.holding)
                     }
+                }
                 if index < sortedRows.count - 1 {
                     Divider().opacity(0.4)
                 }
@@ -48,6 +67,12 @@ struct HoldingCardsView: View {
         .background(Color.tqCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.medium))
         .padding(.horizontal, Theme.Spacing.md)
+    }
+
+    private func toggle(_ id: PersistentIdentifier) {
+        var set = selection.wrappedValue
+        if set.contains(id) { set.remove(id) } else { set.insert(id) }
+        selection.wrappedValue = set
     }
 
     @ViewBuilder
@@ -86,6 +111,7 @@ struct HoldingCardsView: View {
 
 struct HoldingCardView: View {
     let row: HoldingTableRow
+    var showsChevron: Bool = true
 
     private var holding: Holding { row.holding }
 
@@ -94,13 +120,28 @@ struct HoldingCardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 primaryLine
                 secondaryLine
+                statusIndicator
             }
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.tertiary)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
+    }
+
+    private var statusIndicator: some View {
+        HStack(spacing: 3) {
+            Image(systemName: holding.status.icon)
+                .font(.system(size: 9))
+            Text(holding.status.displayName)
+                .font(.system(size: 10, weight: .medium))
+        }
+        .foregroundStyle(holding.status.color)
+        .padding(.top, 1)
+        .allowsHitTesting(false)
     }
 
     private var primaryLine: some View {
