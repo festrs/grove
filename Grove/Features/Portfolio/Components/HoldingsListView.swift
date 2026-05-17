@@ -14,6 +14,8 @@ struct HoldingsListView: View {
     var onBuy: (Holding) -> Void = { _ in }
     var onSell: (Holding) -> Void = { _ in }
     var onRemove: (Holding) -> Void = { _ in }
+    var isEditing: Bool = false
+    var selection: Binding<Set<PersistentIdentifier>> = .constant([])
 
     @Environment(\.rates) private var rates
     @Binding var sortOrder: [KeyPathComparator<HoldingTableRow>]
@@ -29,20 +31,45 @@ struct HoldingsListView: View {
     var body: some View {
         LazyVStack(spacing: 0) {
             ForEach(sortedRows) { row in
-                HoldingRowView(
-                    row: row,
-                    onChangeStatus: onChangeStatus
-                )
+                let id = row.holding.persistentModelID
+                let isSelected = selection.wrappedValue.contains(id)
+                HStack(spacing: Theme.Spacing.sm) {
+                    if isEditing {
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                            .padding(.leading, Theme.Spacing.md)
+                            .transition(.opacity)
+                    }
+                    HoldingRowView(
+                        row: row,
+                        onChangeStatus: onChangeStatus,
+                        statusInteractive: !isEditing
+                    )
+                }
+                .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    onSelect(row.holding.persistentModelID)
+                    if isEditing {
+                        toggle(id)
+                    } else {
+                        onSelect(id)
+                    }
                 }
                 .contextMenu {
-                    holdingContextMenu(row.holding)
+                    if !isEditing {
+                        holdingContextMenu(row.holding)
+                    }
                 }
                 Divider().opacity(0.4)
             }
         }
+    }
+
+    private func toggle(_ id: PersistentIdentifier) {
+        var set = selection.wrappedValue
+        if set.contains(id) { set.remove(id) } else { set.insert(id) }
+        selection.wrappedValue = set
     }
 
     @ViewBuilder
@@ -200,6 +227,7 @@ struct HoldingsColumnHeader: View {
 struct HoldingRowView: View {
     let row: HoldingTableRow
     var onChangeStatus: (Holding, HoldingStatus) -> Void = { _, _ in }
+    var statusInteractive: Bool = true
 
     var body: some View {
         HStack(spacing: Theme.Spacing.xs) {
@@ -231,8 +259,14 @@ struct HoldingRowView: View {
                 .lineLimit(1)
                 .frame(width: HoldingsColumn.income.width, alignment: .trailing)
 
-            statusMenu
-                .frame(width: HoldingsColumn.status.width, alignment: .trailing)
+            Group {
+                if statusInteractive {
+                    statusMenu
+                } else {
+                    TQStatusBadge(status: row.holding.status)
+                }
+            }
+            .frame(width: HoldingsColumn.status.width, alignment: .trailing)
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
@@ -316,6 +350,16 @@ struct HoldingTableRow: Identifiable, Comparable {
     var gainValue: Double { NSDecimalNumber(decimal: holding.gainLossPercent).doubleValue }
     var incomeValue: Double { NSDecimalNumber(decimal: holding.estimatedMonthlyIncomeNet()).doubleValue }
     var allocationValue: Double { NSDecimalNumber(decimal: allocation).doubleValue }
+    /// Bastter pipeline ordering: actively funded → quarantined → studying → selling.
+    /// Sorting ascending puts the holdings the user cares about most on top.
+    var statusRank: Int {
+        switch holding.status {
+        case .aportar: 0
+        case .quarentena: 1
+        case .estudo: 2
+        case .vender: 3
+        }
+    }
 
     var allocation: Decimal {
         guard totalValue.amount > 0 else { return 0 }

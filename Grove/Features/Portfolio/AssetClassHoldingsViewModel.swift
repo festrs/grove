@@ -99,4 +99,82 @@ final class AssetClassHoldingsViewModel {
             rates: rates
         )
     }
+
+    // MARK: - Bulk edit
+
+    func applyBulkStatus(
+        _ newStatus: HoldingStatus,
+        to ids: Set<PersistentIdentifier>,
+        modelContext: ModelContext,
+        portfolio: Portfolio?,
+        displayCurrency: Currency,
+        rates: any ExchangeRates
+    ) {
+        guard !ids.isEmpty else { return }
+        for id in ids {
+            guard let holding = modelContext.model(for: id) as? Holding else { continue }
+            holding.status = newStatus
+        }
+        try? modelContext.save()
+        loadData(
+            portfolio: portfolio,
+            modelContext: modelContext,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
+    }
+
+    func applyBulkAssetClass(
+        _ newClass: AssetClassType,
+        to ids: Set<PersistentIdentifier>,
+        modelContext: ModelContext,
+        portfolio: Portfolio?,
+        displayCurrency: Currency,
+        rates: any ExchangeRates
+    ) {
+        guard !ids.isEmpty else { return }
+        for id in ids {
+            guard let holding = modelContext.model(for: id) as? Holding else { continue }
+            holding.assetClass = newClass
+        }
+        try? modelContext.save()
+        loadData(
+            portfolio: portfolio,
+            modelContext: modelContext,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
+    }
+
+    func applyBulkDelete(
+        ids: Set<PersistentIdentifier>,
+        modelContext: ModelContext,
+        portfolio: Portfolio?,
+        displayCurrency: Currency,
+        rates: any ExchangeRates
+    ) {
+        guard !ids.isEmpty else { return }
+        for id in ids {
+            guard let holding = modelContext.model(for: id) as? Holding else { continue }
+            if holding.hasPosition {
+                let zeroingTx = Transaction(
+                    date: .now,
+                    amount: -(holding.quantity * holding.currentPrice),
+                    shares: -holding.quantity,
+                    pricePerShare: holding.currentPrice
+                )
+                zeroingTx.holding = holding
+                modelContext.insert(zeroingTx)
+            }
+            modelContext.delete(holding)
+        }
+        try? modelContext.save()
+        holdings.removeAll { ids.contains($0.persistentModelID) }
+        loadData(
+            portfolio: portfolio,
+            modelContext: modelContext,
+            displayCurrency: displayCurrency,
+            rates: rates
+        )
+    }
 }
