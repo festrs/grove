@@ -107,14 +107,13 @@ struct HoldingsListView: View {
 // MARK: - Column layout
 
 enum HoldingsColumn: String, CaseIterable {
-    case ticker, qty, price, gain, allocation, income, status
+    case ticker, qty, price, allocation, income, status
 
     var title: String {
         switch self {
         case .ticker: "Ticker"
         case .qty: "Qty"
         case .price: "Price"
-        case .gain: "Gain"
         case .allocation: "Allocation"
         case .income: "Income/Mo"
         case .status: "Status"
@@ -126,7 +125,6 @@ enum HoldingsColumn: String, CaseIterable {
         case .ticker: nil      // flexible — shrinks via lineLimit(1) on contents
         case .qty: 52
         case .price: 78
-        case .gain: 60
         case .allocation: 64
         case .income: 84
         case .status: 88
@@ -146,7 +144,6 @@ enum HoldingsColumn: String, CaseIterable {
         case .ticker: KeyPathComparator(\.ticker)
         case .qty: KeyPathComparator(\.quantityValue)
         case .price: KeyPathComparator(\.priceValue)
-        case .gain: KeyPathComparator(\.gainValue)
         case .allocation: KeyPathComparator(\.allocationValue)
         case .income: KeyPathComparator(\.incomeValue)
         case .status: nil
@@ -244,9 +241,6 @@ struct HoldingRowView: View {
                 .lineLimit(1)
                 .frame(width: HoldingsColumn.price.width, alignment: .trailing)
 
-            gainCell
-                .frame(width: HoldingsColumn.gain.width, alignment: .trailing)
-
             Text(row.allocation.formattedPercent())
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
@@ -318,22 +312,6 @@ struct HoldingRowView: View {
         }
     }
 
-    private var gainCell: some View {
-        let gain = row.holding.gainLossPercent
-        return HStack(spacing: 2) {
-            Image(systemName: gain >= 0 ? "arrow.up.right" : "arrow.down.right")
-                .font(.system(size: 9, weight: .bold))
-            Text(gain.formattedPercent())
-                .font(.system(size: 12, weight: .semibold))
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(
-            gain >= 0 ? Color.tqPositive : Color.tqNegative,
-            in: RoundedRectangle(cornerRadius: 4)
-        )
-    }
 }
 
 // MARK: - Row Model
@@ -347,7 +325,6 @@ struct HoldingTableRow: Identifiable, Comparable {
     var ticker: String { holding.ticker }
     var quantityValue: Double { NSDecimalNumber(decimal: holding.quantity).doubleValue }
     var priceValue: Double { NSDecimalNumber(decimal: holding.currentPrice).doubleValue }
-    var gainValue: Double { NSDecimalNumber(decimal: holding.gainLossPercent).doubleValue }
     var incomeValue: Double { NSDecimalNumber(decimal: holding.estimatedMonthlyIncomeNet()).doubleValue }
     var allocationValue: Double { NSDecimalNumber(decimal: allocation).doubleValue }
     /// Bastter pipeline ordering: actively funded → quarantined → studying → selling.
