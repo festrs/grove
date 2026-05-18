@@ -120,8 +120,8 @@ struct HoldingCardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 primaryLine
                 secondaryLine
-                statusIndicator
             }
+            statusIndicator
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
@@ -133,14 +133,13 @@ struct HoldingCardView: View {
     }
 
     private var statusIndicator: some View {
-        HStack(spacing: 3) {
+        VStack(spacing: 2) {
             Image(systemName: holding.status.icon)
-                .font(.system(size: 9))
+                .font(.system(size: 11))
             Text(holding.status.displayName)
                 .font(.system(size: 10, weight: .medium))
         }
         .foregroundStyle(holding.status.color)
-        .padding(.top, 1)
         .allowsHitTesting(false)
     }
 
@@ -154,7 +153,6 @@ struct HoldingCardView: View {
                 .font(.system(.subheadline, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
-            gainPill
         }
     }
 
@@ -170,19 +168,5 @@ struct HoldingCardView: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
-    }
-
-    private var gainPill: some View {
-        let gain = holding.gainLossPercent
-        return Text(gain.formattedPercent())
-            .font(.system(size: 11, weight: .semibold))
-            .monospacedDigit()
-            .foregroundStyle(.white)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(
-                gain >= 0 ? Color.tqPositive : Color.tqNegative,
-                in: Capsule()
-            )
     }
 }
