@@ -163,6 +163,38 @@ struct AddAssetViewModelTests {
         #expect(vm.hasFixedClass == false)
     }
 
+    // MARK: - US bond ETF (fixed income)
+
+    private static let bondEtfSearch = StockSearchResultDTO(
+        id: "SGOV", symbol: "SGOV",
+        name: "iShares 0-3 Month Treasury Bond ETF",
+        type: "fixed income"
+    )
+
+    @MainActor
+    @Test func bondEtfDetectsRendaFixaAndUSD() {
+        // A US-listed treasury ETF (backend type "fixed income") routes to
+        // the Fixed Income class but is quoted and held in USD.
+        let vm = AddAssetViewModel(searchResult: Self.bondEtfSearch)
+        #expect(vm.detectedClass == .rendaFixa)
+        #expect(vm.currency == .usd)
+    }
+
+    @MainActor
+    @Test func bondEtfPersistsAsUSDHolding() throws {
+        let ctx = try makeTestContext()
+        let backend = MockBackendService()
+        let vm = AddAssetViewModel(searchResult: Self.bondEtfSearch)
+
+        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
+
+        #expect(added == true)
+        let holding = try #require(try ctx.fetch(FetchDescriptor<Holding>()).first)
+        #expect(holding.ticker == "SGOV")
+        #expect(holding.assetClass == .rendaFixa)
+        #expect(holding.currency == .usd, "A US treasury ETF must be held in USD, not rendaFixa's BR default")
+    }
+
     // MARK: - Custom ticker
 
     @MainActor
@@ -212,6 +244,75 @@ struct AddAssetViewModelTests {
         let transactions = try ctx.fetch(FetchDescriptor<Transaction>())
         #expect(transactions.count == 1)
         #expect(transactions.first?.shares == 2)
+    }
+
+    // MARK: - Custom draft (editable name — Emergency Reserve add flow)
+
+    @MainActor
+    @Test func customDraftPinsClassAndStartsUnnamed() {
+        let vm = AddAssetViewModel.customDraft(assetClass: .emergencyReserve)
+        #expect(vm.isCustom == true)
+        #expect(vm.nameIsEditable == true)
+        #expect(vm.hasFixedClass == true, "An editable-name draft pins the class — no picker")
+        #expect(vm.detectedClass == .emergencyReserve)
+        #expect(vm.customNameText.isEmpty)
+        #expect(vm.isValid == false, "An unnamed draft can't be saved")
+    }
+
+    @MainActor
+    @Test func customDraftBecomesValidOnceNamed() {
+        let vm = AddAssetViewModel.customDraft(assetClass: .emergencyReserve)
+        vm.customNameText = "Tesouro Selic"
+        #expect(vm.isValid == true)
+        #expect(vm.resolvedSymbol == "TESOURO SELIC", "Typed name normalizes to the canonical ticker")
+        #expect(vm.resolvedDisplayName == "Tesouro Selic", "Display name keeps the user's casing")
+    }
+
+    @MainActor
+    @Test func customDraftStaysInvalidForWhitespaceOnlyName() {
+        let vm = AddAssetViewModel.customDraft(assetClass: .emergencyReserve)
+        vm.customNameText = "   "
+        #expect(vm.isValid == false)
+    }
+
+    @MainActor
+    @Test func customDraftAddPersistsLocalReserveHolding() async throws {
+        let ctx = try makeTestContext()
+        let backend = MockBackendService()
+        let vm = AddAssetViewModel.customDraft(assetClass: .emergencyReserve)
+        vm.customNameText = "Tesouro Selic"
+
+        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
+
+        #expect(added == true)
+        let holding = try #require(try ctx.fetch(FetchDescriptor<Holding>()).first)
+        #expect(holding.ticker == "TESOURO SELIC")
+        #expect(holding.displayName == "Tesouro Selic")
+        #expect(holding.isCustom == true)
+        #expect(holding.assetClass == .emergencyReserve)
+        #expect(holding.status == .estudo, "Track-only draft defaults to .estudo")
+        #expect(try ctx.fetch(FetchDescriptor<Transaction>()).isEmpty)
+    }
+
+    @MainActor
+    @Test func customDraftAddWithPositionRecordsTransaction() async throws {
+        let ctx = try makeTestContext()
+        let backend = MockBackendService()
+        let vm = AddAssetViewModel.customDraft(assetClass: .emergencyReserve)
+        vm.customNameText = "CDB Nubank"
+        vm.ownsPosition = true
+        vm.quantityText = "1"
+        vm.priceText = "5000"
+
+        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
+
+        #expect(added == true)
+        let holding = try #require(try ctx.fetch(FetchDescriptor<Holding>()).first)
+        #expect(holding.isCustom == true)
+        #expect(holding.status == .aportar)
+        let transactions = try ctx.fetch(FetchDescriptor<Transaction>())
+        #expect(transactions.count == 1)
+        #expect(transactions.first?.shares == 1)
     }
 
     @MainActor

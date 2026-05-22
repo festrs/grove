@@ -194,11 +194,10 @@ final class NewTransactionViewModel {
         transaction.holding = holding
         modelContext.insert(transaction)
 
+        // Recalculate but keep the holding alive even at zero quantity — the
+        // transaction ledger is the source of truth and must survive a full
+        // exit. Explicit removal is the user's job via "Remove Holding".
         holding.recalculateFromTransactions()
-
-        if holding.quantity <= 0 {
-            modelContext.delete(holding)
-        }
         return true
     }
 }

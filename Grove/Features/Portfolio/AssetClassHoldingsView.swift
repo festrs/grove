@@ -5,11 +5,15 @@ import GroveRepositories
 
 /// Class-scoped holdings screen. Pushed from the portfolio root when the
 /// user taps an asset-class row. Hosts the sortable holdings table for
-/// this class plus a `+` toolbar shortcut that opens the global add-ticker
-/// flow (`AddTickerSheet` → `AddAssetDetailSheet`). Adds aren't scoped to
-/// the screen's class — the resulting class is derived from the search
-/// result via `AssetClassType.detect` (or chosen by the user for custom
-/// tickers), so the screen context never lies about routing.
+/// this class plus the add-asset entry points.
+///
+/// Add routing depends on the class. Tradable classes open the global
+/// `AddTickerSheet` search → `AddAssetDetailSheet`; the resulting class is
+/// derived from the search result via `AssetClassType.detect` (or picked by
+/// the user for custom tickers), so the screen context never lies about
+/// routing. Emergency Reserve has no ticker to look up, so its add button —
+/// and a `+` toolbar shortcut — skip search and open `AddAssetDetailSheet`
+/// directly as a custom draft with the class pinned.
 struct AssetClassHoldingsView: View {
     let assetClass: AssetClassType
     let portfolio: Portfolio?
@@ -27,6 +31,7 @@ struct AssetClassHoldingsView: View {
 
     @State private var viewModel: AssetClassHoldingsViewModel
     @State private var showingAddTicker = false
+    @State private var showingCustomDraft = false
     @State private var pendingAdd: AddTickerSelection?
     @State private var sortOrder: [KeyPathComparator<HoldingTableRow>] = [KeyPathComparator(\HoldingTableRow.ticker)]
     @State private var isEditing = false
@@ -54,9 +59,9 @@ struct AssetClassHoldingsView: View {
                         TQEmptyState(
                             icon: assetClass.icon,
                             title: "No \(assetClass.displayName) yet",
-                            message: "Add a ticker to start tracking this class.",
-                            actionTitle: "Add Ticker",
-                            action: { showingAddTicker = true }
+                            message: emptyStateMessage,
+                            actionTitle: addActionTitle,
+                            action: { startAdd() }
                         )
                         .padding(.top, 60)
                     } else if useCardLayout {
@@ -112,6 +117,13 @@ struct AssetClassHoldingsView: View {
             if !viewModel.holdings.isEmpty, !isEditing {
                 ToolbarItem(placement: .topBarTrailing) {
                     sortMenu
+                }
+            }
+            if assetClass == .emergencyReserve, !isEditing {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingCustomDraft = true } label: {
+                        Label("Add Reserve", systemImage: "plus")
+                    }
                 }
             }
             ToolbarItem(placement: .primaryAction) {
@@ -186,6 +198,16 @@ struct AssetClassHoldingsView: View {
             AddTickerSheet { selection in
                 pendingAdd = selection
             }
+        }
+        .sheet(isPresented: $showingCustomDraft, onDismiss: {
+            viewModel.loadData(
+                portfolio: portfolio,
+                modelContext: modelContext,
+                displayCurrency: displayCurrency,
+                rates: rates
+            )
+        }) {
+            AddAssetDetailSheet(customDraft: assetClass)
         }
         .sheet(item: $pendingAdd, onDismiss: {
             viewModel.loadData(
@@ -306,6 +328,31 @@ struct AssetClassHoldingsView: View {
     private func exitEditMode() {
         selection.removeAll()
         isEditing = false
+    }
+
+    // MARK: - Add flow
+
+    /// Emergency Reserve has no ticker to look up — its add button skips
+    /// search entirely and opens the custom-draft form with the class pinned.
+    /// Every other class routes through the global `AddTickerSheet` search.
+    private func startAdd() {
+        if assetClass == .emergencyReserve {
+            showingCustomDraft = true
+        } else {
+            showingAddTicker = true
+        }
+    }
+
+    private var emptyStateMessage: String {
+        assetClass == .emergencyReserve
+            ? String(localized: "Add an entry to start tracking your emergency reserve.")
+            : String(localized: "Add a ticker to start tracking this class.")
+    }
+
+    private var addActionTitle: String {
+        assetClass == .emergencyReserve
+            ? String(localized: "Add Reserve")
+            : String(localized: "Add Ticker")
     }
 
     // MARK: - Sort

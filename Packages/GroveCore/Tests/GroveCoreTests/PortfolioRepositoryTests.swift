@@ -109,9 +109,9 @@ struct PortfolioRepositoryTests {
         )
 
         let settings = try repo.fetchSettings()
-        // Even though only acoesBR has holdings, all 6 weights persist so the
-        // Settings view reflects what the user set during onboarding.
-        #expect(settings.classAllocations.count == AssetClassType.allCases.count)
+        // Even though only acoesBR has holdings, every weight the user set
+        // persists so the Settings view reflects the onboarding allocation.
+        #expect(settings.classAllocations.count == allocations.count)
         #expect(settings.classAllocations[.fiis] == 25)
         #expect(settings.classAllocations[.crypto] == 5)
     }

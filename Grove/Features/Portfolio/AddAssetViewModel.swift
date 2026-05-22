@@ -17,10 +17,18 @@ final class AddAssetViewModel {
     let searchResult: StockSearchResultDTO
     let hasFixedClass: Bool
     let isCustom: Bool
+    /// True when the user types the asset's name in the detail sheet itself
+    /// rather than receiving it from search — the Emergency Reserve add flow,
+    /// which has no ticker to look up. Makes the header symbol field editable
+    /// and routes the typed text into the saved `Holding`.
+    let nameIsEditable: Bool
 
     // Form state
     var detectedClass: AssetClassType
     var selectedStatus: HoldingStatus = .estudo
+    /// User-typed name for a `nameIsEditable` draft. Drives the saved
+    /// Holding's ticker and display name. Empty for every other entry point.
+    var customNameText: String = ""
     var ownsPosition: Bool = false {
         didSet { syncStatusWithOwnership() }
     }
@@ -43,10 +51,12 @@ final class AddAssetViewModel {
     init(
         searchResult: StockSearchResultDTO,
         assetClass: AssetClassType? = nil,
-        isCustom: Bool = false
+        isCustom: Bool = false,
+        nameIsEditable: Bool = false
     ) {
         self.searchResult = searchResult
         self.isCustom = isCustom
+        self.nameIsEditable = nameIsEditable
         if let assetClass {
             self.detectedClass = assetClass
             self.hasFixedClass = true
@@ -73,7 +83,35 @@ final class AddAssetViewModel {
         return AddAssetViewModel(searchResult: dto, assetClass: nil, isCustom: true)
     }
 
+    /// Build a VM for a brand-new custom entry whose name is typed inside the
+    /// detail sheet — the Emergency Reserve add flow, where there is no ticker
+    /// to search. The class is pinned to `assetClass`; the user names the
+    /// entry inline and it persists as a local-only `Holding`.
+    static func customDraft(assetClass: AssetClassType) -> AddAssetViewModel {
+        AddAssetViewModel(
+            searchResult: StockSearchResultDTO(id: "", symbol: ""),
+            assetClass: assetClass,
+            isCustom: true,
+            nameIsEditable: true
+        )
+    }
+
     // MARK: - Computed
+
+    /// Canonical symbol persisted as the Holding's ticker. For a
+    /// `nameIsEditable` draft this is the user-typed name, normalized;
+    /// otherwise the search result's symbol.
+    var resolvedSymbol: String {
+        nameIsEditable ? customNameText.normalizedTicker : searchResult.symbol
+    }
+
+    /// Human-facing name persisted as the Holding's display name.
+    var resolvedDisplayName: String {
+        if nameIsEditable {
+            return customNameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return searchResult.name ?? searchResult.symbol
+    }
 
     var quantity: Decimal? {
         Decimal(string: quantityText.replacingOccurrences(of: ",", with: "."))
@@ -83,7 +121,7 @@ final class AddAssetViewModel {
         Decimal(string: priceText.replacingOccurrences(of: ",", with: "."))
     }
 
-    var currency: Currency { detectedClass.defaultCurrency }
+    var currency: Currency { detectedClass.resolvedCurrency(apiType: searchResult.type) }
 
     var totalValue: Decimal {
         guard let q = quantity, let p = price else { return 0 }
@@ -91,6 +129,7 @@ final class AddAssetViewModel {
     }
 
     var isValid: Bool {
+        if nameIsEditable, resolvedSymbol.isEmpty { return false }
         if !ownsPosition { return true }
         return (quantity ?? 0) > 0 && (price ?? 0) > 0
     }
@@ -158,10 +197,11 @@ final class AddAssetViewModel {
         let livePrice = convertedSearchPrice ?? price ?? 0
 
         let holding = Holding(
-            ticker: searchResult.symbol,
-            displayName: searchResult.name ?? searchResult.symbol,
+            ticker: resolvedSymbol,
+            displayName: resolvedDisplayName,
             currentPrice: livePrice,
             assetClass: detectedClass,
+            currency: currency,
             status: selectedStatus,
             targetPercent: targetPercent,
             isCustom: isCustom
@@ -184,7 +224,7 @@ final class AddAssetViewModel {
         // Upsert by canonical ticker. The picker dims already-added rows, but
         // races (custom-add path, stale snapshot) can still land here — and
         // there's no DB-level unique constraint to fall back on.
-        let canonical = searchResult.symbol.normalizedTicker
+        let canonical = resolvedSymbol.normalizedTicker
         let existingHolding = portfolio.holdings.first { $0.ticker == canonical }
 
         let target: Holding
