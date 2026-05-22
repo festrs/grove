@@ -109,10 +109,10 @@ struct NewTransactionViewModelTests {
         #expect(holdings.contains { $0.ticker == "BBAS3" })
     }
 
-    // MARK: - submit (sell to zero deletes holding)
+    // MARK: - submit (sell to zero keeps holding, quantity zeroed)
 
     @MainActor
-    @Test func submitSellToZeroDeletesHolding() async throws {
+    @Test func submitSellToZeroKeepsHoldingZeroed() async throws {
         let ctx = try makeTestContext()
         let portfolio = Portfolio(name: "T")
         ctx.insert(portfolio)
@@ -134,7 +134,10 @@ struct NewTransactionViewModelTests {
         let ok = vm.submit(modelContext: ctx, backendService: backend)
         #expect(ok == true)
         let leftover = try ctx.fetch(FetchDescriptor<Holding>()).filter { $0.ticker == "X" }
-        #expect(leftover.isEmpty, "Selling all shares deletes the holding")
+        #expect(leftover.count == 1, "Selling all shares keeps the holding")
+        #expect(leftover.first?.quantity == 0, "Quantity is zeroed after a full sell")
+        let txns = try ctx.fetch(FetchDescriptor<Transaction>()).filter { $0.holding?.ticker == "X" }
+        #expect(txns.count == 2, "Both the buy and the sell transaction are retained")
     }
 
     // MARK: - submit blocked when invalid

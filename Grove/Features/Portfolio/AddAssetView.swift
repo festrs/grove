@@ -13,6 +13,7 @@ struct AddAssetDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var viewModel: AddAssetViewModel
+    @FocusState private var nameFieldFocused: Bool
     let mode: Mode
 
     enum Mode {
@@ -33,6 +34,14 @@ struct AddAssetDetailSheet: View {
     /// search result. Saves with `Holding.isCustom = true`.
     init(customSymbol: String, mode: Mode = .portfolio) {
         _viewModel = State(initialValue: AddAssetViewModel.custom(symbol: customSymbol))
+        self.mode = mode
+    }
+
+    /// Editable-name custom entry — the user names the asset in this sheet
+    /// instead of searching for it (Emergency Reserve add flow). The class is
+    /// pinned to `assetClass`; saves with `Holding.isCustom = true`.
+    init(customDraft assetClass: AssetClassType, mode: Mode = .portfolio) {
+        _viewModel = State(initialValue: AddAssetViewModel.customDraft(assetClass: assetClass))
         self.mode = mode
     }
 
@@ -73,7 +82,10 @@ struct AddAssetDetailSheet: View {
                     .disabled(!viewModel.isValid)
                 }
             }
-            .task { await viewModel.fetchPrice(backendService: backendService, rates: rates) }
+            .task {
+                if viewModel.nameIsEditable { nameFieldFocused = true }
+                await viewModel.fetchPrice(backendService: backendService, rates: rates)
+            }
         }
         #if os(macOS)
         .frame(minWidth: 460, idealWidth: 520, minHeight: 480, idealHeight: 560)
@@ -106,17 +118,30 @@ struct AddAssetDetailSheet: View {
                         .foregroundStyle(viewModel.detectedClass.color)
                 }
             VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.searchResult.displaySymbol)
-                    .font(.title3).fontWeight(.bold)
-                if viewModel.isCustom {
+                if viewModel.nameIsEditable {
+                    TextField("Name", text: $viewModel.customNameText)
+                        .font(.title3).fontWeight(.bold)
+                        .focused($nameFieldFocused)
+                        .autocorrectionDisabled()
+                        #if os(iOS)
+                        .textInputAutocapitalization(.words)
+                        #endif
                     Text("Custom ticker — local only")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                } else if let name = viewModel.searchResult.name {
-                    Text(name)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                } else {
+                    Text(viewModel.searchResult.displaySymbol)
+                        .font(.title3).fontWeight(.bold)
+                    if viewModel.isCustom {
+                        Text("Custom ticker — local only")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else if let name = viewModel.searchResult.name {
+                        Text(name)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                 }
             }
             Spacer()

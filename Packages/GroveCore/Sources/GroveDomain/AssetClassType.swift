@@ -7,6 +7,7 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
     case reits
     case crypto
     case rendaFixa
+    case emergencyReserve
 
     public var id: String { rawValue }
 
@@ -18,6 +19,7 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
         case .reits: "US REITs"
         case .crypto: "Crypto"
         case .rendaFixa: "Fixed Income"
+        case .emergencyReserve: "Emergency Reserve"
         }
     }
 
@@ -29,6 +31,7 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
         case .reits: "REITs"
         case .crypto: "Crypto"
         case .rendaFixa: "RF"
+        case .emergencyReserve: "Reserve"
         }
     }
 
@@ -40,6 +43,7 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
         case .reits: "house.fill"
         case .crypto: "bitcoinsign.circle"
         case .rendaFixa: "lock.shield"
+        case .emergencyReserve: "lifepreserver"
         }
     }
 
@@ -51,15 +55,28 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
         case .reits: .orange
         case .crypto: .yellow
         case .rendaFixa: .teal
+        case .emergencyReserve: .pink
         }
     }
 
     public var defaultCurrency: Currency {
         switch self {
-        case .acoesBR, .fiis, .rendaFixa: .brl
+        case .acoesBR, .fiis, .rendaFixa, .emergencyReserve: .brl
         case .usStocks, .reits: .usd
         case .crypto: .usd
         }
+    }
+
+    /// Currency a holding should be created with, given the backend search
+    /// `type` hint. Identical to `defaultCurrency` except for US-listed
+    /// treasury/bond ETFs: those classify as `.rendaFixa` (otherwise a BRL
+    /// class) but are quoted and held in USD. The unified search only ever
+    /// tags US-listed ETFs `"fixed income"`, so that hint reliably means USD.
+    public func resolvedCurrency(apiType: String?) -> Currency {
+        if self == .rendaFixa, apiType?.lowercased() == "fixed income" {
+            return .usd
+        }
+        return defaultCurrency
     }
 
     public var defaultTaxTreatment: TaxTreatment {
@@ -69,7 +86,7 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
         case .usStocks: .nra30
         case .reits: .nra30
         case .crypto: .crypto15
-        case .rendaFixa: .irRegressivo
+        case .rendaFixa, .emergencyReserve: .irRegressivo
         }
     }
 
@@ -77,7 +94,7 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
     public var hasDividends: Bool {
         switch self {
         case .acoesBR, .fiis, .usStocks, .reits: true
-        case .crypto, .rendaFixa: false
+        case .crypto, .rendaFixa, .emergencyReserve: false
         }
     }
 
@@ -85,7 +102,7 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
     public var hasPriceHistory: Bool {
         switch self {
         case .acoesBR, .fiis, .usStocks, .reits, .crypto: true
-        case .rendaFixa: false
+        case .rendaFixa, .emergencyReserve: false
         }
     }
 
@@ -93,7 +110,7 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
     public var hasFundamentals: Bool {
         switch self {
         case .acoesBR, .usStocks: true
-        case .fiis, .reits, .crypto, .rendaFixa: false
+        case .fiis, .reits, .crypto, .rendaFixa, .emergencyReserve: false
         }
     }
 
@@ -113,6 +130,11 @@ public enum AssetClassType: String, Codable, CaseIterable, Identifiable, Sendabl
             if apiType == "bdr" { return .usStocks }
             if apiType == "reit" { return .reits }
             if apiType == "common stock" { return .usStocks }
+            // US-listed ETFs from the unified search: the backend tags
+            // treasury/bond funds (SGOV, BND, AGG) "fixed income" and every
+            // other ETF (VOO, SPY) "etf".
+            if apiType == "fixed income" { return .rendaFixa }
+            if apiType == "etf" { return .usStocks }
         }
 
         // Crypto

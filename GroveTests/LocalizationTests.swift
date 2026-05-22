@@ -22,6 +22,7 @@ struct LocalizationTests {
         #expect(AssetClassType.reits.displayName == "US REITs")
         #expect(AssetClassType.crypto.displayName == "Crypto")
         #expect(AssetClassType.rendaFixa.displayName == "Fixed Income")
+        #expect(AssetClassType.emergencyReserve.displayName == "Emergency Reserve")
     }
 
     @Test func taxTreatmentDisplayNames() {

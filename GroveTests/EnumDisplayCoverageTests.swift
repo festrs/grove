@@ -125,6 +125,7 @@ struct EnumDisplayCoverageTests {
         #expect(AssetClassType.usStocks.defaultCurrency == .usd)
         #expect(AssetClassType.reits.defaultCurrency == .usd)
         #expect(AssetClassType.crypto.defaultCurrency == .usd)
+        #expect(AssetClassType.emergencyReserve.defaultCurrency == .brl)
     }
 
     @Test func assetClassDefaultTaxTreatmentCoversAllCases() {
@@ -134,6 +135,7 @@ struct EnumDisplayCoverageTests {
         #expect(AssetClassType.reits.defaultTaxTreatment == .nra30)
         #expect(AssetClassType.crypto.defaultTaxTreatment == .crypto15)
         #expect(AssetClassType.rendaFixa.defaultTaxTreatment == .irRegressivo)
+        #expect(AssetClassType.emergencyReserve.defaultTaxTreatment == .irRegressivo)
     }
 
     // MARK: - AssetClassType — capability flags
@@ -147,6 +149,7 @@ struct EnumDisplayCoverageTests {
         #expect(AssetClassType.reits.hasDividends)
         #expect(!AssetClassType.crypto.hasDividends)
         #expect(!AssetClassType.rendaFixa.hasDividends)
+        #expect(!AssetClassType.emergencyReserve.hasDividends)
     }
 
     @Test func priceHistoryCapabilityMatchesTradableClasses() {
@@ -158,6 +161,7 @@ struct EnumDisplayCoverageTests {
         #expect(AssetClassType.reits.hasPriceHistory)
         #expect(AssetClassType.crypto.hasPriceHistory)
         #expect(!AssetClassType.rendaFixa.hasPriceHistory)
+        #expect(!AssetClassType.emergencyReserve.hasPriceHistory)
     }
 
     @Test func fundamentalsCapabilityLimitedToEquities() {
@@ -169,6 +173,7 @@ struct EnumDisplayCoverageTests {
         #expect(!AssetClassType.reits.hasFundamentals)
         #expect(!AssetClassType.crypto.hasFundamentals)
         #expect(!AssetClassType.rendaFixa.hasFundamentals)
+        #expect(!AssetClassType.emergencyReserve.hasFundamentals)
     }
 
     // MARK: - AssetClassType — extra detect paths

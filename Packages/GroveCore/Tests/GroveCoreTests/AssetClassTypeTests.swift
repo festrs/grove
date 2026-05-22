@@ -69,6 +69,18 @@ struct AssetClassTypeTests {
         #expect(AssetClassType.detect(from: "DOGE", apiType: "crypto") == .crypto)
     }
 
+    @Test func detectsFromApiTypeFixedIncome() {
+        // Backend tags treasury/bond ETFs (SGOV, BND, AGG) "fixed income"
+        // so they land in the Fixed Income class instead of US Stocks.
+        #expect(AssetClassType.detect(from: "SGOV", apiType: "fixed income") == .rendaFixa)
+        #expect(AssetClassType.detect(from: "BND", apiType: "fixed income") == .rendaFixa)
+    }
+
+    @Test func detectsFromApiTypeEtf() {
+        // Non-bond ETFs (VOO, SPY) are tagged "etf" and route to US Stocks.
+        #expect(AssetClassType.detect(from: "VOO", apiType: "etf") == .usStocks)
+    }
+
     @Test func apiTypeOverridesTickerHeuristic() {
         // BTLG11 ends in "11" → ticker heuristic says FII; but if the
         // backend (somehow) tagged it "stock", the apiType wins. This
@@ -90,6 +102,27 @@ struct AssetClassTypeTests {
         #expect(AssetClassType.reits.defaultCurrency == .usd)
     }
 
+    // MARK: - Resolved Currency (search-type aware)
+
+    @Test func resolvedCurrencyMatchesDefaultWithoutApiHint() {
+        // No type hint → identical to defaultCurrency for every class.
+        for type in AssetClassType.allCases {
+            #expect(type.resolvedCurrency(apiType: nil) == type.defaultCurrency)
+        }
+    }
+
+    @Test func resolvedCurrencyForBondEtfIsUSD() {
+        // A US-listed treasury/bond ETF routes to rendaFixa but is held in
+        // USD — the "fixed income" hint overrides the BR class default.
+        #expect(AssetClassType.rendaFixa.resolvedCurrency(apiType: "fixed income") == .usd)
+    }
+
+    @Test func resolvedCurrencyIgnoresBondHintForNonRendaFixa() {
+        // The override is scoped to rendaFixa; other classes keep their default.
+        #expect(AssetClassType.acoesBR.resolvedCurrency(apiType: "fixed income") == .brl)
+        #expect(AssetClassType.rendaFixa.resolvedCurrency(apiType: "stock") == .brl)
+    }
+
     // MARK: - Tax Treatment
 
     @Test func exemptAssetsHaveCorrectTreatment() {
@@ -100,5 +133,10 @@ struct AssetClassTypeTests {
     @Test func usAssetsHaveNRATreatment() {
         #expect(AssetClassType.usStocks.defaultTaxTreatment == .nra30)
         #expect(AssetClassType.reits.defaultTaxTreatment == .nra30)
+    }
+
+    @Test func emergencyReserveHasCorrectCurrencyAndTaxTreatment() {
+        #expect(AssetClassType.emergencyReserve.defaultCurrency == .brl)
+        #expect(AssetClassType.emergencyReserve.defaultTaxTreatment == .irRegressivo)
     }
 }

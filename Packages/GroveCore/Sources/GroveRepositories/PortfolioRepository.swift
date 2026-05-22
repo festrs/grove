@@ -240,6 +240,7 @@ public struct PortfolioRepository {
                 currentPrice: pending.currentPrice,
                 dividendYield: pending.dividendYield,
                 assetClass: pending.assetClass,
+                currency: pending.assetClass.resolvedCurrency(apiType: pending.apiType),
                 status: pending.status,
                 targetPercent: pending.targetPercent
             )
