@@ -7,13 +7,16 @@ import GroveRepositories
 /// user taps an asset-class row. Hosts the sortable holdings table for
 /// this class plus the add-asset entry points.
 ///
-/// Add routing depends on the class. Tradable classes open the global
-/// `AddTickerSheet` search → `AddAssetDetailSheet`; the resulting class is
-/// derived from the search result via `AssetClassType.detect` (or picked by
-/// the user for custom tickers), so the screen context never lies about
-/// routing. Emergency Reserve has no ticker to look up, so its add button —
-/// and a `+` toolbar shortcut — skip search and open `AddAssetDetailSheet`
-/// directly as a custom draft with the class pinned.
+/// Add routing depends on the class. Tradable classes open the
+/// `AddTickerSheet` search → `AddAssetDetailSheet`; we pass the screen's
+/// `assetClass` to the sheet so the backend can route to the right
+/// provider (CoinGecko for crypto, yfinance + Brapi for everything else).
+/// The final class assigned to the new holding still comes from
+/// `AssetClassType.detect` on the chosen result, so the screen context
+/// never lies about routing — it only picks the right search index.
+/// Emergency Reserve has no ticker to look up, so its add button skips
+/// search and opens `AddAssetDetailSheet` directly as a custom draft with
+/// the class pinned.
 struct AssetClassHoldingsView: View {
     let assetClass: AssetClassType
     let portfolio: Portfolio?
@@ -109,28 +112,26 @@ struct AssetClassHoldingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
+            // Edit mode: Cancel ↔ Done. Same on every size class.
             if isEditing {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { exitEditMode() }
                 }
-            }
-            if !viewModel.holdings.isEmpty, !isEditing {
-                ToolbarItem(placement: .topBarTrailing) {
-                    sortMenu
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") { exitEditMode() }
                 }
             }
-            if assetClass == .emergencyReserve, !isEditing {
+            // View mode: `+ Add` (always) and Edit (when populated). Sort
+            // lives in the class header card so the top bar can stay at two
+            // trailing items.
+            if !isEditing {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingCustomDraft = true } label: {
-                        Label("Add Reserve", systemImage: "plus")
+                    Button { startAdd() } label: {
+                        Label(addActionTitle, systemImage: "plus")
                     }
                 }
-            }
-            ToolbarItem(placement: .primaryAction) {
                 if !viewModel.holdings.isEmpty {
-                    if isEditing {
-                        Button("Done") { exitEditMode() }
-                    } else {
+                    ToolbarItem(placement: .primaryAction) {
                         Button("Edit") { isEditing = true }
                     }
                 }
@@ -138,43 +139,7 @@ struct AssetClassHoldingsView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if isEditing {
-                BulkEditBar(
-                    selectionCount: selection.count,
-                    allSelected: allSelected,
-                    currentAssetClass: assetClass,
-                    onToggleSelectAll: {
-                        if allSelected {
-                            selection.removeAll()
-                        } else {
-                            selection = Set(viewModel.holdings.map(\.persistentModelID))
-                        }
-                    },
-                    onApplyStatus: { status in
-                        viewModel.applyBulkStatus(
-                            status,
-                            to: selection,
-                            modelContext: modelContext,
-                            portfolio: portfolio,
-                            displayCurrency: displayCurrency,
-                            rates: rates
-                        )
-                        selection.removeAll()
-                    },
-                    onApplyAssetClass: { cls in
-                        viewModel.applyBulkAssetClass(
-                            cls,
-                            to: selection,
-                            modelContext: modelContext,
-                            portfolio: portfolio,
-                            displayCurrency: displayCurrency,
-                            rates: rates
-                        )
-                        selection.removeAll()
-                    },
-                    onDelete: {
-                        showingBulkDeleteConfirm = true
-                    }
-                )
+                bulkEditBar
             }
         }
         .confirmationDialog(
@@ -195,7 +160,7 @@ struct AssetClassHoldingsView: View {
             Button("Cancel", role: .cancel) { }
         }
         .sheet(isPresented: $showingAddTicker) {
-            AddTickerSheet { selection in
+            AddTickerSheet(assetClass: assetClass) { selection in
                 pendingAdd = selection
             }
         }
@@ -383,23 +348,6 @@ struct AssetClassHoldingsView: View {
         return .name
     }
 
-    private var sortMenu: some View {
-        Menu {
-            Picker("Sort by", selection: Binding(
-                get: { activeSortOption },
-                set: { applySort($0) }
-            )) {
-                ForEach(SortOption.allCases) { option in
-                    Label(option.label, systemImage: option.icon).tag(option)
-                }
-            }
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(.subheadline)
-                .accessibilityLabel(Text("Sort"))
-        }
-    }
-
     private func applySort(_ option: SortOption) {
         switch option {
         case .name:
@@ -419,34 +367,116 @@ struct AssetClassHoldingsView: View {
         #endif
     }
 
+    // MARK: - Bars
+
+    /// In-header sort menu. Lives in the class header card so it stays
+    /// visible without crowding the top nav bar (which now carries only
+    /// `+ Add` and `Edit`). Shows the active sort label inline so users
+    /// can see and change the order in one tap.
+    private var headerSortMenu: some View {
+        Menu {
+            Picker("Sort by", selection: Binding(
+                get: { activeSortOption },
+                set: { applySort($0) }
+            )) {
+                ForEach(SortOption.allCases) { option in
+                    Label(option.label, systemImage: option.icon).tag(option)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.caption.weight(.semibold))
+                Text(activeSortOption.label)
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.tqBackground, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .accessibilityLabel(Text("Sort"))
+    }
+
+    private var bulkEditBar: some View {
+        BulkEditBar(
+            selectionCount: selection.count,
+            allSelected: allSelected,
+            currentAssetClass: assetClass,
+            onToggleSelectAll: {
+                if allSelected {
+                    selection.removeAll()
+                } else {
+                    selection = Set(viewModel.holdings.map(\.persistentModelID))
+                }
+            },
+            onApplyStatus: { status in
+                viewModel.applyBulkStatus(
+                    status,
+                    to: selection,
+                    modelContext: modelContext,
+                    portfolio: portfolio,
+                    displayCurrency: displayCurrency,
+                    rates: rates
+                )
+                selection.removeAll()
+            },
+            onApplyAssetClass: { cls in
+                viewModel.applyBulkAssetClass(
+                    cls,
+                    to: selection,
+                    modelContext: modelContext,
+                    portfolio: portfolio,
+                    displayCurrency: displayCurrency,
+                    rates: rates
+                )
+                selection.removeAll()
+            },
+            onDelete: {
+                showingBulkDeleteConfirm = true
+            }
+        )
+    }
+
     private var classHeader: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            HStack(spacing: Theme.Spacing.sm) {
-                ZStack {
-                    Circle()
-                        .fill(assetClass.color.opacity(0.15))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: assetClass.icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(assetClass.color)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(assetClass.displayName)
-                        .font(.title3.weight(.bold))
-                    Text(viewModel.classTotalValue.formatted())
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Spacer()
-                if viewModel.classTargetPercent > 0 {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(viewModel.classCurrentPercent.formattedPercent(decimals: 0))
-                            .font(.system(.body, weight: .semibold))
-                            .monospacedDigit()
-                        Text("of \(viewModel.classTargetPercent.formattedPercent(decimals: 0)) target")
-                            .font(.caption2)
+            VStack(spacing: Theme.Spacing.sm) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    ZStack {
+                        Circle()
+                            .fill(assetClass.color.opacity(0.15))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: assetClass.icon)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(assetClass.color)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(assetClass.displayName)
+                            .font(.title3.weight(.bold))
+                        Text(viewModel.classTotalValue.formatted())
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Spacer()
+                    if viewModel.classTargetPercent > 0 {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(viewModel.classCurrentPercent.formattedPercent(decimals: 0))
+                                .font(.system(.body, weight: .semibold))
+                                .monospacedDigit()
+                            Text("of \(viewModel.classTargetPercent.formattedPercent(decimals: 0)) target")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                // Sort lives in the card — keeps the top nav bar at just
+                // `+ Add` and `Edit`. Hidden when there's nothing to sort.
+                if !viewModel.holdings.isEmpty {
+                    HStack {
+                        Spacer()
+                        headerSortMenu
                     }
                 }
             }

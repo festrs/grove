@@ -20,8 +20,6 @@ struct CompactPortfolioView: View {
     @Query private var holdings: [Holding]
     @State private var viewModel = PortfolioViewModel()
     @State private var showingImport = false
-    @State private var showingAddTicker = false
-    @State private var pendingAdd: AddTickerSelection?
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
@@ -72,13 +70,6 @@ struct CompactPortfolioView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        showingAddTicker = true
-                    } label: {
-                        Label("Add Ticker", systemImage: "plus")
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
                         showingImport = true
                     } label: {
                         Label("Import", systemImage: "square.and.arrow.down")
@@ -98,8 +89,6 @@ struct CompactPortfolioView: View {
             .modifier(PortfolioSheetsAndAlerts(
                 viewModel: viewModel,
                 showingImport: $showingImport,
-                showingAddTicker: $showingAddTicker,
-                pendingAdd: $pendingAdd,
                 holdings: holdings
             ))
             .refreshable {
