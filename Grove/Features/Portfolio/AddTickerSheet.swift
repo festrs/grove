@@ -2,11 +2,17 @@ import SwiftUI
 import SwiftData
 import GroveDomain
 
-/// Global add-ticker sheet. Single entry point for adding holdings to the
-/// portfolio — search hits the backend unfiltered (the asset class is
-/// derived from the result via `AssetClassType.detect`), and a "custom
-/// ticker" row at the bottom routes through the same `AddAssetDetailSheet`
-/// for symbols the backend doesn't know about.
+/// Per-class add-ticker sheet. Opened from `AssetClassHoldingsView`; the
+/// screen's `assetClass` is passed through to the backend so search can hit
+/// the right provider — `crypto` routes to CoinGecko, everything else to
+/// yfinance + Brapi. Without this scoping, searching "BTC" inside the
+/// Crypto class would land in yfinance and miss CoinGecko entirely. The
+/// final routing in `AddAssetDetailSheet` still uses `AssetClassType.detect`
+/// on the result, so we never lie about which class a chosen ticker
+/// belongs to — we just use the screen context to pick the right index.
+///
+/// A "custom ticker" row at the bottom routes through the same
+/// `AddAssetDetailSheet` for symbols the backend doesn't know about.
 ///
 /// The parent presents the detail sheet after this one dismisses (we hand
 /// the selection back via `onSelect`); SwiftUI doesn't like stacking two
@@ -31,6 +37,10 @@ struct AddTickerSheet: View {
     @State private var viewModel = AddTickerSheetViewModel()
     @FocusState private var fieldFocused: Bool
 
+    /// The class the sheet was opened from. Passed straight through to the
+    /// backend so it can route to the right search provider (CoinGecko for
+    /// crypto, yfinance + Brapi otherwise).
+    let assetClass: AssetClassType?
     let onSelect: (AddTickerSelection) -> Void
 
     var body: some View {
@@ -68,7 +78,7 @@ struct AddTickerSheet: View {
                 }
             }
             .background(Color.tqBackground)
-            .navigationTitle("Add Ticker")
+            .navigationTitle(LocalizedStringKey(navigationTitle))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -80,8 +90,9 @@ struct AddTickerSheet: View {
             .task {
                 viewModel.loadExistingTickers(modelContext: modelContext)
                 let service = backendService
+                let scopedClass = assetClass
                 viewModel.debouncer.start { query in
-                    (try? await service.searchStocks(query: query, assetClass: nil)) ?? []
+                    (try? await service.searchStocks(query: query, assetClass: scopedClass)) ?? []
                 }
                 fieldFocused = true
             }
@@ -187,6 +198,17 @@ struct AddTickerSheet: View {
         dismiss()
         DispatchQueue.main.async {
             onSelect(.custom(symbol: symbol))
+        }
+    }
+
+    /// Title reflects the active provider so users searching from the
+    /// Crypto class know they're hitting CoinGecko, not a generic stock
+    /// index. Keeps "Add Ticker" as the default for everything else.
+    private var navigationTitle: String {
+        switch assetClass {
+        case .crypto: return String(localized: "Add Crypto")
+        case .emergencyReserve: return String(localized: "Add Reserve")
+        default: return String(localized: "Add Ticker")
         }
     }
 }

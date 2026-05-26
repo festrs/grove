@@ -8,13 +8,11 @@ import GroveDomain
 /// `Button(label:)` rendering.
 struct PortfolioActionButtons: View {
     let onEdit: () -> Void
-    let onAdd: () -> Void
     let onImport: () -> Void
 
     var body: some View {
         HStack(spacing: Theme.Spacing.xs) {
             iconButton("pencil", help: "Rename Portfolio", action: onEdit)
-            iconButton("plus", help: "Add Ticker", action: onAdd)
             iconButton("square.and.arrow.down", help: "Import", action: onImport)
         }
     }

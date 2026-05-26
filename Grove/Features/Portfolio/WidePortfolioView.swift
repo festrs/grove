@@ -18,8 +18,6 @@ struct WidePortfolioView: View {
     @State private var viewModel = PortfolioViewModel()
     @State private var selectedClass: AssetClassType?
     @State private var showingImport = false
-    @State private var showingAddTicker = false
-    @State private var pendingAdd: AddTickerSelection?
     @State private var detailPath = NavigationPath()
 
     var body: some View {
@@ -55,8 +53,6 @@ struct WidePortfolioView: View {
         .modifier(PortfolioSheetsAndAlerts(
             viewModel: viewModel,
             showingImport: $showingImport,
-            showingAddTicker: $showingAddTicker,
-            pendingAdd: $pendingAdd,
             holdings: holdings
         ))
         .refreshable {
@@ -142,7 +138,6 @@ struct WidePortfolioView: View {
             Spacer()
             PortfolioActionButtons(
                 onEdit: { viewModel.showingEditPortfolio = true },
-                onAdd: { showingAddTicker = true },
                 onImport: { showingImport = true }
             )
         }
