@@ -264,14 +264,6 @@ final class OnboardingViewModel {
         errorMessage = nil
     }
 
-    /// Update the priority for a pending holding by id. The view binds
-    /// to this so the inline 1–5 stepper writes through without the
-    /// ForEach having to re-anchor the index on every render.
-    func setTargetPercent(id: UUID, value: Decimal) {
-        guard let index = pendingHoldings.firstIndex(where: { $0.id == id }) else { return }
-        pendingHoldings[index].targetPercent = value
-    }
-
     /// Append a pre-populated draft (from `AddAssetDetailSheet` in
     /// `.onboarding` mode) with the same dedupe/limit guards as
     /// `addHolding(from:)`.

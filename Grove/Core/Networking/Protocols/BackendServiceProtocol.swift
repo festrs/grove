@@ -26,7 +26,6 @@ protocol BackendServiceProtocol: Sendable {
 
     // Symbol tracking (tell backend which symbols to keep fresh)
     func trackSymbol(symbol: String, assetClass: String) async throws
-    func untrackSymbol(symbol: String) async throws
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws
 
     // Price history

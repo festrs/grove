@@ -53,7 +53,6 @@ actor MockBackendService: BackendServiceProtocol {
     }
 
     func trackSymbol(symbol: String, assetClass: String) async throws {}
-    func untrackSymbol(symbol: String) async throws {}
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {}
 
     func fetchPriceHistory(symbol: String, period: String) async throws -> [PriceHistoryPointDTO] {

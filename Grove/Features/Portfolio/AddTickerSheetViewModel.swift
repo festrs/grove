@@ -7,9 +7,10 @@ import GroveRepositories
 /// the search field state, debouncer, and "already added" check so the view
 /// stays layout-only.
 ///
-/// Selecting a real result or tapping the "Add custom ticker" row both
-/// route to `AddAssetDetailSheet`; this VM just emits the chosen target
-/// back to the parent.
+/// Selecting a real result or tapping the toolbar `+` both route to
+/// `AddAssetDetailSheet`; this VM just emits the chosen target back to the
+/// parent. The `+` path opens a blank `customDraft`, so this VM has no
+/// custom-symbol logic of its own — search results are its only output.
 @Observable
 @MainActor
 final class AddTickerSheetViewModel {
@@ -30,11 +31,5 @@ final class AddTickerSheetViewModel {
 
     func isAlreadyAdded(_ symbol: String) -> Bool {
         existingTickers.contains(symbol.normalizedTicker.displayTicker)
-    }
-
-    /// True when the typed text could be saved as a custom ticker — non-empty,
-    /// not currently mid-search, and not already in the portfolio.
-    func canAddAsCustom(trimmed: String, isSearching: Bool) -> Bool {
-        !trimmed.isEmpty && !isSearching && !isAlreadyAdded(trimmed)
     }
 }

@@ -39,14 +39,4 @@ extension Date {
     func monthsAgo(_ months: Int) -> Date {
         Calendar.current.date(byAdding: .month, value: -months, to: self) ?? self
     }
-
-    func isSameMonth(as other: Date) -> Bool {
-        let cal = Calendar.current
-        return cal.component(.year, from: self) == cal.component(.year, from: other)
-            && cal.component(.month, from: self) == cal.component(.month, from: other)
-    }
-
-    func isSameDay(as other: Date) -> Bool {
-        Calendar.current.isDate(self, inSameDayAs: other)
-    }
 }

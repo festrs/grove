@@ -118,10 +118,34 @@ struct HoldingCardView: View {
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
             VStack(alignment: .leading, spacing: 2) {
-                primaryLine
-                secondaryLine
+                Text(holding.displayTicker)
+                    .font(.system(.subheadline, weight: .semibold))
+                    .lineLimit(1)
+                HStack(spacing: Theme.Spacing.xs) {
+                    Text(holding.displayName)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Text(row.allocation.formattedPercent())
+                        .font(.caption2)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    if holding.quantity > 0 {
+                        Text(verbatim: "· \(formattedQuantity)")
+                            .font(.caption2)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
-            statusIndicator
+            Spacer(minLength: Theme.Spacing.xs)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(holding.currentValueMoney.formatted())
+                    .font(.system(.subheadline, weight: .semibold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                statusIndicator
+            }
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
@@ -132,8 +156,20 @@ struct HoldingCardView: View {
         .padding(.vertical, Theme.Spacing.sm)
     }
 
+    private var formattedQuantity: String {
+        let d = NSDecimalNumber(decimal: holding.quantity).doubleValue
+        if d >= 1, d == d.rounded(.towardZero), d < 1_000_000 {
+            return "\(Int(d))"
+        }
+        let formatter = NumberFormatter()
+        formatter.maximumSignificantDigits = 4
+        formatter.minimumSignificantDigits = 1
+        formatter.usesSignificantDigits = true
+        return formatter.string(from: NSDecimalNumber(decimal: holding.quantity)) ?? "\(holding.quantity)"
+    }
+
     private var statusIndicator: some View {
-        VStack(spacing: 2) {
+        HStack(spacing: 4) {
             Image(systemName: holding.status.icon)
                 .font(.system(size: 11))
             Text(holding.status.displayName)
@@ -142,31 +178,52 @@ struct HoldingCardView: View {
         .foregroundStyle(holding.status.color)
         .allowsHitTesting(false)
     }
+}
 
-    private var primaryLine: some View {
-        HStack(spacing: Theme.Spacing.xs) {
-            Text(holding.displayTicker)
-                .font(.system(.subheadline, weight: .semibold))
-                .lineLimit(1)
-            Spacer(minLength: Theme.Spacing.xs)
-            Text(holding.currentValueMoney.formatted())
-                .font(.system(.subheadline, weight: .semibold))
-                .monospacedDigit()
-                .lineLimit(1)
+#Preview("HoldingCardsView") {
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(
+        for: Portfolio.self, Holding.self, DividendPayment.self, GroveDomain.Transaction.self, UserSettings.self,
+        configurations: config
+    )
+    let ctx = container.mainContext
+
+    let portfolio = Portfolio(name: "Meu Portfolio")
+    ctx.insert(portfolio)
+
+    let holdings: [Holding] = [.itub3, .petr4, .wege3, .btlg11, .aapl, .nvda, .o, .btc]
+    for h in holdings {
+        h.portfolio = portfolio
+        ctx.insert(h)
+    }
+
+    let totalAmount = holdings.reduce(Decimal(0)) { $0 + $1.currentValueMoney.amount }
+
+    struct PreviewWrapper: View {
+        let holdings: [Holding]
+        let totalValue: Money
+        @State private var sortOrder: [KeyPathComparator<HoldingTableRow>] = [
+            KeyPathComparator(\HoldingTableRow.ticker)
+        ]
+        @State private var selection: Set<PersistentIdentifier> = []
+
+        var body: some View {
+            ScrollView {
+                HoldingCardsView(
+                    holdings: holdings,
+                    totalValue: totalValue,
+                    selection: $selection,
+                    sortOrder: $sortOrder
+                )
+                .padding(.vertical, Theme.Spacing.md)
+            }
         }
     }
 
-    private var secondaryLine: some View {
-        HStack(spacing: Theme.Spacing.xs) {
-            Text(holding.displayName)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer(minLength: Theme.Spacing.xs)
-            Text(row.allocation.formattedPercent())
-                .font(.caption2)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-        }
-    }
+    return PreviewWrapper(
+        holdings: holdings,
+        totalValue: Money(amount: totalAmount, currency: .brl)
+    )
+    .modelContainer(container)
+    .preferredColorScheme(.dark)
 }

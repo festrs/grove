@@ -187,7 +187,6 @@ private actor StubBackend: BackendServiceProtocol {
         return DividendRefreshResultDTO(scraped: symbols.count, newRecords: 0, failed: [])
     }
     func trackSymbol(symbol: String, assetClass: String) async throws {}
-    func untrackSymbol(symbol: String) async throws {}
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {}
     func fetchPriceHistory(symbol: String, period: String) async throws -> [PriceHistoryPointDTO] { [] }
     func fetchFundamentals(symbol: String) async throws -> FundamentalsDTO {
@@ -215,7 +214,6 @@ private actor ThrowingBackend: BackendServiceProtocol {
     func fetchDividendsForSymbols(symbols: [String], year: Int?) async throws -> [MobileDividendDTO] { throw E.nope }
     func refreshDividends(symbols: [String], assetClass: String, since: Date?) async throws -> DividendRefreshResultDTO { throw E.nope }
     func trackSymbol(symbol: String, assetClass: String) async throws { throw E.nope }
-    func untrackSymbol(symbol: String) async throws {}
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {}
     func fetchPriceHistory(symbol: String, period: String) async throws -> [PriceHistoryPointDTO] { throw E.nope }
     func fetchFundamentals(symbol: String) async throws -> FundamentalsDTO { throw E.nope }

@@ -1,10 +1,7 @@
 import Foundation
 
 enum AppConstants {
-    static let appGroupIdentifier = "group.com.felipepereira.Grove"
-
     static let freeTierMaxHoldings = 10
-    static let freeTierMaxPortfolios = 1
 
     enum API {
         #if GROVE_BETA

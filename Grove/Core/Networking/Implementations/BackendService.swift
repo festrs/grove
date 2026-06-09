@@ -229,10 +229,6 @@ actor BackendService: BackendServiceProtocol {
         }
     }
 
-    func untrackSymbol(symbol: String) async throws {
-        // No-op: symbols are shared across users, never removed
-    }
-
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {
         guard !pairs.isEmpty else { return }
         let chunks = pairs.chunked(into: Self.batchChunkSize)

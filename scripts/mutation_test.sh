@@ -116,11 +116,11 @@ add "$I" "empirical-yield: max -> min"              'let bestAnnualGross = max(e
 H="Packages/GroveCore/Sources/GroveDomain/Holding.swift"
 
 # --- Holding.empiricalAnnualGross: rolling-window forward yield ---
-add "$H" "empirical: window cutoff > -> >="         '$0.paymentDate > cutoff && $0.paymentDate <= asOf'  '$0.paymentDate >= cutoff && $0.paymentDate <= asOf'                                "IncomeProjectorTests"
+add "$H" "empirical: window cutoff > -> >="         '$0.paymentDate > effectiveCutoff && $0.paymentDate <= asOf'  '$0.paymentDate >= effectiveCutoff && $0.paymentDate <= asOf'                                "IncomeProjectorTests"
 add "$H" "empirical: drop × quantity"               'let annualNative = Money(amount: annualPerShare * quantity, currency: currency)'   'let annualNative = Money(amount: annualPerShare, currency: currency)'  "IncomeProjectorTests"
 add "$H" "empirical: drop partial-window scaling"   'let annualPerShare = totalPerShare * annualizationFactor'  'let annualPerShare = totalPerShare'                                                   "IncomeProjectorTests"
-add "$H" "empirical: drop firstContribution clamp"  'let effectiveCutoff = max(twelveMonthsAgo, firstContribution)'  'let effectiveCutoff = twelveMonthsAgo'                                          "HoldingMonthlyIncomeTests"
-add "$H" "empirical: clamp uses min instead of max" 'let effectiveCutoff = max(twelveMonthsAgo, firstContribution)'  'let effectiveCutoff = min(twelveMonthsAgo, firstContribution)'                  "HoldingMonthlyIncomeTests"
+add "$H" "empirical: drop firstTransaction clamp"   'let effectiveCutoff = max(twelveMonthsAgo, firstTransaction)'   'let effectiveCutoff = twelveMonthsAgo'                                          "HoldingMonthlyIncomeTests"
+add "$H" "empirical: clamp uses min instead of max" 'let effectiveCutoff = max(twelveMonthsAgo, firstTransaction)'   'let effectiveCutoff = min(twelveMonthsAgo, firstTransaction)'                  "HoldingMonthlyIncomeTests"
 
 # --- Holding.estimatedMonthlyIncome: TTM / 12 with yield fallback ---
 add "$H" "monthly: drop /12 divisor"                'return ttmAnnual.amount / 12'                       'return ttmAnnual.amount'                                                                "HoldingMonthlyIncomeTests"
@@ -180,7 +180,7 @@ add "$R" "flip drift sign"                   'drift: currentPct - targetPct'    
 # --- AssetClassType: currency + tax-treatment routing ---
 A="Packages/GroveCore/Sources/GroveDomain/AssetClassType.swift"
 add "$A" "detect FII -> acoesBR"             'if apiType == "fund" { return .fiis }'                 'if apiType == "fund" { return .acoesBR }'                                               "BackendDTOTests"
-add "$A" "BR currency -> USD"                'case .acoesBR, .fiis, .rendaFixa: .brl'                'case .acoesBR, .fiis, .rendaFixa: .usd'                                                 "AssetClassTypeTests,TaxCalculatorTests"
+add "$A" "BR currency -> USD"                'case .acoesBR, .fiis, .rendaFixa, .emergencyReserve: .brl'  'case .acoesBR, .fiis, .rendaFixa, .emergencyReserve: .usd'                          "AssetClassTypeTests,TaxCalculatorTests"
 add "$A" "detect crypto -> nil"              'if apiType == "crypto" { return .crypto }'             'if apiType == "crypto" { return nil }'                                                  "BackendDTOTests"
 add "$A" "acoesBR tax: exempt -> nra30"      'case .acoesBR: .exempt'                                'case .acoesBR: .nra30'                                                                  "TaxCalculatorTests"
 add "$A" "crypto tax: crypto15 -> exempt"    'case .crypto: .crypto15'                               'case .crypto: .exempt'                                                                  "TaxCalculatorTests"

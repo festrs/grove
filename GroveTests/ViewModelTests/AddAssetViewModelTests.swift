@@ -195,58 +195,7 @@ struct AddAssetViewModelTests {
         #expect(holding.currency == .usd, "A US treasury ETF must be held in USD, not rendaFixa's BR default")
     }
 
-    // MARK: - Custom ticker
-
-    @MainActor
-    @Test func customFactoryDefaultsToAcoesBRWithPickerEnabled() {
-        let vm = AddAssetViewModel.custom(symbol: " mycoin ")
-        #expect(vm.isCustom == true)
-        #expect(vm.searchResult.symbol == "MYCOIN")
-        #expect(vm.detectedClass == .acoesBR, "Custom add starts on a sane default; user can repick")
-        #expect(vm.hasFixedClass == false, "Custom always exposes the class picker")
-        #expect(vm.priceText.isEmpty, "Custom never pre-fills price — there's no backend quote")
-    }
-
-    @MainActor
-    @Test func customAddPersistsHoldingWithIsCustomTrue() async throws {
-        let ctx = try makeTestContext()
-        let backend = MockBackendService()
-        let vm = AddAssetViewModel.custom(symbol: "myCoin")
-        vm.detectedClass = .crypto
-
-        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
-
-        #expect(added == true)
-        let holdings = try ctx.fetch(FetchDescriptor<Holding>())
-        let custom = try #require(holdings.first { $0.ticker == "MYCOIN" })
-        #expect(custom.isCustom == true)
-        #expect(custom.assetClass == .crypto)
-        #expect(custom.status == .estudo, "Track-only custom defaults to .estudo")
-        #expect(custom.currentPrice == 0, "Custom track-only enters with zero price; user fills from detail screen")
-    }
-
-    @MainActor
-    @Test func customAddWithPositionRecordsTransaction() async throws {
-        let ctx = try makeTestContext()
-        let backend = MockBackendService()
-        let vm = AddAssetViewModel.custom(symbol: "MYCOIN")
-        vm.detectedClass = .crypto
-        vm.ownsPosition = true
-        vm.quantityText = "2"
-        vm.priceText = "150"
-
-        let added = vm.addAsset(modelContext: ctx, backendService: backend, rates: StaticRates(brlPerUsd: 5))
-
-        #expect(added == true)
-        let holding = try #require(try ctx.fetch(FetchDescriptor<Holding>()).first)
-        #expect(holding.isCustom == true)
-        #expect(holding.status == .aportar)
-        let transactions = try ctx.fetch(FetchDescriptor<Transaction>())
-        #expect(transactions.count == 1)
-        #expect(transactions.first?.shares == 2)
-    }
-
-    // MARK: - Custom draft (editable name — Emergency Reserve add flow)
+    // MARK: - Custom draft (editable name — toolbar + on AddTickerSheet, Emergency Reserve add)
 
     @MainActor
     @Test func customDraftPinsClassAndStartsUnnamed() {

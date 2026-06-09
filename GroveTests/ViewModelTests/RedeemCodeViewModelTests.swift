@@ -138,7 +138,6 @@ private actor FailingBackendService: BackendServiceProtocol {
         DividendRefreshResultDTO(scraped: 0, newRecords: 0, failed: [])
     }
     func trackSymbol(symbol: String, assetClass: String) async throws {}
-    func untrackSymbol(symbol: String) async throws {}
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {}
     func fetchPriceHistory(symbol: String, period: String) async throws -> [PriceHistoryPointDTO] { [] }
     func fetchFundamentals(symbol: String) async throws -> FundamentalsDTO {
