@@ -22,16 +22,12 @@ enum Theme {
         static let title3: CGFloat = 20
         static let title2: CGFloat = 24
         static let title1: CGFloat = 28
-        static let largeTitle: CGFloat = 34
-        static let hero: CGFloat = 48
     }
 
     enum Layout {
         static let maxContentWidth: CGFloat = 1200
         static let compactCardMin: CGFloat = 150
         static let regularCardMin: CGFloat = 300
-        static let sidebarWidth: CGFloat = 340
-        static let wideThreshold: CGFloat = 700
 
         static func gaugeSize(for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
             sizeClass == .regular ? 260 : 180

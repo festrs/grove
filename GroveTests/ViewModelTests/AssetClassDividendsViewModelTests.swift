@@ -132,7 +132,6 @@ private actor RecordingBackend: BackendServiceProtocol {
         return DividendRefreshResultDTO(scraped: symbols.count, newRecords: 0, failed: [])
     }
     func trackSymbol(symbol: String, assetClass: String) async throws {}
-    func untrackSymbol(symbol: String) async throws {}
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {}
     func fetchPriceHistory(symbol: String, period: String) async throws -> [PriceHistoryPointDTO] { [] }
     func fetchFundamentals(symbol: String) async throws -> FundamentalsDTO {
@@ -170,7 +169,6 @@ private actor FailingBackend: BackendServiceProtocol {
         throw TestError.refreshFailed
     }
     func trackSymbol(symbol: String, assetClass: String) async throws {}
-    func untrackSymbol(symbol: String) async throws {}
     func syncTrackedSymbols(pairs: [(symbol: String, assetClass: String)]) async throws {}
     func fetchPriceHistory(symbol: String, period: String) async throws -> [PriceHistoryPointDTO] { [] }
     func fetchFundamentals(symbol: String) async throws -> FundamentalsDTO {

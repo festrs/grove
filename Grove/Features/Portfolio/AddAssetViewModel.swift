@@ -35,6 +35,9 @@ final class AddAssetViewModel {
     var quantityText: String = ""
     var priceText: String = ""
     var date: Date = .now
+    /// Non-nil only when the user explicitly overrides the default currency —
+    /// currently only exposed for Fixed Income, which can be either BRL or USD.
+    var selectedCurrency: Currency? = nil
     /// Within-class priority surfaced during onboarding so the user picks
     /// it next to class and status. 1–5, default 5.
     var targetPercent: Decimal = 5
@@ -72,21 +75,11 @@ final class AddAssetViewModel {
         }
     }
 
-    /// Build a VM for a manually-typed ticker. Synthesizes a minimal DTO so
-    /// the rest of the form (header card, position section) keeps working
-    /// without branching on `isCustom` everywhere.
-    static func custom(symbol: String) -> AddAssetViewModel {
-        let trimmed = symbol
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .uppercased()
-        let dto = StockSearchResultDTO(id: trimmed, symbol: trimmed, name: trimmed)
-        return AddAssetViewModel(searchResult: dto, assetClass: nil, isCustom: true)
-    }
-
     /// Build a VM for a brand-new custom entry whose name is typed inside the
-    /// detail sheet — the Emergency Reserve add flow, where there is no ticker
-    /// to search. The class is pinned to `assetClass`; the user names the
-    /// entry inline and it persists as a local-only `Holding`.
+    /// detail sheet — Emergency Reserve's add flow and the toolbar `+` on
+    /// `AddTickerSheet` for every other class. The class is pinned to
+    /// `assetClass`; the user names the entry inline and it persists as a
+    /// local-only `Holding`.
     static func customDraft(assetClass: AssetClassType) -> AddAssetViewModel {
         AddAssetViewModel(
             searchResult: StockSearchResultDTO(id: "", symbol: ""),
@@ -121,7 +114,7 @@ final class AddAssetViewModel {
         Decimal(string: priceText.replacingOccurrences(of: ",", with: "."))
     }
 
-    var currency: Currency { detectedClass.resolvedCurrency(apiType: searchResult.type) }
+    var currency: Currency { selectedCurrency ?? detectedClass.resolvedCurrency(apiType: searchResult.type) }
 
     var totalValue: Decimal {
         guard let q = quantity, let p = price else { return 0 }

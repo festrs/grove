@@ -11,20 +11,22 @@ import GroveDomain
 /// on the result, so we never lie about which class a chosen ticker
 /// belongs to — we just use the screen context to pick the right index.
 ///
-/// A "custom ticker" row at the bottom routes through the same
-/// `AddAssetDetailSheet` for symbols the backend doesn't know about.
+/// A toolbar `+` (top-right) opens `AddAssetDetailSheet` as a blank custom
+/// draft — the same flow Emergency Reserve uses. The screen-typed search
+/// text is not carried over; the user fills name, ticker, price from scratch
+/// in the detail sheet.
 ///
 /// The parent presents the detail sheet after this one dismisses (we hand
 /// the selection back via `onSelect`); SwiftUI doesn't like stacking two
 /// fullscreen sheets directly.
 enum AddTickerSelection: Identifiable {
     case found(StockSearchResultDTO)
-    case custom(symbol: String)
+    case customDraft
 
     var id: String {
         switch self {
         case .found(let dto): return "found:\(dto.id)"
-        case .custom(let symbol): return "custom:\(symbol)"
+        case .customDraft: return "customDraft"
         }
     }
 }
@@ -62,8 +64,6 @@ struct AddTickerSheet: View {
                                 onAdd: handleResultTapped,
                                 onRemove: { _ in /* removal handled in main list */ }
                             )
-
-                            customTickerRow
                         } else {
                             hint
                         }
@@ -85,6 +85,14 @@ struct AddTickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        handleCustomDraftTapped()
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add custom ticker")
                 }
             }
             .task {
@@ -143,7 +151,7 @@ struct AddTickerSheet: View {
             Text("Search for a ticker or company")
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            Text("Or type a symbol and add it as a custom ticker.")
+            Text("Or tap + to add a custom entry.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -151,38 +159,6 @@ struct AddTickerSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 60)
         .padding(.horizontal, Theme.Spacing.md)
-    }
-
-    @ViewBuilder
-    private var customTickerRow: some View {
-        let trimmed = viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if viewModel.canAddAsCustom(trimmed: trimmed, isSearching: viewModel.debouncer.isSearching) {
-            Button {
-                handleCustomTapped(symbol: trimmed)
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "plus.circle.dashed")
-                        .foregroundStyle(Color.tqAccentGreen)
-                        .font(.title3)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Add \"\(trimmed.uppercased())\" as custom ticker")
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                        Text("Local-only. Edit price and details after adding.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, Theme.Spacing.md)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            Divider()
-                .padding(.horizontal, Theme.Spacing.md)
-        }
     }
 
     private func handleResultTapped(_ result: StockSearchResultDTO) {
@@ -194,10 +170,10 @@ struct AddTickerSheet: View {
         }
     }
 
-    private func handleCustomTapped(symbol: String) {
+    private func handleCustomDraftTapped() {
         dismiss()
         DispatchQueue.main.async {
-            onSelect(.custom(symbol: symbol))
+            onSelect(.customDraft)
         }
     }
 

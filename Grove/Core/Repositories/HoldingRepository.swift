@@ -20,22 +20,4 @@ struct HoldingRepository {
         )
         return try modelContext.fetch(descriptor)
     }
-
-    func fetchByAssetClass(_ assetClass: AssetClassType) throws -> [Holding] {
-        let classRaw = assetClass.rawValue
-        let descriptor = FetchDescriptor<Holding>(
-            predicate: #Predicate { $0.assetClassRaw == classRaw },
-            sortBy: [SortDescriptor(\.ticker)]
-        )
-        return try modelContext.fetch(descriptor)
-    }
-
-    func fetchEligibleForRebalancing() throws -> [Holding] {
-        try fetchByStatus(.aportar)
-    }
-
-    func holdingCount() throws -> Int {
-        let descriptor = FetchDescriptor<Holding>()
-        return try modelContext.fetchCount(descriptor)
-    }
 }

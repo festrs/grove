@@ -30,15 +30,9 @@ struct AddAssetDetailSheet: View {
         self.mode = mode
     }
 
-    /// Custom-ticker entry point — user typed a symbol that didn't match any
-    /// search result. Saves with `Holding.isCustom = true`.
-    init(customSymbol: String, mode: Mode = .portfolio) {
-        _viewModel = State(initialValue: AddAssetViewModel.custom(symbol: customSymbol))
-        self.mode = mode
-    }
-
     /// Editable-name custom entry — the user names the asset in this sheet
-    /// instead of searching for it (Emergency Reserve add flow). The class is
+    /// instead of searching for it. Used by Emergency Reserve's add button
+    /// and by the toolbar `+` on `AddTickerSheet` for any class. The class is
     /// pinned to `assetClass`; saves with `Holding.isCustom = true`.
     init(customDraft assetClass: AssetClassType, mode: Mode = .portfolio) {
         _viewModel = State(initialValue: AddAssetViewModel.customDraft(assetClass: assetClass))
@@ -162,6 +156,21 @@ struct AddAssetDetailSheet: View {
                 } else {
                     fieldRow("Asset Class") {
                         TQAssetClassPicker(selection: $viewModel.detectedClass)
+                    }
+                }
+                if viewModel.detectedClass == .rendaFixa {
+                    Divider()
+                    fieldRow("Currency") {
+                        Picker("Currency", selection: Binding(
+                            get: { viewModel.currency },
+                            set: { viewModel.selectedCurrency = $0 }
+                        )) {
+                            ForEach(Currency.allCases) { c in
+                                Text(verbatim: c.code).tag(c)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 160)
                     }
                 }
                 Divider()

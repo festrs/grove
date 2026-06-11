@@ -15,29 +15,6 @@ enum HTTPClient: Sendable {
         return try await perform(request: request, url: url, method: "GET")
     }
 
-    nonisolated static func post<T: Decodable & Sendable, B: Encodable & Sendable>(
-        url: URL,
-        body: B,
-        headers: [String: String] = [:]
-    ) async throws(APIError) -> T {
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 30
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        for (key, value) in headers {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
-
-        do {
-            request.httpBody = try JSONEncoder().encode(body)
-        } catch {
-            record(method: "POST", url: url, started: Date(), status: nil, success: false)
-            throw .unknown("Erro ao codificar dados: \(error.localizedDescription)")
-        }
-
-        return try await perform(request: request, url: url, method: "POST")
-    }
-
     private nonisolated static func perform<T: Decodable & Sendable>(
         request: URLRequest,
         url: URL,

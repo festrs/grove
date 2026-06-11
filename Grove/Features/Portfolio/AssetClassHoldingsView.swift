@@ -16,7 +16,9 @@ import GroveRepositories
 /// never lies about routing — it only picks the right search index.
 /// Emergency Reserve has no ticker to look up, so its add button skips
 /// search and opens `AddAssetDetailSheet` directly as a custom draft with
-/// the class pinned.
+/// the class pinned. The other classes' `AddTickerSheet` exposes the same
+/// blank-draft flow via a toolbar `+` button, so any class can have local-
+/// only entries with editable name/ticker/price.
 struct AssetClassHoldingsView: View {
     let assetClass: AssetClassType
     let portfolio: Portfolio?
@@ -185,8 +187,8 @@ struct AssetClassHoldingsView: View {
             switch selection {
             case .found(let result):
                 AddAssetDetailSheet(searchResult: result, assetClass: nil)
-            case .custom(let symbol):
-                AddAssetDetailSheet(customSymbol: symbol)
+            case .customDraft:
+                AddAssetDetailSheet(customDraft: assetClass)
             }
         }
         .sheet(item: $viewModel.holdingToBuy, onDismiss: {

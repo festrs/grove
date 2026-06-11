@@ -1,18 +1,5 @@
 import SwiftUI
 
-// MARK: - Router
-
-private struct RouterKey: EnvironmentKey {
-    static let defaultValue = Router()
-}
-
-extension EnvironmentValues {
-    var router: Router {
-        get { self[RouterKey.self] }
-        set { self[RouterKey.self] = newValue }
-    }
-}
-
 // MARK: - Backend Service
 
 private struct BackendServiceKey: EnvironmentKey {
