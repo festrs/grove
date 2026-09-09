@@ -12,6 +12,7 @@ final class RebalancingViewModel {
     var hasCalculated = false
     var isRegistering = false
     var emptyReason: RebalancingEmptyReason?
+    var editedShares: [String: Int] = [:]
 
     var investmentAmountDecimal: Decimal {
         let cleaned = investmentAmountText
@@ -22,6 +23,20 @@ final class RebalancingViewModel {
 
     func investmentAmount(in currency: Currency) -> Money {
         Money(amount: investmentAmountDecimal, currency: currency)
+    }
+
+    func effectiveShares(for suggestion: RebalancingSuggestion) -> Int {
+        editedShares[suggestion.ticker] ?? suggestion.sharesToBuy
+    }
+
+    func setShares(_ value: Int, for suggestion: RebalancingSuggestion) {
+        editedShares[suggestion.ticker] = max(0, value)
+    }
+
+    func effectiveAmount(for suggestion: RebalancingSuggestion) -> Money {
+        guard suggestion.sharesToBuy > 0 else { return suggestion.amount }
+        let perShare = suggestion.amount.amount / Decimal(suggestion.sharesToBuy)
+        return Money(amount: Decimal(effectiveShares(for: suggestion)) * perShare, currency: suggestion.amount.currency)
     }
 
     func calculate(modelContext: ModelContext, displayCurrency: Currency, rates: any ExchangeRates) {
@@ -36,6 +51,7 @@ final class RebalancingViewModel {
             let allocated = suggestions.map { $0.amount }.sum(in: displayCurrency, using: rates)
             totalAllocated = allocated
             hasCalculated = true
+            editedShares = [:]
 
             emptyReason = suggestions.isEmpty ? RebalancingEngine.diagnoseEmpty(modelContext: modelContext) : nil
         } catch {
@@ -79,6 +95,9 @@ final class RebalancingViewModel {
         defer { isRegistering = false }
 
         for suggestion in suggestions {
+            let shares = effectiveShares(for: suggestion)
+            guard shares > 0 else { continue }
+
             let ticker = suggestion.ticker
             let descriptor = FetchDescriptor<Holding>(
                 predicate: #Predicate { $0.ticker == ticker }
@@ -87,8 +106,8 @@ final class RebalancingViewModel {
 
             let transaction = Transaction(
                 date: .now,
-                amount: suggestion.amount.amount,
-                shares: Decimal(suggestion.sharesToBuy),
+                amount: Decimal(shares) * holding.currentPrice,
+                shares: Decimal(shares),
                 pricePerShare: holding.currentPrice
             )
             transaction.holding = holding
@@ -100,5 +119,6 @@ final class RebalancingViewModel {
         suggestions = []
         investmentAmountText = ""
         hasCalculated = false
+        editedShares = [:]
     }
 }

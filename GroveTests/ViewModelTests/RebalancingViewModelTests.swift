@@ -171,4 +171,131 @@ struct RebalancingViewModelTests {
         #expect(vm.investmentAmountText == "")
         #expect(vm.hasCalculated == false)
     }
+
+    // MARK: - editedShares / effectiveShares
+
+    @Test func effectiveSharesReturnsEngineDefaultWhenNoOverride() {
+        let vm = RebalancingViewModel()
+        let suggestion = makeSuggestion(ticker: "ITUB3", shares: 10)
+        #expect(vm.effectiveShares(for: suggestion) == 10)
+    }
+
+    @Test func effectiveSharesReturnsOverrideAfterSet() {
+        let vm = RebalancingViewModel()
+        let suggestion = makeSuggestion(ticker: "ITUB3", shares: 10)
+        vm.setShares(7, for: suggestion)
+        #expect(vm.effectiveShares(for: suggestion) == 7)
+    }
+
+    @Test func setSharesClampsNegativeToZero() {
+        let vm = RebalancingViewModel()
+        let suggestion = makeSuggestion(ticker: "ITUB3", shares: 10)
+        vm.setShares(-5, for: suggestion)
+        #expect(vm.effectiveShares(for: suggestion) == 0)
+    }
+
+    @Test func effectiveAmountScalesWithEditedShares() {
+        let vm = RebalancingViewModel()
+        // 10 shares @ R$32 = R$320
+        let suggestion = makeSuggestion(ticker: "ITUB3", shares: 10, pricePerShare: 32)
+        let original = vm.effectiveAmount(for: suggestion)
+        #expect(original.amount == 320)
+
+        vm.setShares(5, for: suggestion)
+        let halved = vm.effectiveAmount(for: suggestion)
+        #expect(halved.amount == 160)
+    }
+
+    @Test func effectiveAmountIsZeroWhenSharesSetToZero() {
+        let vm = RebalancingViewModel()
+        let suggestion = makeSuggestion(ticker: "ITUB3", shares: 10, pricePerShare: 32)
+        vm.setShares(0, for: suggestion)
+        #expect(vm.effectiveAmount(for: suggestion).amount == 0)
+    }
+
+    @MainActor
+    @Test func calculateClearsEditedShares() throws {
+        let ctx = try makeTestContext()
+        let (_, _) = seedTestData(ctx)
+
+        let vm = RebalancingViewModel()
+        vm.investmentAmountText = "5000"
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
+        guard let first = vm.suggestions.first else { return }
+        vm.setShares(99, for: first)
+        #expect(vm.editedShares[first.ticker] == 99)
+
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
+        #expect(vm.editedShares.isEmpty)
+    }
+
+    @MainActor
+    @Test func registerUsesEditedShareCount() throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+
+        let vm = RebalancingViewModel()
+        vm.investmentAmountText = "5000"
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
+        guard let first = vm.suggestions.first else { return }
+
+        vm.setShares(3, for: first)
+        vm.registerContributions(modelContext: ctx)
+
+        let ticker = first.ticker
+        let descriptor = FetchDescriptor<Holding>(predicate: #Predicate { $0.ticker == ticker })
+        guard let holding = try ctx.fetch(descriptor).first else { return }
+        let txns = holding.transactions
+        #expect(txns.contains { $0.shares == 3 })
+        _ = holdings // suppress unused warning
+    }
+
+    @MainActor
+    @Test func registerSkipsSuggestionWithZeroShares() throws {
+        let ctx = try makeTestContext()
+        let (_, holdings) = seedTestData(ctx)
+
+        let vm = RebalancingViewModel()
+        vm.investmentAmountText = "5000"
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
+        guard let first = vm.suggestions.first else { return }
+
+        vm.setShares(0, for: first)
+        vm.registerContributions(modelContext: ctx)
+
+        let ticker = first.ticker
+        let descriptor = FetchDescriptor<Holding>(predicate: #Predicate { $0.ticker == ticker })
+        guard let holding = try ctx.fetch(descriptor).first else { return }
+        let txns = holding.transactions
+        #expect(txns.isEmpty)
+        _ = holdings
+    }
+
+    @MainActor
+    @Test func registerClearsEditedShares() throws {
+        let ctx = try makeTestContext()
+        let (_, _) = seedTestData(ctx)
+
+        let vm = RebalancingViewModel()
+        vm.investmentAmountText = "5000"
+        vm.calculate(modelContext: ctx, displayCurrency: .brl, rates: Self.rates)
+        if let first = vm.suggestions.first { vm.setShares(2, for: first) }
+
+        vm.registerContributions(modelContext: ctx)
+        #expect(vm.editedShares.isEmpty)
+    }
+
+    // MARK: - Helpers
+
+    private func makeSuggestion(ticker: String, shares: Int, pricePerShare: Decimal = 32) -> RebalancingSuggestion {
+        RebalancingSuggestion(
+            ticker: ticker,
+            displayName: ticker,
+            sharesToBuy: shares,
+            amount: Money(amount: Decimal(shares) * pricePerShare, currency: .brl),
+            currentPercent: 10,
+            targetPercent: 25,
+            newPercent: 18
+        )
+    }
 }
