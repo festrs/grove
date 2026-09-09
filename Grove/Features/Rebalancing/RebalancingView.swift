@@ -142,25 +142,36 @@ struct RebalancingView: View {
     }
 
     private var suggestionsCard: some View {
-        TQCard {
+        let effectiveTotal = viewModel.suggestions
+            .map { viewModel.effectiveAmount(for: $0) }
+            .sum(in: displayCurrency, using: rates)
+
+        return TQCard {
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 HStack {
                     Text("Investment Suggestion")
                         .font(.headline)
                     Spacer()
-                    Text(viewModel.totalAllocated.formatted())
+                    Text(effectiveTotal.formatted())
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
                 ForEach(viewModel.suggestions) { suggestion in
-                    RebalancingResultRow(suggestion: suggestion)
+                    RebalancingResultRow(
+                        suggestion: suggestion,
+                        shares: Binding(
+                            get: { viewModel.effectiveShares(for: suggestion) },
+                            set: { viewModel.setShares($0, for: suggestion) }
+                        ),
+                        amount: viewModel.effectiveAmount(for: suggestion)
+                    )
                     if suggestion.id != viewModel.suggestions.last?.id {
                         Divider()
                     }
                 }
 
-                let remainder = viewModel.investmentAmountDecimal - viewModel.totalAllocated.amount
+                let remainder = viewModel.investmentAmountDecimal - effectiveTotal.amount
                 if remainder > 0 {
                     HStack {
                         Text("Remainder (fractional)")
